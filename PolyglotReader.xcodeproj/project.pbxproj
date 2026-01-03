@@ -6,13 +6,33 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		6B8FDF592F009B5600C2FB33 /* AI_HIGHLIGHT_CRASH_FIXES.md in Resources */ = {isa = PBXBuildFile; fileRef = 6B8FDF582F009B5500C2FB33 /* AI_HIGHLIGHT_CRASH_FIXES.md */; };
+		6B9AC8BE2EF4446400369EF8 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 6B9AC8BD2EF4446400369EF8 /* Supabase */; };
+		6B9AC8C52EF44AA200369EF8 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = 6B9AC8C42EF44AA200369EF8 /* GoogleGenerativeAI */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		6B8FDF582F009B5500C2FB33 /* AI_HIGHLIGHT_CRASH_FIXES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AI_HIGHLIGHT_CRASH_FIXES.md; sourceTree = "<group>"; };
 		6B9AC8692EF43FBE00369EF8 /* PolyglotReader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PolyglotReader.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		6B9AC8C72EF451DB00369EF8 /* Exceptions for "PolyglotReader" folder in "PolyglotReader" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 6B9AC8682EF43FBE00369EF8 /* PolyglotReader */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		6B9AC86B2EF43FBE00369EF8 /* PolyglotReader */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6B9AC8C72EF451DB00369EF8 /* Exceptions for "PolyglotReader" folder in "PolyglotReader" target */,
+			);
 			path = PolyglotReader;
 			sourceTree = "<group>";
 		};
@@ -23,6 +43,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6B9AC8BE2EF4446400369EF8 /* Supabase in Frameworks */,
+				6B9AC8C52EF44AA200369EF8 /* GoogleGenerativeAI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -33,7 +55,9 @@
 			isa = PBXGroup;
 			children = (
 				6B9AC86B2EF43FBE00369EF8 /* PolyglotReader */,
+				6B9AC8BC2EF4446400369EF8 /* Frameworks */,
 				6B9AC86A2EF43FBE00369EF8 /* Products */,
+				6B8FDF582F009B5500C2FB33 /* AI_HIGHLIGHT_CRASH_FIXES.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -43,6 +67,13 @@
 				6B9AC8692EF43FBE00369EF8 /* PolyglotReader.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		6B9AC8BC2EF4446400369EF8 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -65,6 +96,8 @@
 			);
 			name = PolyglotReader;
 			packageProductDependencies = (
+				6B9AC8BD2EF4446400369EF8 /* Supabase */,
+				6B9AC8C42EF44AA200369EF8 /* GoogleGenerativeAI */,
 			);
 			productName = PolyglotReader;
 			productReference = 6B9AC8692EF43FBE00369EF8 /* PolyglotReader.app */;
@@ -94,6 +127,10 @@
 			);
 			mainGroup = 6B9AC8602EF43FBE00369EF8;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				6B9AC8B82EF4421300369EF8 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				6B9AC8C32EF44AA200369EF8 /* XCRemoteSwiftPackageReference "generative-ai-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6B9AC86A2EF43FBE00369EF8 /* Products */;
 			projectDirPath = "";
@@ -109,6 +146,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6B8FDF592F009B5600C2FB33 /* AI_HIGHLIGHT_CRASH_FIXES.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -251,13 +289,16 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BM9SHU2L8V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PolyglotReader/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -282,13 +323,16 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BM9SHU2L8V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PolyglotReader/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -328,6 +372,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		6B9AC8B82EF4421300369EF8 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase-community/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+		6B9AC8C32EF44AA200369EF8 /* XCRemoteSwiftPackageReference "generative-ai-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/generative-ai-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.5.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		6B9AC8BD2EF4446400369EF8 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6B9AC8B82EF4421300369EF8 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+		6B9AC8C42EF44AA200369EF8 /* GoogleGenerativeAI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6B9AC8C32EF44AA200369EF8 /* XCRemoteSwiftPackageReference "generative-ai-swift" */;
+			productName = GoogleGenerativeAI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 6B9AC8612EF43FBE00369EF8 /* Project object */;
 }

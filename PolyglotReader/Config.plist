@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>SupabaseURL</key>
+	<string>https://tftmypxwgccdgvldhaya.supabase.co</string>
+	<key>SupabaseAnonKey</key>
+	<string>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmdG15cHh3Z2NjZGd2bGRoYXlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM2NDQ2OTksImV4cCI6MjA3OTIyMDY5OX0.67Dw4hQDFbNxh5znaj8VVPmVwe5N50rSbzfZntUOz_0</string>
+	<key>GeminiAPIKey</key>
+	<string>AIzaSyCxZNSNzVq78in0FDOyizgaFDs1iWA8zn0</string>
+	<key>GeminiModelName</key>
+	<string>gemini-3-flash-preview</string>
+</dict>
+</plist>
