@@ -5,8 +5,8 @@ import SwiftUI
 struct FolderCardView: View {
     let folder: Folder
     var onTap: () -> Void
-    var onDelete: (() -> Void)? = nil
-    
+    var onDelete: (() -> Void)?
+
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 8) {
@@ -14,14 +14,14 @@ struct FolderCardView: View {
                 Image(systemName: folder.sfSymbol)
                     .font(.system(size: 36))
                     .foregroundStyle(Color(hex: folder.color) ?? .indigo)
-                
+
                 // Klasör adı
                 Text(folder.name)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .lineLimit(2)
                     .foregroundStyle(.primary)
-                
+
                 // Dosya sayısı
                 Text("\(folder.fileCount) dosya")
                     .font(.caption)
@@ -50,7 +50,7 @@ struct FolderCardView: View {
 struct CollapsibleFolderSection: View {
     @ObservedObject var viewModel: LibraryViewModel
     @AppStorage("areFoldersCollapsed") private var isCollapsed: Bool = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Başlık - tıklanabilir
@@ -65,22 +65,22 @@ struct CollapsibleFolderSection: View {
                         Circle()
                             .fill(.ultraThinMaterial)
                             .frame(width: 28, height: 28)
-                        
+
                         Image(systemName: "folder.fill")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.indigo)
                     }
-                    
+
                     Text("Klasörler")
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                    
+
                     Text("(\(viewModel.folders.count))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    
+
                     Spacer()
-                    
+
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
@@ -91,7 +91,7 @@ struct CollapsibleFolderSection: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            
+
             // Klasör grid - animasyonlu açılış/kapanış
             if !isCollapsed {
                 LazyVGrid(columns: [
@@ -132,12 +132,12 @@ struct CollapsibleFolderSection: View {
 struct LiquidGlassFolderCard: View {
     let folder: Folder
     var onTap: () -> Void
-    var onDelete: (() -> Void)? = nil
-    
+    var onDelete: (() -> Void)?
+
     private var folderColor: Color {
         Color(hex: folder.color) ?? .indigo
     }
-    
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 10) {
@@ -177,14 +177,14 @@ struct LiquidGlassFolderCard: View {
                                 )
                         }
                         .frame(width: 38, height: 38)
-                    
+
                     // Klasör ikonu
                     Image(systemName: folder.sfSymbol)
                         .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(folderColor)
                         .shadow(color: folderColor.opacity(0.3), radius: 2, x: 0, y: 1)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 2) {
                     // Klasör adı
                     Text(folder.name)
@@ -192,15 +192,15 @@ struct LiquidGlassFolderCard: View {
                         .fontWeight(.medium)
                         .lineLimit(1)
                         .foregroundStyle(.primary)
-                    
+
                     // Dosya sayısı
                     Text("\(folder.fileCount) dosya")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                
+
                 Spacer(minLength: 0)
-                
+
                 // Chevron
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
@@ -213,7 +213,7 @@ struct LiquidGlassFolderCard: View {
                     // Ana blur arka plan
                     RoundedRectangle(cornerRadius: 12)
                         .fill(.ultraThinMaterial)
-                    
+
                     // Renkli glow
                     RoundedRectangle(cornerRadius: 12)
                         .fill(
@@ -227,7 +227,7 @@ struct LiquidGlassFolderCard: View {
                                 endRadius: 80
                             )
                         )
-                    
+
                     // Üst parlama
                     RoundedRectangle(cornerRadius: 12)
                         .fill(
@@ -237,7 +237,7 @@ struct LiquidGlassFolderCard: View {
                                 endPoint: .center
                             )
                         )
-                    
+
                     // Kenar
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(
@@ -281,8 +281,8 @@ struct LiquidGlassFolderButtonStyle: ButtonStyle {
 struct CompactFolderCardView: View {
     let folder: Folder
     var onTap: () -> Void
-    var onDelete: (() -> Void)? = nil
-    
+    var onDelete: (() -> Void)?
+
     var body: some View {
         LiquidGlassFolderCard(folder: folder, onTap: onTap, onDelete: onDelete)
     }
@@ -292,7 +292,7 @@ struct CompactFolderCardView: View {
 /// Klasörleri grid olarak gösteren bölüm
 struct FolderSectionView: View {
     @ObservedObject var viewModel: LibraryViewModel
-    
+
     var body: some View {
         CollapsibleFolderSection(viewModel: viewModel)
     }
@@ -302,7 +302,7 @@ struct FolderSectionView: View {
 /// Klasör hiyerarşisi navigasyonu
 struct BreadcrumbView: View {
     @ObservedObject var viewModel: LibraryViewModel
-    
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 4) {
@@ -316,13 +316,13 @@ struct BreadcrumbView: View {
                     }
                     .foregroundStyle(viewModel.currentFolder == nil ? Color.primary : Color.indigo)
                 }
-                
+
                 // Klasör yolu
                 ForEach(viewModel.folderPath) { folder in
                     Image(systemName: "chevron.right")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    
+
                     Button(folder.name) {
                         // Bu klasöre kadar git
                         while let last = viewModel.folderPath.last, last.id != folder.id {
@@ -344,10 +344,10 @@ struct BreadcrumbView: View {
 struct CreateFolderSheet: View {
     @ObservedObject var viewModel: LibraryViewModel
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var folderName = ""
     @State private var selectedColor = "#6366F1"
-    
+
     private let colors = [
         "#6366F1", // indigo
         "#3B82F6", // blue
@@ -358,14 +358,14 @@ struct CreateFolderSheet: View {
         "#8B5CF6", // violet
         "#14B8A6"  // teal
     ]
-    
+
     var body: some View {
         NavigationStack {
             Form {
                 Section("Klasör Adı") {
                     TextField("Klasör adı girin", text: $folderName)
                 }
-                
+
                 Section("Renk") {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 12) {
                         ForEach(colors, id: \.self) { color in
@@ -386,14 +386,14 @@ struct CreateFolderSheet: View {
                     }
                     .padding(.vertical, 8)
                 }
-                
+
                 // Önizleme
                 Section("Önizleme") {
                     HStack {
                         Image(systemName: "folder.fill")
                             .font(.system(size: 32))
                             .foregroundStyle(Color(hex: selectedColor) ?? .indigo)
-                        
+
                         Text(folderName.isEmpty ? "Klasör Adı" : folderName)
                             .foregroundStyle(folderName.isEmpty ? .secondary : .primary)
                     }
@@ -407,7 +407,7 @@ struct CreateFolderSheet: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Oluştur") {
                         Task {
@@ -426,7 +426,7 @@ struct CreateFolderSheet: View {
     FolderCardView(
         folder: Folder(name: "Akademik Makaleler", color: "#6366F1", userId: "test", fileCount: 5)
     ) {
-        print("Tapped")
+        logDebug("FolderViews", "Preview tapped")
     }
     .padding()
 }

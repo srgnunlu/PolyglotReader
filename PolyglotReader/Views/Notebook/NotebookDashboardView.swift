@@ -17,9 +17,8 @@ struct NotebookDashboardView: View {
                 if !viewModel.recentFavorites.isEmpty {
                     RecentFavoritesSection(
                         favorites: viewModel.recentFavorites,
-                        onSelectAnnotation: onSelectAnnotation,
-                        onSeeAll: { onSelectCategory(.favorites) }
-                    )
+                        onSelectAnnotation: onSelectAnnotation
+                    ) { onSelectCategory(.favorites) }
                 }
 
                 // MARK: - Kategoriler
@@ -209,9 +208,8 @@ private struct CategoriesSection: View {
                 ForEach(mainCategories) { category in
                     CategoryCard(
                         category: category,
-                        count: viewModel.countForCategory(category),
-                        onTap: { onSelectCategory(category) }
-                    )
+                        count: viewModel.countForCategory(category)
+                    ) { onSelectCategory(category) }
                 }
             }
 
@@ -221,9 +219,8 @@ private struct CategoriesSection: View {
                     ForEach(colorCategories) { category in
                         ColorCategoryChip(
                             category: category,
-                            count: viewModel.countForCategory(category),
-                            onTap: { onSelectCategory(category) }
-                        )
+                            count: viewModel.countForCategory(category)
+                        ) { onSelectCategory(category) }
                     }
                 }
             }
@@ -339,7 +336,13 @@ private struct FilesSection: View {
                     } label: {
                         HStack {
                             Spacer()
-                            Text("+ \(files.count - 5) dosya daha")
+                            Text(String(
+                                format: NSLocalizedString(
+                                    "notebook.more_files",
+                                    comment: "More files button"
+                                ),
+                                files.count - 5
+                            ))
                                 .font(.caption)
                                 .foregroundStyle(.indigo)
                             Image(systemName: "chevron.right")

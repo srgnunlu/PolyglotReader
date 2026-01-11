@@ -5,12 +5,12 @@ struct PDFCardView: View {
     let file: PDFDocumentMetadata
     let onTap: () -> Void
     let onDelete: () -> Void
-    var onMoveToFolder: ((Folder?) -> Void)? = nil
+    var onMoveToFolder: ((Folder?) -> Void)?
     var availableFolders: [Folder] = []
-    
+
     @State private var showDeleteConfirmation = false
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 0) {
@@ -18,7 +18,7 @@ struct PDFCardView: View {
                 thumbnailView
                     .frame(height: 130)
                     .clipped()
-                
+
                 // Info Area
                 infoArea
             }
@@ -41,7 +41,7 @@ struct PDFCardView: View {
                     } label: {
                         Label("Ana Klasör", systemImage: "house")
                     }
-                    
+
                     ForEach(availableFolders) { folder in
                         Button {
                             onMoveToFolder(folder)
@@ -52,22 +52,26 @@ struct PDFCardView: View {
                 } label: {
                     Label("Klasöre Taşı", systemImage: "folder")
                 }
-                
+
                 Divider()
             }
-            
+
             Button(role: .destructive) {
                 showDeleteConfirmation = true
             } label: {
                 Label("Sil", systemImage: "trash")
             }
         }
-        .confirmationDialog("Bu dosyayı silmek istediğinizden emin misiniz?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+        .confirmationDialog(
+            "Bu dosyayı silmek istediğinizden emin misiniz?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
             Button("Sil", role: .destructive, action: onDelete)
             Button("İptal", role: .cancel) {}
         }
     }
-    
+
     // MARK: - Thumbnail View
     private var thumbnailView: some View {
         ZStack(alignment: .top) {
@@ -93,7 +97,7 @@ struct PDFCardView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                
+
                 // PDF Icon
                 VStack(spacing: 8) {
                     Image(systemName: "doc.text.fill")
@@ -105,14 +109,14 @@ struct PDFCardView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                    
+
                     Text("PDF")
                         .font(.caption2)
                         .fontWeight(.semibold)
                         .foregroundStyle(.indigo.opacity(0.5))
                 }
             }
-            
+
             // Üst gradient overlay (okunabilirlik için)
             VStack {
                 LinearGradient(
@@ -121,14 +125,14 @@ struct PDFCardView: View {
                     endPoint: .bottom
                 )
                 .frame(height: 30)
-                
+
                 Spacer()
             }
-            
+
             // Alt gradient overlay
             VStack {
                 Spacer()
-                
+
                 LinearGradient(
                     colors: [.clear, .black.opacity(0.2)],
                     startPoint: .top,
@@ -138,7 +142,7 @@ struct PDFCardView: View {
             }
         }
     }
-    
+
     // MARK: - Info Area
     private var infoArea: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -147,20 +151,20 @@ struct PDFCardView: View {
                 .fontWeight(.semibold)
                 .lineLimit(2)
                 .foregroundStyle(.primary)
-            
+
             HStack(spacing: 4) {
                 Image(systemName: "clock")
                     .font(.caption2)
                 Text(file.formattedDate)
-                
+
                 Spacer()
-                
+
                 Text(file.formattedSize)
                     .fontWeight(.medium)
             }
             .font(.caption)
             .foregroundStyle(.secondary)
-            
+
             // Etiketler
             if !file.tags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -179,7 +183,7 @@ struct PDFCardView: View {
                             .foregroundStyle(Color(hex: tag.color) ?? .green)
                             .clipShape(Capsule())
                         }
-                        
+
                         if file.tags.count > 3 {
                             Text("+\(file.tags.count - 3)")
                                 .font(.caption2)
@@ -208,15 +212,15 @@ struct PDFListRowView: View {
     let file: PDFDocumentMetadata
     let onTap: () -> Void
     let onDelete: () -> Void
-    
+
     @State private var showDeleteConfirmation = false
-    
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 14) {
                 // Thumbnail
                 listThumbnail
-                
+
                 // Info
                 VStack(alignment: .leading, spacing: 4) {
                     Text(file.name)
@@ -224,23 +228,23 @@ struct PDFListRowView: View {
                         .fontWeight(.medium)
                         .lineLimit(1)
                         .foregroundStyle(.primary)
-                    
+
                     HStack(spacing: 6) {
                         Text(file.formattedSize)
                             .fontWeight(.medium)
-                        
+
                         Circle()
                             .fill(.secondary)
                             .frame(width: 3, height: 3)
-                        
+
                         Text(file.formattedDate)
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .fontWeight(.semibold)
@@ -264,12 +268,16 @@ struct PDFListRowView: View {
                 Label("Sil", systemImage: "trash")
             }
         }
-        .confirmationDialog("Bu dosyayı silmek istediğinizden emin misiniz?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+        .confirmationDialog(
+            "Bu dosyayı silmek istediğinizden emin misiniz?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
             Button("Sil", role: .destructive, action: onDelete)
             Button("İptal", role: .cancel) {}
         }
     }
-    
+
     // MARK: - List Thumbnail
     private var listThumbnail: some View {
         ZStack(alignment: .top) {
@@ -288,7 +296,7 @@ struct PDFListRowView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                
+
                 Image(systemName: "doc.text.fill")
                     .font(.system(size: 18))
                     .foregroundStyle(.indigo.opacity(0.6))
@@ -312,7 +320,7 @@ struct PDFListRowView: View {
             endPoint: .bottomTrailing
         )
         .ignoresSafeArea()
-        
+
         VStack(spacing: 24) {
             // Grid Card
             HStack(spacing: 16) {
@@ -328,7 +336,7 @@ struct PDFListRowView: View {
                     onDelete: {}
                 )
                 .frame(width: 170)
-                
+
                 PDFCardView(
                     file: PDFDocumentMetadata(
                         id: "2",
@@ -342,7 +350,7 @@ struct PDFListRowView: View {
                 )
                 .frame(width: 170)
             }
-            
+
             // List Row
             PDFListRowView(
                 file: PDFDocumentMetadata(

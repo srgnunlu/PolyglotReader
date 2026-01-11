@@ -5,12 +5,12 @@ struct DebugLogsView: View {
     @State private var selectedLevel: LogLevel?
     @State private var searchText = ""
     @State private var showShareSheet = false
-    
+
     var filteredLogs: [LogEntry] {
         loggingService.filteredLogs(level: selectedLevel, source: searchText)
             .reversed() // En yeni loglar üstte
     }
-    
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -22,7 +22,7 @@ struct DebugLogsView: View {
                 }
                 .padding()
                 .background(Color(.secondarySystemBackground))
-                
+
                 // Filters
                 VStack(spacing: 12) {
                     // Search
@@ -35,14 +35,14 @@ struct DebugLogsView: View {
                     .padding(10)
                     .background(Color(.tertiarySystemBackground))
                     .cornerRadius(10)
-                    
+
                     // Level Filter
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             FilterChip(label: "Tümü", isSelected: selectedLevel == nil) {
                                 selectedLevel = nil
                             }
-                            
+
                             ForEach(LogLevel.allCases, id: \.self) { level in
                                 FilterChip(
                                     label: "\(level.emoji) \(level.rawValue)",
@@ -56,9 +56,9 @@ struct DebugLogsView: View {
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
-                
+
                 Divider()
-                
+
                 // Log List
                 if filteredLogs.isEmpty {
                     Spacer()
@@ -92,7 +92,7 @@ struct DebugLogsView: View {
                         } label: {
                             Label("Logları Paylaş", systemImage: "square.and.arrow.up")
                         }
-                        
+
                         Button(role: .destructive) {
                             loggingService.clearLogs()
                         } label: {
@@ -118,26 +118,27 @@ struct DebugLogsView: View {
 struct LogEntryRow: View {
     let entry: LogEntry
     @State private var isExpanded = false
-    
+
     var backgroundColor: Color {
         switch entry.level {
         case .error: return .red.opacity(0.1)
+        case .critical: return .red.opacity(0.2)
         case .warning: return .orange.opacity(0.1)
         default: return Color(.tertiarySystemBackground)
         }
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(entry.level.emoji)
                     .font(.caption)
-                
+
                 Text(entry.formattedTimestamp)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
-                
+
                 Text(entry.source)
                     .font(.caption)
                     .fontWeight(.medium)
@@ -146,20 +147,20 @@ struct LogEntryRow: View {
                     .padding(.vertical, 2)
                     .background(Color.indigo.opacity(0.1))
                     .cornerRadius(4)
-                
+
                 Spacer()
-                
+
                 if entry.details != nil {
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
-            
+
             Text(entry.message)
                 .font(.subheadline)
                 .lineLimit(isExpanded ? nil : 2)
-            
+
             if isExpanded, let details = entry.details {
                 Text(details)
                     .font(.caption)
@@ -189,7 +190,7 @@ struct StatBadge: View {
     let count: Int
     let label: String
     let color: Color
-    
+
     var body: some View {
         VStack(spacing: 2) {
             Text("\(count)")
@@ -208,7 +209,7 @@ struct FilterChip: View {
     let label: String
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             Text(label)
@@ -226,11 +227,11 @@ struct FilterChip: View {
 // MARK: - Share Sheet
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
-    
+
     func makeUIViewController(context: Context) -> UIActivityViewController {
         UIActivityViewController(activityItems: items, applicationActivities: nil)
     }
-    
+
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 

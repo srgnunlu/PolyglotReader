@@ -33,9 +33,8 @@ struct NotebookCategoryView: View {
                 subtitle: subtitle,
                 category: category,
                 sortOption: viewModel.sortOption,
-                onDismiss: onDismiss,
-                onShowSort: { showingSortOptions = true }
-            )
+                onDismiss: onDismiss
+            ) { showingSortOptions = true }
 
             // Arama
             SearchBar(searchQuery: $viewModel.searchQuery)

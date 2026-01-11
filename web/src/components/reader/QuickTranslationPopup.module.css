@@ -1,0 +1,126 @@
+.popup {
+    position: absolute;
+    z-index: 120;
+    padding: var(--qt-padding-y, 10px) var(--qt-padding-x, 14px);
+    padding-top: calc(var(--qt-padding-y, 10px) + 12px);
+    /* Space for drag handle */
+    width: var(--qt-width, min(680px, 80vw));
+    max-width: var(--qt-max-width, 720px);
+    min-width: var(--qt-min-width, 240px);
+    max-height: var(--qt-max-height, 40vh);
+    overflow: hidden;
+    /* Changed to hidden to handle header/content scrolling */
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 16px;
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(14px) saturate(1.1);
+    color: var(--text-primary);
+    /* transform: translateX(-50%); Removed to handle custom positioning */
+    animation: quickPopupIn 0.18s ease;
+    user-select: text;
+    display: flex;
+    flex-direction: column;
+}
+
+.dragHandle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    z-index: 10;
+}
+
+.dragHandle:active {
+    cursor: grabbing;
+}
+
+.dragIndicator {
+    width: 32px;
+    height: 4px;
+    background: var(--text-tertiary);
+    border-radius: 2px;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.dragHandle:hover .dragIndicator {
+    opacity: 0.8;
+}
+
+.content {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.text {
+    font-size: var(--qt-font-size, 0.95rem);
+    line-height: var(--qt-line-height, 1.5);
+    white-space: pre-wrap;
+    word-break: break-word;
+    text-align: left;
+}
+
+.loading {
+    font-size: var(--qt-font-size, 0.9rem);
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--color-primary-500);
+    animation: pulse 0.8s ease-in-out infinite;
+}
+
+.dot:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.dot:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.4;
+    }
+
+    50% {
+        transform: scale(1.4);
+        opacity: 0.9;
+    }
+}
+
+@keyframes quickPopupIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+        /* Removed translateX since we handle it manually */
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .popup {
+        background: rgba(28, 25, 23, 0.78);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+}

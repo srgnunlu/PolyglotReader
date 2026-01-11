@@ -90,17 +90,17 @@ struct TextSelectionPopup: View {
         
         // X pozisyonu: seçimin ortasında, ekran sınırları içinde
         var x = selectionRect.midX
-        x = max(popupWidth/2 + 8, min(screenWidth - popupWidth/2 - 8, x))
+        x = max(popupWidth / 2 + 8, min(screenWidth - popupWidth / 2 - 8, x))
         
         // Y pozisyonu: seçimin altında, sığmazsa üstünde
-        let belowSelectionY = selectionRect.maxY + verticalOffset + baseHeight/2
-        let aboveSelectionY = selectionRect.minY - verticalOffset - baseHeight/2
+        let belowSelectionY = selectionRect.maxY + verticalOffset + baseHeight / 2
+        let aboveSelectionY = selectionRect.minY - verticalOffset - baseHeight / 2
         
         var y: CGFloat
         
-        if belowSelectionY + baseHeight/2 < screenHeight - safeAreaBottom - 100 {
+        if belowSelectionY + baseHeight / 2 < screenHeight - safeAreaBottom - 100 {
             y = belowSelectionY
-        } else if aboveSelectionY - baseHeight/2 > safeAreaTop + 100 {
+        } else if aboveSelectionY - baseHeight / 2 > safeAreaTop + 100 {
             y = aboveSelectionY
         } else {
             y = screenHeight / 2
@@ -137,7 +137,9 @@ struct TextSelectionPopup: View {
             if showTranslation {
                 translationArea
                     .transition(.asymmetric(
-                        insertion: .move(edge: .top).combined(with: .opacity).combined(with: .scale(scale: 0.95, anchor: .top)),
+                        insertion: .move(edge: .top)
+                            .combined(with: .opacity)
+                            .combined(with: .scale(scale: 0.95, anchor: .top)),
                         removal: .move(edge: .top).combined(with: .opacity)
                     ))
             }
@@ -298,7 +300,6 @@ struct TextSelectionPopup: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .padding(.horizontal, 14)
-                
             } else if let translated = translatedText {
                 ScrollView(.vertical, showsIndicators: true) {
                     Text(translated)
@@ -314,7 +315,6 @@ struct TextSelectionPopup: View {
                 .scrollIndicators(.visible)
                 .scrollBounceBehavior(.basedOnSize)
                 .frame(maxHeight: 100) // Max 4-5 satır, içerik daha azsa küçülür
-                
             } else {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -422,128 +422,6 @@ struct TextSelectionPopup: View {
            let rootVC = windowScene.windows.first?.rootViewController {
             rootVC.present(activityVC, animated: true)
         }
-    }
-}
-
-// MARK: - Compact Action Button
-
-struct CompactActionButton: View {
-    let icon: String
-    var isActive: Bool = false
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(isActive ? .indigo : .primary)
-                .frame(width: 36, height: 36)
-                .background {
-                    if isActive {
-                        Circle()
-                            .fill(Color.indigo.opacity(0.15))
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.indigo.opacity(0.3), lineWidth: 1)
-                            )
-                    } else {
-                        Circle()
-                            .fill(Color(.tertiarySystemBackground).opacity(0.6))
-                    }
-                }
-        }
-        .animation(.easeInOut(duration: 0.2), value: isActive)
-    }
-}
-
-struct CompactActionLabel: View {
-    let icon: String
-    
-    var body: some View {
-        Image(systemName: icon)
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(.primary)
-            .frame(width: 36, height: 36)
-            .background(Color(.tertiarySystemBackground).opacity(0.6))
-            .clipShape(Circle())
-    }
-}
-
-// MARK: - Add Note Sheet
-struct AddNoteSheet: View {
-    let selectedText: String
-    @Binding var noteText: String
-    let onSave: (String) -> Void
-    let onCancel: () -> Void
-    
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Seçilen Metin")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    Text(selectedText)
-                        .font(.subheadline)
-                        .lineLimit(3)
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(.tertiarySystemBackground))
-                        .cornerRadius(12)
-                }
-                .padding(.horizontal)
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Notunuz")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    TextEditor(text: $noteText)
-                        .frame(minHeight: 120)
-                        .padding(8)
-                        .background(Color(.tertiarySystemBackground))
-                        .cornerRadius(12)
-                }
-                .padding(.horizontal)
-                
-                Spacer()
-            }
-            .padding(.top)
-            .navigationTitle("Not Ekle")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("İptal", action: onCancel)
-                }
-                
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Kaydet") {
-                        onSave(noteText)
-                    }
-                    .disabled(noteText.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .fontWeight(.semibold)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Color Extension
-extension Color {
-    init?(hex: String) {
-        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
-        
-        var rgb: UInt64 = 0
-        
-        guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else { return nil }
-        
-        let r = Double((rgb & 0xFF0000) >> 16) / 255.0
-        let g = Double((rgb & 0x00FF00) >> 8) / 255.0
-        let b = Double(rgb & 0x0000FF) / 255.0
-        
-        self.init(red: r, green: g, blue: b)
     }
 }
 

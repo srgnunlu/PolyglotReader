@@ -3,7 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var settingsViewModel: SettingsViewModel
-    
+
     var body: some View {
         NavigationStack {
             List {
@@ -21,17 +21,17 @@ struct SettingsView: View {
                                         )
                                     )
                                     .frame(width: 60, height: 60)
-                                
+
                                 Text(String(user.name.prefix(1)).uppercased())
                                     .font(.title2)
                                     .fontWeight(.bold)
                                     .foregroundStyle(.white)
                             }
-                            
+
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(user.name)
                                     .font(.headline)
-                                
+
                                 Text(user.email)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -40,15 +40,15 @@ struct SettingsView: View {
                         .padding(.vertical, 8)
                     }
                 }
-                
+
                 // Appearance Section
                 Section("Görünüm") {
                     // Theme Picker
                     HStack {
                         Label("Tema", systemImage: "paintbrush")
-                        
+
                         Spacer()
-                        
+
                         Picker("", selection: $settingsViewModel.preferences.theme) {
                             ForEach(UserPreferences.ThemeMode.allCases, id: \.self) { theme in
                                 Text(theme.displayName).tag(theme)
@@ -57,7 +57,7 @@ struct SettingsView: View {
                         .pickerStyle(.menu)
                     }
                 }
-                
+
                 // Features Section
                 Section("Özellikler") {
                     Toggle(isOn: $settingsViewModel.preferences.autoSummary) {
@@ -91,7 +91,7 @@ struct SettingsView: View {
                         Text("1.0.0")
                             .foregroundStyle(.secondary)
                     }
-                    
+
                     NavigationLink {
                         DebugLogsView()
                     } label: {
@@ -99,7 +99,7 @@ struct SettingsView: View {
                             Label("Debug Logları", systemImage: "ladybug")
                             Spacer()
                             if LoggingService.shared.errorCount > 0 {
-                                Text("\(LoggingService.shared.errorCount)")
+                                Text(String(LoggingService.shared.errorCount))
                                     .font(.caption2)
                                     .fontWeight(.medium)
                                     .foregroundStyle(.white)
@@ -110,16 +110,20 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    
-                    Link(destination: URL(string: "https://polyglotreader.app/privacy")!) {
-                        Label("Gizlilik Politikası", systemImage: "hand.raised")
+
+                    if let privacyURL = URL(string: "https://polyglotreader.app/privacy") {
+                        Link(destination: privacyURL) {
+                            Label("Gizlilik Politikası", systemImage: "hand.raised")
+                        }
                     }
-                    
-                    Link(destination: URL(string: "https://polyglotreader.app/terms")!) {
-                        Label("Kullanım Koşulları", systemImage: "doc.text")
+
+                    if let termsURL = URL(string: "https://polyglotreader.app/terms") {
+                        Link(destination: termsURL) {
+                            Label("Kullanım Koşulları", systemImage: "doc.text")
+                        }
                     }
                 }
-                
+
                 // Logout Section
                 Section {
                     Button(role: .destructive) {

@@ -3,28 +3,27 @@ import SwiftUI
 struct QuizView: View {
     @StateObject private var viewModel: QuizViewModel
     @Environment(\.dismiss) private var dismiss
-    
+
     init(textContext: String) {
         _viewModel = StateObject(wrappedValue: QuizViewModel(textContext: textContext))
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
-                
+
                 if viewModel.isLoading {
                     LoadingQuizView()
                 } else if viewModel.questions.isEmpty {
-                    ErrorQuizView(onClose: { dismiss() })
+                    ErrorQuizView { dismiss() }
                 } else if viewModel.showResult {
                     QuizResultView(
                         score: viewModel.score,
                         total: viewModel.questions.count,
-                        percentage: viewModel.scorePercentage,
-                        onClose: { dismiss() }
-                    )
+                        percentage: viewModel.scorePercentage
+                    ) { dismiss() }
                 } else if let question = viewModel.currentQuestion {
                     QuestionView(
                         viewModel: viewModel,
@@ -54,26 +53,29 @@ struct QuizView: View {
 // MARK: - Loading View
 struct LoadingQuizView: View {
     @State private var isAnimating = false
-    
+
     var body: some View {
         VStack(spacing: 24) {
             ZStack {
                 Circle()
                     .fill(Color.indigo.opacity(0.1))
                     .frame(width: 100, height: 100)
-                
+
                 Image(systemName: "brain")
                     .font(.system(size: 40))
                     .foregroundStyle(.indigo)
                     .scaleEffect(isAnimating ? 1.1 : 1.0)
                     .animation(.easeInOut(duration: 1).repeatForever(), value: isAnimating)
             }
-            
+
             VStack(spacing: 8) {
                 Text("Quiz Oluşturuluyor...")
                     .font(.headline)
-                
-                Text("Doküman analiz ediliyor ve sorular hazırlanıyor")
+
+                Text(NSLocalizedString(
+                    "quiz.preparing_questions",
+                    comment: "Preparing quiz questions"
+                ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -87,16 +89,16 @@ struct LoadingQuizView: View {
 // MARK: - Error View
 struct ErrorQuizView: View {
     let onClose: () -> Void
-    
+
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 50))
                 .foregroundStyle(.red)
-            
+
             Text("Quiz oluşturulamadı")
                 .font(.headline)
-            
+
             Button("Kapat", action: onClose)
                 .buttonStyle(.bordered)
         }
@@ -107,30 +109,37 @@ struct ErrorQuizView: View {
 struct QuestionView: View {
     @ObservedObject var viewModel: QuizViewModel
     let question: QuizQuestion
-    
+
     var body: some View {
         VStack(spacing: 24) {
             // Progress
             HStack {
-                Text("Soru \(viewModel.currentQuestionIndex + 1) / \(viewModel.questions.count)")
+                Text(String(
+                    format: NSLocalizedString(
+                        "quiz.question_progress",
+                        comment: "Question progress format"
+                    ),
+                    viewModel.currentQuestionIndex + 1,
+                    viewModel.questions.count
+                ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                
+
                 Spacer()
-                
+
                 Text("Puan: \(viewModel.score)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal)
-            
+
             // Question
             Text(question.question)
                 .font(.title3)
                 .fontWeight(.semibold)
                 .multilineTextAlignment(.center)
                 .padding()
-            
+
             // Options
             VStack(spacing: 12) {
                 ForEach(Array(question.options.enumerated()), id: \.offset) { index, option in
@@ -139,20 +148,19 @@ struct QuestionView: View {
                         index: index,
                         isSelected: viewModel.selectedAnswer == index,
                         isCorrect: index == question.correctAnswerIndex,
-                        isAnswered: viewModel.isAnswered,
-                        action: { viewModel.selectAnswer(index) }
-                    )
+                        isAnswered: viewModel.isAnswered
+                    ) { viewModel.selectAnswer(index) }
                 }
             }
             .padding(.horizontal)
-            
+
             // Explanation
             if viewModel.isAnswered, let explanation = question.explanation {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Açıklama", systemImage: "lightbulb.fill")
                         .font(.caption)
                         .foregroundStyle(.indigo)
-                    
+
                     Text(explanation)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -163,9 +171,9 @@ struct QuestionView: View {
                 .cornerRadius(12)
                 .padding(.horizontal)
             }
-            
+
             Spacer()
-            
+
             // Next Button
             if viewModel.isAnswered {
                 Button {
@@ -197,12 +205,12 @@ struct OptionButton: View {
     let isCorrect: Bool
     let isAnswered: Bool
     let action: () -> Void
-    
+
     var backgroundColor: Color {
         guard isAnswered else {
             return isSelected ? Color.indigo.opacity(0.1) : Color(.secondarySystemBackground)
         }
-        
+
         if isCorrect {
             return Color.green.opacity(0.15)
         } else if isSelected {
@@ -211,12 +219,12 @@ struct OptionButton: View {
             return Color(.secondarySystemBackground).opacity(0.5)
         }
     }
-    
+
     var borderColor: Color {
         guard isAnswered else {
             return isSelected ? Color.indigo : Color.clear
         }
-        
+
         if isCorrect {
             return Color.green
         } else if isSelected {
@@ -225,16 +233,16 @@ struct OptionButton: View {
             return Color.clear
         }
     }
-    
+
     var body: some View {
         Button(action: action) {
             HStack {
                 Text(text)
                     .font(.subheadline)
                     .multilineTextAlignment(.leading)
-                
+
                 Spacer()
-                
+
                 if isAnswered {
                     if isCorrect {
                         Image(systemName: "checkmark.circle.fill")
@@ -265,36 +273,43 @@ struct QuizResultView: View {
     let total: Int
     let percentage: Int
     let onClose: () -> Void
-    
+
     var body: some View {
         VStack(spacing: 32) {
             ZStack {
                 Circle()
                     .stroke(Color.gray.opacity(0.2), lineWidth: 12)
                     .frame(width: 150, height: 150)
-                
+
                 Circle()
                     .trim(from: 0, to: CGFloat(percentage) / 100)
                     .stroke(Color.indigo, style: StrokeStyle(lineWidth: 12, lineCap: .round))
                     .frame(width: 150, height: 150)
                     .rotationEffect(.degrees(-90))
-                
+
                 Text("%\(percentage)")
                     .font(.system(size: 40, weight: .bold))
                     .foregroundStyle(.indigo)
             }
-            
+
             VStack(spacing: 8) {
                 Text("Quiz Tamamlandı!")
                     .font(.title2)
                     .fontWeight(.bold)
-                
-                Text("\(total) sorudan \(score) tanesini doğru cevapladınız.")
+
+                Text(String(
+                    format: NSLocalizedString(
+                        "quiz.score_summary",
+                        comment: "Quiz score summary"
+                    ),
+                    total,
+                    score
+                ))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
-            
+
             Button(action: onClose) {
                 Text("Kapat")
                     .font(.headline)

@@ -13,7 +13,20 @@ struct PDFImageMetadata: Identifiable, Codable {
     var caption: String?
     var analyzedAt: Date?
     let createdAt: Date
-    
+
+    // CodingKeys for snake_case <-> camelCase conversion
+    enum CodingKeys: String, CodingKey {
+        case id
+        case fileId = "file_id"
+        case pageNumber = "page_number"
+        case imageIndex = "image_index"
+        case bounds
+        case thumbnailBase64 = "thumbnail_base64"
+        case caption
+        case analyzedAt = "analyzed_at"
+        case createdAt = "created_at"
+    }
+
     init(
         id: UUID = UUID(),
         fileId: UUID,
@@ -35,12 +48,12 @@ struct PDFImageMetadata: Identifiable, Codable {
         self.analyzedAt = analyzedAt
         self.createdAt = createdAt
     }
-    
+
     /// Görsel analiz edilmiş mi?
     var isAnalyzed: Bool {
         analyzedAt != nil && caption != nil
     }
-    
+
     /// Thumbnail'ı UIImage olarak döndür
     var thumbnailImage: UIImage? {
         guard let base64 = thumbnailBase64,
@@ -56,18 +69,18 @@ struct ImageBounds: Codable, Equatable {
     let y: CGFloat
     let width: CGFloat
     let height: CGFloat
-    
+
     var cgRect: CGRect {
         CGRect(x: x, y: y, width: width, height: height)
     }
-    
+
     init(rect: CGRect) {
         self.x = rect.origin.x
         self.y = rect.origin.y
         self.width = rect.width
         self.height = rect.height
     }
-    
+
     init(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) {
         self.x = x
         self.y = y
@@ -81,7 +94,7 @@ struct ImageBounds: Codable, Equatable {
 struct PageImagesInfo {
     let pageNumber: Int
     let images: [PDFImageMetadata]
-    
+
     var imageCount: Int { images.count }
     var hasImages: Bool { !images.isEmpty }
     var hasUnanalyzedImages: Bool { images.contains { !$0.isAnalyzed } }
@@ -103,7 +116,7 @@ struct ImageAnalysisResult {
     let caption: String
     let captionEmbedding: [Float]?
     let analyzedAt: Date
-    
+
     init(imageId: UUID, caption: String, captionEmbedding: [Float]? = nil) {
         self.imageId = imageId
         self.caption = caption
@@ -125,10 +138,10 @@ extension PDFImageMetadata {
         let caption: String?
         let analyzed_at: String?
         let created_at: String
-        
+
         func toModel() -> PDFImageMetadata {
             let dateFormatter = ISO8601DateFormatter()
-            
+
             return PDFImageMetadata(
                 id: id,
                 fileId: file_id,
@@ -142,7 +155,7 @@ extension PDFImageMetadata {
             )
         }
     }
-    
+
     /// Supabase'e kaydetmek için
     struct InsertPayload: Encodable {
         let file_id: UUID
@@ -151,7 +164,7 @@ extension PDFImageMetadata {
         let bounds: ImageBounds?
         let thumbnail_base64: String?
     }
-    
+
     /// Caption güncelleme için
     struct CaptionUpdatePayload: Encodable {
         let caption: String
@@ -159,7 +172,3 @@ extension PDFImageMetadata {
         let analyzed_at: String
     }
 }
-
-
-
-

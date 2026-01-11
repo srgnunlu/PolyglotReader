@@ -1,0 +1,54 @@
+.toolbar {
+    display: flex;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    align-items: center;
+}
+
+.section {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.toolBtn, .colorBtn {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    background: var(--background);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 1.1rem;
+}
+
+.toolBtn:hover, .colorBtn:hover {
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.toolBtn.active, .colorBtn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.colorBtn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-width: 2px;
+}
+
+.colorBtn.active {
+    border-color: var(--text);
+    box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary);
+}

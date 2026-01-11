@@ -52,21 +52,6 @@ enum NotebookSortOption: String, CaseIterable {
     case pageNumber = "Sayfa No"
 }
 
-// MARK: - Annotation Stats
-struct AnnotationStats {
-    var total: Int = 0
-    var highlights: Int = 0
-    var notes: Int = 0
-    var aiNotes: Int = 0
-    var favorites: Int = 0
-    var colorCounts: [String: Int] = [:]
-
-    var yellowCount: Int { colorCounts["#fef08a"] ?? 0 }
-    var greenCount: Int { colorCounts["#bbf7d0"] ?? 0 }
-    var blueCount: Int { colorCounts["#bae6fd"] ?? 0 }
-    var pinkCount: Int { colorCounts["#fbcfe8"] ?? 0 }
-}
-
 // MARK: - File Annotation Info
 struct FileAnnotationInfo: Identifiable {
     let id: String
@@ -102,11 +87,9 @@ class NotebookViewModel: ObservableObject {
         var seen = Set<String>()
         var result: [(id: String, name: String)] = []
 
-        for ann in annotations {
-            if !seen.contains(ann.fileId) {
-                seen.insert(ann.fileId)
-                result.append((id: ann.fileId, name: ann.fileName))
-            }
+        for ann in annotations where !seen.contains(ann.fileId) {
+            seen.insert(ann.fileId)
+            result.append((id: ann.fileId, name: ann.fileName))
         }
 
         return result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -132,7 +115,7 @@ class NotebookViewModel: ObservableObject {
                 case .favorites:
                     return ann.isFavorite
                 case .notes:
-                    return ann.note != nil && !ann.note!.isEmpty && !ann.isAiGenerated
+                    return !(ann.note ?? "").isEmpty && !ann.isAiGenerated
                 case .aiNotes:
                     return ann.isAiGenerated
                 case .yellow:
@@ -248,11 +231,21 @@ class NotebookViewModel: ObservableObject {
 
     func loadFileAnnotationCounts() async {
         do {
-            let results = try await supabaseService.getFileAnnotationCounts()
-            fileAnnotationCounts = results.map {
-                FileAnnotationInfo(id: $0.fileId, name: $0.fileName, count: $0.count)
-            }
-            logInfo("NotebookVM", "Dosya sayıları yüklendi", details: "\(results.count) dosya")
+            isLoading = true
+            let counts = try await supabaseService.getFileAnnotationCounts()
+
+            // Get files to resolve names
+            let files = try await supabaseService.listFiles() // Or simplified list
+
+            fileAnnotationCounts = counts
+                .map { fileId, count in
+                    let fileName = files.first { $0.id == fileId }?.name ?? "Unknown Document"
+                    return FileAnnotationInfo(id: fileId, name: fileName, count: count)
+                }
+                .sorted { $0.count > $1.count }
+
+            isLoading = false
+            logInfo("NotebookVM", "Dosya sayıları yüklendi", details: "\(fileAnnotationCounts.count) dosya")
         } catch {
             logError("NotebookVM", "Dosya sayıları yükleme hatası", error: error)
         }
@@ -278,7 +271,7 @@ class NotebookViewModel: ObservableObject {
         let newValue = !annotations[index].isFavorite
 
         do {
-            try await supabaseService.toggleAnnotationFavorite(id: id, isFavorite: newValue)
+            _ = try await supabaseService.toggleAnnotationFavorite(id: id)
             annotations[index].isFavorite = newValue
 
             // Stats güncelle
@@ -323,7 +316,7 @@ class NotebookViewModel: ObservableObject {
 
     /// Dosya metadata'sını al (navigasyon için)
     func getFileMetadata(fileId: String) async throws -> PDFDocumentMetadata? {
-        return try await supabaseService.getFile(id: fileId)
+        try await supabaseService.getFile(id: fileId)
     }
 
     /// Kategoriye göre sayı al

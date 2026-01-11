@@ -6,13 +6,13 @@ struct LiquidGlassBackground: View {
     var cornerRadius: CGFloat = 20
     var intensity: LiquidGlassIntensity = .medium
     var accentColor: Color = .indigo
-    
+
     var body: some View {
         ZStack {
             // Ana blur katmanı
             RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(intensity.material)
-            
+
             // Gradient overlay - üst parlama
             LinearGradient(
                 colors: [
@@ -24,7 +24,7 @@ struct LiquidGlassBackground: View {
                 endPoint: .center
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            
+
             // Renkli cam efekti
             RadialGradient(
                 colors: [
@@ -37,7 +37,7 @@ struct LiquidGlassBackground: View {
                 endRadius: 200
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            
+
             // İç glow - parlak kenar
             RoundedRectangle(cornerRadius: cornerRadius)
                 .stroke(
@@ -53,7 +53,7 @@ struct LiquidGlassBackground: View {
                     ),
                     lineWidth: 1
                 )
-            
+
             // Dış ince kenar
             RoundedRectangle(cornerRadius: cornerRadius)
                 .stroke(.white.opacity(0.15), lineWidth: 0.5)
@@ -67,7 +67,7 @@ enum LiquidGlassIntensity {
     case light
     case medium
     case heavy
-    
+
     var material: Material {
         switch self {
         case .light: return .ultraThinMaterial
@@ -75,7 +75,7 @@ enum LiquidGlassIntensity {
         case .heavy: return .regularMaterial
         }
     }
-    
+
     var topGlowOpacity: Double {
         switch self {
         case .light: return 0.25
@@ -92,7 +92,7 @@ struct LiquidGlassCard<Content: View>: View {
     var cornerRadius: CGFloat = 20
     var accentColor: Color = .indigo
     var shadowOpacity: Double = 0.12
-    
+
     init(
         cornerRadius: CGFloat = 20,
         accentColor: Color = .indigo,
@@ -104,7 +104,7 @@ struct LiquidGlassCard<Content: View>: View {
         self.shadowOpacity = shadowOpacity
         self.content = content()
     }
-    
+
     var body: some View {
         content
             .background {
@@ -124,7 +124,7 @@ struct LiquidGlassCard<Content: View>: View {
 struct LiquidGlassButtonStyle: ButtonStyle {
     var isSelected: Bool = false
     var accentColor: Color = .indigo
-    
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .padding(.horizontal, 16)
@@ -133,12 +133,12 @@ struct LiquidGlassButtonStyle: ButtonStyle {
                 ZStack {
                     Capsule()
                         .fill(isSelected ? .ultraThinMaterial : .ultraThinMaterial)
-                    
+
                     if isSelected {
                         // Seçili durum için glow
                         Capsule()
                             .fill(accentColor.opacity(0.15))
-                        
+
                         Capsule()
                             .stroke(accentColor.opacity(0.4), lineWidth: 1)
                     } else {
@@ -146,7 +146,7 @@ struct LiquidGlassButtonStyle: ButtonStyle {
                         Capsule()
                             .stroke(.white.opacity(0.3), lineWidth: 0.5)
                     }
-                    
+
                     // Üst parlama
                     Capsule()
                         .fill(
@@ -169,17 +169,17 @@ struct LiquidGlassButtonStyle: ButtonStyle {
 struct LiquidGlassSearchBar: View {
     @Binding var text: String
     var placeholder: String = "Ara..."
-    
+
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
                 .font(.system(size: 16, weight: .medium))
-            
+
             TextField(placeholder, text: $text)
                 .textFieldStyle(.plain)
                 .font(.body)
-            
+
             if !text.isEmpty {
                 Button {
                     text = ""
@@ -206,7 +206,7 @@ struct LiquidGlassSearchBar: View {
 struct LiquidGlassTabBar: View {
     @Binding var selectedTab: Int
     let tabs: [(icon: String, title: String)]
-    
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
@@ -228,10 +228,10 @@ struct LiquidGlassTabBar: View {
         .padding(.horizontal, 40)
         .padding(.bottom, 20)
     }
-    
+
     private func tabButton(for index: Int, icon: String, title: String) -> some View {
         let isSelected = selectedTab == index
-        
+
         return Button {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                 selectedTab = index
@@ -240,7 +240,7 @@ struct LiquidGlassTabBar: View {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
-                
+
                 Text(title)
                     .font(.caption2)
                     .fontWeight(isSelected ? .semibold : .regular)
@@ -269,7 +269,7 @@ struct LiquidGlassPillButton: View {
     let icon: String?
     var isSelected: Bool = false
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
@@ -304,7 +304,7 @@ extension View {
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
-    
+
     /// Liquid glass efekti ile shadow
     func liquidGlassCard(
         cornerRadius: CGFloat = 20,
@@ -325,19 +325,19 @@ extension View {
             endPoint: .bottomTrailing
         )
         .ignoresSafeArea()
-        
+
         VStack(spacing: 20) {
             // Search Bar
             LiquidGlassSearchBar(text: .constant(""), placeholder: "Dosya ara...")
                 .padding(.horizontal)
-            
+
             // Pills
             HStack(spacing: 8) {
                 LiquidGlassPillButton(title: "Tarih", icon: "chevron.down", isSelected: true) {}
                 LiquidGlassPillButton(title: "İsim", icon: nil, isSelected: false) {}
                 LiquidGlassPillButton(title: "Boyut", icon: nil, isSelected: false) {}
             }
-            
+
             // Card
             LiquidGlassCard {
                 VStack(alignment: .leading, spacing: 8) {
@@ -351,9 +351,9 @@ extension View {
                 .padding()
             }
             .frame(width: 180)
-            
+
             Spacer()
-            
+
             // Tab Bar
             LiquidGlassTabBar(
                 selectedTab: .constant(0),

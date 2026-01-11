@@ -1,0 +1,334 @@
+
+ ▐▛███▜▌   Claude Code v2.1.2
+▝▜█████▛▘  Opus 4.5 · Claude Pro
+  ▘▘ ▝▝    ~/…/PolyglotReader/polyglotreaderx/PolyglotReader
+══════════════════ Conversation compacted · ctrl+o for history ═════════════════
+  ⎿  Read PolyglotReader/Services/RAG/RAGChunker.swift (431 lines)
+  ⎿  Read PolyglotReader/Services/RAG/RAGModels.swift (124 lines)
+  ⎿ Referenced file ../../../../../.claude/projects/-Users-sergenunlu-Desktop-ac
+    il-antigravity-PolyglotReader-polyglotreaderx-PolyglotReader/84db1aac-e9d8-4
+    471-8a3d-f60824865594/tool-results/toolu_01WMyZCLAFFnfdFrbh2X8fRd.txt
+  ⎿  Read PolyglotReader/ViewModels/ChatViewModel.swift (226 lines)
+  ⎿  Read PolyglotReader/ViewModels/ChatViewModel+Messaging.swift (300 lines)
+  ⎿  Todo list read (7 items)
+
+⏺ P1.1 tamamlandı. Şimdi P1.2'ye devam ediyorum - chunk'lara görsel referansları ekleme ve context builder'ı güncelleme.
+
+⏺ Read(PolyglotReader/Services/RAG/RAGContextBuilder.swift)
+  ⎿  Read 118 lines
+
+⏺ Read(PolyglotReader/Services/RAG/RAGService.swift)
+  ⎿  Error reading file
+
+⏺ Search(pattern: "**/RAGService.swift")
+  ⎿  Found 1 file (ctrl+o to expand)
+
+⏺ Read(PolyglotReader/Services/RAGService.swift)
+  ⎿  Read 424 lines
+
+⏺ Search(pattern: "**/PDFImageMetadata.swift")
+  ⎿  Found 1 file (ctrl+o to expand)
+
+⏺ Read(PolyglotReader/Models/PDFImageMetadata.swift)
+  ⎿  Read 175 lines
+
+⏺ Şimdi P1.2'yi uyguluyorum. Önce RAGChunker'ı görsel referanslarını kabul edecek şekilde güncelliyorum.
+
+⏺ Update(PolyglotReader/Services/RAG/RAGChunker.swift)
+  ⎿  Added 56 lines, removed 1 line                                      
+      74                                                                 
+      75       /// Cümle ve paragraf sınırlarına saygılı akıllı chunking 
+      76       func semanticChunkText(_ text: String, fileId: UUID) ->   
+          [DocumentChunk] {                                              
+      77 +         semanticChunkText(text, fileId: fileId,               
+         +imageMetadata: [])                                             
+      78 +     }                                                         
+      79 +                                                               
+      80 +     /// P1.2: Görsel metadata ile zenginleştirilmiş chunking  
+      81 +     func semanticChunkText(_ text: String, fileId: UUID,      
+         +imageMetadata: [PDFImageMetadata]) -> [DocumentChunk] {        
+      82           let paragraphs = extractParagraphs(from: text)        
+      83           var context = ChunkingContext(fileId: fileId)         
+      84                                                                 
+     ...
+       82           }                                                    
+       83                                                                
+       84           finalizeChunks(context: &context)                    
+       85 -         return context.chunks                                
+       85 +                                                              
+       86 +         // P1.2: Chunk'lara sayfa bazlı görsel referansları  
+          +ekle                                                          
+       87 +         return assignImageReferences(to: context.chunks,     
+          +from: imageMetadata)                                          
+       88       }                                                        
+       89                                                                
+       90 +     // MARK: - P1.2: Image Reference Assignment              
+       91 +                                                              
+       92 +     /// Her chunk'a ilgili görsellerin ID'lerini atar (sayfa 
+          + örtüşmesine göre)                                            
+       93 +     private func assignImageReferences(                      
+       94 +         to chunks: [DocumentChunk],                          
+       95 +         from images: [PDFImageMetadata]                      
+       96 +     ) -> [DocumentChunk] {                                   
+       97 +         guard !images.isEmpty else { return chunks }         
+       98 +                                                              
+       99 +         // Görselleri sayfa numarasına göre grupla           
+      100 +         let imagesByPage = Dictionary(grouping: images, by:  
+          +{ $0.pageNumber })                                            
+      101 +                                                              
+      102 +         return chunks.map { chunk in                         
+      103 +             var updatedChunk = chunk                         
+      104 +                                                              
+      105 +             // Chunk'ın kapsadığı sayfa aralığını belirle    
+      106 +             let startPage = chunk.startPage ??               
+          +chunk.pageNumber ?? 0                                         
+      107 +             let endPage = chunk.endPage ?? chunk.pageNumber  
+          +?? startPage                                                  
+      108 +                                                              
+      109 +             // Bu sayfa aralığındaki tüm görselleri topla    
+      110 +             var relevantImages: [UUID] = []                  
+      111 +             for page in startPage...max(startPage, endPage)  
+          +{                                                             
+      112 +                 if let pageImages = imagesByPage[page] {     
+      113 +                     relevantImages.append(contentsOf:        
+          +pageImages.map { $0.id })                                     
+      114 +                 }                                            
+      115 +             }                                                
+      116 +                                                              
+      117 +             if !relevantImages.isEmpty {                     
+      118 +                 updatedChunk = DocumentChunk(                
+      119 +                     id: chunk.id,                            
+      120 +                     fileId: chunk.fileId,                    
+      121 +                     chunkIndex: chunk.chunkIndex,            
+      122 +                     content: chunk.content,                  
+      123 +                     pageNumber: chunk.pageNumber,            
+      124 +                     startPage: chunk.startPage,              
+      125 +                     endPage: chunk.endPage,                  
+      126 +                     sectionTitle: chunk.sectionTitle,        
+      127 +                     contentType: chunk.contentType,          
+      128 +                     containsTable: chunk.containsTable,      
+      129 +                     containsList: chunk.containsList,        
+      130 +                     imageReferences: relevantImages          
+      131 +                 )                                            
+      132 +             }                                                
+      133 +                                                              
+      134 +             return updatedChunk                              
+      135 +         }                                                    
+      136 +     }                                                        
+      137 +                                                              
+      138       // MARK: - Helper Methods                                
+      139                                                                
+      140       private func processParagraph(_ paragraph: Paragraph,    
+           context: inout ChunkingContext) {                             
+
+⏺ Şimdi RAGContextBuilder'ı metadata özeti ekleyecek şekilde güncelliyorum.
+
+⏺ Update(PolyglotReader/Services/RAG/RAGContextBuilder.swift)
+  ⎿  Added 4 lines, removed 1 line                                       
+      28               // Güven skoru göstergesi                         
+      29               let confidenceIndicator =                         
+          formatConfidence(scored: scored)                               
+      30                                                                 
+      31 +             // P1.2: Metadata özeti (tablo, liste, görsel     
+         +bilgisi)                                                       
+      32 +             let metadataInfo = formatMetadata(chunk: chunk)   
+      33 +                                                               
+      34               // Zengin citation formatı                        
+      35               let chunkText = """                               
+      36               ---                                               
+      37 -            [\(includedCount +                                 
+         -1)]\(pageInfo)\(confidenceIndicator)                           
+      37 +            [\(includedCount +                                 
+         +1)]\(pageInfo)\(confidenceIndicator)\(metadataInfo)            
+      38               \(chunk.content)                                  
+      39                                                                 
+      40               """                                               
+
+⏺ Update(PolyglotReader/Services/RAG/RAGContextBuilder.swift)
+  ⎿  Added 29 lines                                                      
+       91           return ""                                            
+       92       }                                                        
+       93                                                                
+       94 +     // MARK: - P1.2: Metadata Formatting                     
+       95 +                                                              
+       96 +     private func formatMetadata(chunk: DocumentChunk) ->     
+          +String {                                                      
+       97 +         var parts: [String] = []                             
+       98 +                                                              
+       99 +         // Bölüm başlığı                                     
+      100 +         if let section = chunk.sectionTitle,                 
+          +!section.isEmpty {                                            
+      101 +             parts.append("📑 \(section)")                    
+      102 +         }                                                    
+      103 +                                                              
+      104 +         // Tablo içeriği                                     
+      105 +         if chunk.containsTable {                             
+      106 +             parts.append("📊 Tablo")                         
+      107 +         }                                                    
+      108 +                                                              
+      109 +         // Liste içeriği                                     
+      110 +         if chunk.containsList {                              
+      111 +             parts.append("📝 Liste")                         
+      112 +         }                                                    
+      113 +                                                              
+      114 +         // Görsel referansları                               
+      115 +         if !chunk.imageReferences.isEmpty {                  
+      116 +             parts.append("🖼️ \(chunk.imageReferences.count) 
+          +görsel")                                                      
+      117 +         }                                                    
+      118 +                                                              
+      119 +         guard !parts.isEmpty else { return "" }              
+      120 +         return " [\(parts.joined(separator: " | "))]"        
+      121 +     }                                                        
+      122 +                                                              
+      123       private func buildContextFooter(chunkCount: Int,         
+           pagesSeen: Set<Int>, tokenCount: Int) -> String {             
+      124           let sortedPages = pagesSeen.sorted()                 
+      125           let pagesText = sortedPages.isEmpty ? "Bilinmiyor" : 
+  ⎿  Found 8 new diagnostic issues in 1 file (ctrl+o to expand)
+
+⏺ Şimdi RAGService'i görsel metadata desteği ile güncelliyorum.
+
+⏺ Update(PolyglotReader/Services/RAGService.swift)
+  ⎿  Added 7 lines, removed 2 lines                                      
+      25                                                                 
+      26       /// PDF dokümanını indexler (semantic chunk'lar +         
+          embedding'ler)                                                 
+      27       func indexDocument(text: String, fileId: UUID) async      
+          throws {                                                       
+      28 +         try await indexDocument(text: text, fileId: fileId,   
+         +imageMetadata: [])                                             
+      29 +     }                                                         
+      30 +                                                               
+      31 +     /// P1.2: Görsel metadata ile zenginleştirilmiş indexleme 
+      32 +     func indexDocument(text: String, fileId: UUID,            
+         +imageMetadata: [PDFImageMetadata]) async throws {              
+      33           startIndexing()                                       
+      34           defer { finishIndexing() }                            
+      35 -        logInfo("RAGService", "Doküman indexleniyor", details: 
+         -"FileID: \(fileId)")                                           
+      35 +        logInfo("RAGService", "Doküman indexleniyor", details: 
+         +"FileID: \(fileId), Images: \(imageMetadata.count)")           
+      36                                                                 
+      37 -        let chunks = createChunks(from: text, fileId: fileId)  
+      37 +        let chunks = createChunks(from: text, fileId: fileId   
+         +, imageMetadata: imageMetadata)                                
+      38           guard !chunks.isEmpty else {                          
+      39               logWarning("RAGService", "Chunk oluşturulamadı")  
+      40               return                                            
+
+⏺ Update(PolyglotReader/Services/RAGService.swift)
+  ⎿  Added 2 lines, removed 2 lines                                      
+      58           currentOperation = ""                                 
+      59       }                                                         
+      60                                                                 
+      61 -    private func createChunks(from text: String, fileId: UUID  
+         -) -> [DocumentChunk] {                                         
+      61 +    private func createChunks(from text: String, fileId: UUID  
+         +, imageMetadata: [PDFImageMetadata] = []) -> [DocumentChunk] { 
+      62           currentOperation = "Semantic chunking..."             
+      63 -        return chunker.semanticChunkText(text, fileId: fileId) 
+      63 +        return chunker.semanticChunkText(text, fileId: fileId  
+         +, imageMetadata: imageMetadata)                                
+      64       }                                                         
+      65                                                                 
+      66       private func buildEmbeddings(                             
+  ⎿  Found 10 new diagnostic issues in 1 file (ctrl+o to expand)
+
+⏺ Şimdi backward compatibility için chunkText metodunu da güncelliyorum ve ardından build yapıyorum.
+
+⏺ Update(PolyglotReader/Services/RAGService.swift)
+  ⎿  Added 2 lines, removed 2 lines                                      
+      387                                                                
+      388       // MARK: - Backward Compatibility & Helpers              
+      389                                                                
+      390 -    func chunkText(_ text: String, fileId: UUID               
+          -) -> [DocumentChunk] {                                        
+      391 -        chunker.semanticChunkText(text, fileId: fileId)       
+      390 +    func chunkText(_ text: String, fileId: UUID               
+          +, imageMetadata: [PDFImageMetadata] = []) -> [DocumentChunk] {
+      391 +        chunker.semanticChunkText(text, fileId: fileId        
+          +, imageMetadata: imageMetadata)                               
+      392       }                                                        
+      393                                                                
+      394       func createEmbedding(for text: String) async throws ->   
+           [Float] {                                                     
+  ⎿  Found 10 new diagnostic issues in 1 file (ctrl+o to expand)
+  ⎿  Found 10 new diagnostic issues in 1 file (ctrl+o to expand)
+
+⏺ Bash(xcodebuild -scheme PolyglotReader -destination 'platform=iOS timeout: 5m 
+      Simulator,name=iPhone 16 Pro' -configuration Debug build 2>&1 0s
+      | tail -80)
+
+
+  ⎿ Command line invocation:                                               
+        /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -sche
+    me PolyglotReader -destination "platform=iOS Simulator,name=iPhone 16 P
+    … +50 lines (ctrl+o to expand)
+
+
+
+⏺ Bash(xcodebuild -scheme PolyglotReader -destination 'platform=iOS timeout: 5m 
+      Simulator,name=iPhone 17 Pro' -configuration Debug build 2>&1 0s
+      | tail -100)
+
+
+  ⎿ SwiftDriverJobDiscovery normal arm64 Compiling RAGSearchService.swift (
+    in target 'PolyglotReader' from project 'PolyglotReader')
+    … +829 lines (ctrl+o to expand)
+
+
+⏺ Bash(cat /Users/sergenunlu/.claude/projects/-Users-sergenunlu-Desktop-acil-ant
+      igravity-PolyglotReader-polyglotreaderx-PolyglotReader/84db1aac-e9d8-4471-
+      8a3d-f6082486…)
+  ⎿  ** BUILD SUCCEEDED **
+
+⏺ Build başarılı! P1 implementasyonu tamamlandı.
+
+⏺ P1 İmplementasyonu Tamamlandı!
+
+  Yapılan İyileştirmeler:
+
+  P1.1 - Chunking Kalitesi
+
+  1. Zengin Chunk Metadata (RAGModels.swift:46-110):
+    - sectionTitle: Bölüm/başlık takibi
+    - contentType: İçerik tipi (text/table/list/mixed/heading)
+    - containsTable/containsList: Tablo ve liste bayrakları
+    - imageReferences: İlgili görsel ID'leri
+  2. Tablo Algılama (RAGChunker.swift:42-57, 137-166):
+    - Markdown pipe tabloları
+    - Tab-separated veriler
+    - Tablo başlıkları
+    - Çoklu boşluk heuristikleri
+  3. Liste Algılama (RAGChunker.swift:60-73, 169-187):
+    - Bullet listeler (•, ▸, -)
+    - Numaralı listeler (1. 2. 3.)
+    - Harfli listeler (a. b. c.)
+    - Roma rakamları (i. ii. iii.)
+
+  P1.2 - Görsel Entegrasyonu
+
+  1. Chunk'lara Görsel Atama (RAGChunker.swift:97-141):
+    - Sayfa örtüşmesine göre görsel referansları
+  2. Context Builder Metadata (RAGContextBuilder.swift:94-121):
+    - AI context'e metadata özeti ekleme
+    - Format: 📑 Bölüm | 📊 Tablo | 📝 Liste | 🖼️ X görsel
+  3. RAGService Desteği (RAGService.swift:31-47, 61-64, 390-392):
+    - indexDocument(text:fileId:imageMetadata:) - görsel destekli indexleme
+
+  ---
+  Sonuç: AI artık yanıtlarında şunları bilecek:
+  - Chunk'ın hangi bölümden geldiği
+  - Tablo veya liste içerip içermediği
+  - Kaç görsel ile ilişkili olduğu
+
+  Devam etmemi ister misiniz? P2 (PDF extraction iyileştirmeleri) veya başka özellikler ekleyebilirim.
+
+✻ Brewed for 8m 25s
+
+❯ /usage 
+  ⎿  Status dialog dismissed
+
+
+

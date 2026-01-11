@@ -67,17 +67,17 @@ struct ImageSelectionPopup: View {
         
         // X pozisyonu: seçimin ortasında
         var x = imageInfo.screenRect.midX
-        x = max(popupWidth/2 + 8, min(screenWidth - popupWidth/2 - 8, x))
+        x = max(popupWidth / 2 + 8, min(screenWidth - popupWidth / 2 - 8, x))
         
         // Y pozisyonu: seçimin altında
-        let belowSelectionY = imageInfo.screenRect.maxY + verticalOffset + baseHeight/2
-        let aboveSelectionY = imageInfo.screenRect.minY - verticalOffset - baseHeight/2
+        let belowSelectionY = imageInfo.screenRect.maxY + verticalOffset + baseHeight / 2
+        let aboveSelectionY = imageInfo.screenRect.minY - verticalOffset - baseHeight / 2
         
         var y: CGFloat
         
-        if belowSelectionY + baseHeight/2 < screenHeight - safeAreaBottom - 100 {
+        if belowSelectionY + baseHeight / 2 < screenHeight - safeAreaBottom - 100 {
             y = belowSelectionY
-        } else if aboveSelectionY - baseHeight/2 > safeAreaTop + 100 {
+        } else if aboveSelectionY - baseHeight / 2 > safeAreaTop + 100 {
             y = aboveSelectionY
         } else {
             y = screenHeight / 2
@@ -284,7 +284,6 @@ struct ImageSelectionPopup: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .padding(.horizontal, 14)
-                
             } else if let description = descriptionText {
                 ScrollView(.vertical, showsIndicators: true) {
                     Text(description)
@@ -300,7 +299,6 @@ struct ImageSelectionPopup: View {
                 .scrollIndicators(.visible)
                 .scrollBounceBehavior(.basedOnSize)
                 .frame(maxHeight: 120)
-                
             } else {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -423,101 +421,5 @@ struct ImageSelectionPopup: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - Image Share Sheet
-struct ImageShareSheet: UIViewControllerRepresentable {
-    let image: UIImage
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: [image], applicationActivities: nil)
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
-// MARK: - Fullscreen Image View
-struct FullscreenImageView: View {
-    let image: UIImage
-    let onDismiss: () -> Void
-    
-    @State private var scale: CGFloat = 1.0
-    @State private var lastScale: CGFloat = 1.0
-    
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .scaleEffect(scale)
-                .gesture(
-                    MagnificationGesture()
-                        .onChanged { value in
-                            scale = lastScale * value
-                        }
-                        .onEnded { _ in
-                            lastScale = scale
-                            // Minimum ve maksimum zoom sınırları
-                            if scale < 1 {
-                                withAnimation(.spring()) {
-                                    scale = 1
-                                    lastScale = 1
-                                }
-                            } else if scale > 5 {
-                                withAnimation(.spring()) {
-                                    scale = 5
-                                    lastScale = 5
-                                }
-                            }
-                        }
-                )
-                .onTapGesture(count: 2) {
-                    withAnimation(.spring()) {
-                        if scale > 1 {
-                            scale = 1
-                            lastScale = 1
-                        } else {
-                            scale = 2
-                            lastScale = 2
-                        }
-                    }
-                }
-            
-            VStack {
-                HStack {
-                    Spacer()
-                    
-                    Button(action: onDismiss) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 32))
-                            .foregroundStyle(.white.opacity(0.8))
-                            .shadow(color: .black.opacity(0.3), radius: 4)
-                    }
-                    .padding()
-                }
-                
-                Spacer()
-            }
-        }
-    }
-}
-
-#Preview {
-    ZStack {
-        Color.gray.opacity(0.2).ignoresSafeArea()
-        
-        ImageSelectionPopup(
-            imageInfo: PDFImageInfo(
-                image: UIImage(systemName: "photo")!,
-                rect: .zero,
-                screenRect: CGRect(x: 100, y: 200, width: 200, height: 200),
-                pageNumber: 1
-            ),
-            onDismiss: {},
-            onAskAI: {}
-        )
     }
 }

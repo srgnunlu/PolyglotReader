@@ -8,6 +8,10 @@ struct NotebookView: View {
     @State private var showingFileId: String?
     @State private var showingAllFiles = false
 
+    private var isDetailViewActive: Bool {
+        showingAllFiles || showingCategory != nil || showingFileId != nil
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -62,9 +66,8 @@ struct NotebookView: View {
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                 } else if viewModel.annotations.isEmpty {
                     EmptyNotebookView(
-                        hasFilters: false,
-                        onResetFilters: {}
-                    )
+                        hasFilters: false
+                    ) {}
                 } else {
                     // Dashboard view
                     NotebookDashboardView(
@@ -91,9 +94,9 @@ struct NotebookView: View {
                     .transition(.opacity)
                 }
             }
-            .navigationTitle(showingAllFiles || showingCategory != nil || showingFileId != nil ? "" : "Defterim")
-            .navigationBarTitleDisplayMode(showingAllFiles || showingCategory != nil || showingFileId != nil ? .inline : .large)
-            .navigationBarHidden(showingAllFiles || showingCategory != nil || showingFileId != nil)
+            .navigationTitle(isDetailViewActive ? "" : "Defterim")
+            .navigationBarTitleDisplayMode(isDetailViewActive ? .inline : .large)
+            .navigationBarHidden(isDetailViewActive)
             .toolbar {
                 if showingCategory == nil && showingFileId == nil && !showingAllFiles {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -213,6 +216,16 @@ struct EmptyNotebookView: View {
     let onResetFilters: () -> Void
     @State private var isAnimating = false
 
+    private var emptyTitle: String {
+        hasFilters ? "Sonuc Bulunamadi" : "Henuz Not Yok"
+    }
+
+    private var emptySubtitle: String {
+        hasFilters
+            ? "Farkli filtre secenekleri deneyin"
+            : "PDF'lerinizde metin secerek\nnot almaya baslayin"
+    }
+
     var body: some View {
         VStack(spacing: 28) {
             // Animasyonlu ikon
@@ -258,11 +271,11 @@ struct EmptyNotebookView: View {
             }
 
             VStack(spacing: 10) {
-                Text(hasFilters ? "Sonuc Bulunamadi" : "Henuz Not Yok")
+                Text(emptyTitle)
                     .font(.title2)
                     .fontWeight(.bold)
 
-                Text(hasFilters ? "Farkli filtre secenekleri deneyin" : "PDF'lerinizde metin secerek\nnot almaya baslayin")
+                Text(emptySubtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -302,7 +315,7 @@ struct EmptyNotebookView: View {
 
 // MARK: - Amber Color
 extension Color {
-    static let amber = Color(red: 245/255, green: 158/255, blue: 11/255)
+    static let amber = Color(red: 245 / 255, green: 158 / 255, blue: 11 / 255)
 }
 
 #Preview {

@@ -30,7 +30,6 @@ xcuserdata/
 !default.xcscheme
 *.plist
 !Info.plist
-!Config.plist
 
 ## Swift Package Manager
 #
@@ -67,3 +66,5 @@ xcuserdata/
 ## Supabase
 # If you have any local credentials or config you don't want to share
 .supabase/
+PolyglotReader/Config.plist
+*.log

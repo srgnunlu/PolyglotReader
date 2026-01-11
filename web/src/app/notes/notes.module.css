@@ -1,0 +1,330 @@
+.layout {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+}
+
+.sidebarHeader {
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.logoSection {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logoIcon {
+    font-size: 1.5rem;
+}
+
+.logoText {
+    font-size: 1.125rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-accent-500) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.nav {
+    flex: 1;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.navItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: left;
+}
+
+.navItem:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.navItemActive {
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--color-primary-600);
+}
+
+.navIcon {
+    font-size: 1.125rem;
+}
+
+.sidebarFooter {
+    padding: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.userInfo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.userAvatar {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.userDetails {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.userName {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.userEmail {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.logoutBtn {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.logoutBtn:hover {
+    background: var(--bg-tertiary);
+    color: var(--color-error);
+    border-color: var(--color-error);
+}
+
+/* Main Content */
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.searchBox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    width: 300px;
+}
+
+.searchIcon {
+    opacity: 0.5;
+}
+
+.searchInput {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+}
+
+.searchInput::placeholder {
+    color: var(--text-tertiary);
+}
+
+.content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 32px;
+}
+
+.loading,
+.error,
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 16px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.emptyIcon {
+    font-size: 4rem;
+    opacity: 0.5;
+}
+
+.empty h3 {
+    font-size: 1.25rem;
+    color: var(--text-primary);
+}
+
+.notesList {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.fileGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.fileGroupTitle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.noteCount {
+    font-weight: 400;
+    color: var(--text-tertiary);
+    font-size: 0.875rem;
+}
+
+.fileNotes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.noteCard {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid #fef08a;
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.noteCard:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.noteHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.notePage {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-primary-500);
+    background: rgba(99, 102, 241, 0.1);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+}
+
+.noteDate {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+}
+
+.noteHighlight {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    line-height: 1.5;
+}
+
+.noteText {
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        display: none;
+    }
+
+    .header {
+        padding: 16px;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .searchBox {
+        width: 100%;
+    }
+
+    .content {
+        padding: 16px;
+    }
+
+    .fileNotes {
+        grid-template-columns: 1fr;
+    }
+}

@@ -76,6 +76,72 @@ $$;
 GRANT EXECUTE ON FUNCTION search_chunks_bm25(text, uuid, int) TO authenticated;
 GRANT EXECUTE ON FUNCTION search_chunks_bm25(text, uuid, int) TO anon;
 
+-- 2b. BM25 Search RPC (doküman dili farkındalığı)
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION search_chunks_bm25_lang(
+    search_query text,
+    target_file_id uuid,
+    match_count int DEFAULT 8,
+    search_language text DEFAULT 'simple'
+)
+RETURNS TABLE (
+    id uuid,
+    file_id uuid,
+    chunk_index int,
+    content text,
+    page_number int,
+    rank float
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    config regconfig;
+BEGIN
+    SELECT oid::regconfig INTO config
+    FROM pg_ts_config
+    WHERE cfgname = lower(search_language)
+    LIMIT 1;
+
+    IF config IS NULL THEN
+        config := 'simple';
+    END IF;
+
+    RETURN QUERY
+    WITH docs AS (
+        SELECT
+            dc.id,
+            dc.file_id,
+            dc.chunk_index,
+            dc.content,
+            dc.page_number,
+            to_tsvector(config, dc.content) as ts_doc
+        FROM document_chunks dc
+        WHERE dc.file_id = target_file_id
+    ),
+    q AS (
+        SELECT plainto_tsquery(config, search_query) as ts_query
+    )
+    SELECT
+        d.id,
+        d.file_id,
+        d.chunk_index,
+        d.content,
+        d.page_number,
+        ts_rank(d.ts_doc, q.ts_query)::float as rank
+    FROM docs d, q
+    WHERE d.ts_doc @@ q.ts_query
+    ORDER BY rank DESC
+    LIMIT match_count;
+END;
+$$;
+
+-- RPC fonksiyonuna erişim izni
+GRANT EXECUTE ON FUNCTION search_chunks_bm25_lang(text, uuid, int, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION search_chunks_bm25_lang(text, uuid, int, text) TO anon;
+
 -- 3. Gelişmiş Vector Search RPC (eşik filtreli - v2)
 -- =====================================================
 

@@ -48,8 +48,12 @@ struct PDFReaderView: View {
                             isQuickTranslationMode: viewModel.isQuickTranslationMode,
                             bottomInset: max(showChat ? 350 : 0, bottomDockInset),
                             annotations: viewModel.annotations,
-                            onSelection: { text, rect, page in
-                                viewModel.handleSelection(text: text, rect: rect, page: page)
+                            initialScrollPosition: viewModel.initialScrollPosition,
+                            onProgressChange: { page, point, scale in
+                                viewModel.updateReadingProgress(page: page, point: point, scale: scale)
+                            },
+                            onSelection: { text, rect, page, pdfRects in
+                                viewModel.handleSelection(text: text, rect: rect, page: page, pdfRects: pdfRects)
                                 chatViewModel.selectedText = text.isEmpty ? nil : text
                             },
                             onImageSelection: { imageInfo in
@@ -238,6 +242,34 @@ struct PDFReaderView: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
             }
+            .onChange(of: showChat) { isShowing in
+                // Chat açıldığında indexleme durumunu kontrol et (P0)
+                if isShowing {
+                    Task {
+                        await chatViewModel.checkAndPrepareDocument(
+                            pdfText: viewModel.extractedText
+                        )
+                        // P4: Chat açıldığında mevcut sayfa için önerileri güncelle
+                        chatViewModel.updatePageContext(
+                            pageNumber: viewModel.currentPage,
+                            pageText: viewModel.currentPageText,
+                            sectionTitle: nil,
+                            hasTable: false,
+                            hasImage: false
+                        )
+                    }
+                }
+            }
+            .onChange(of: viewModel.currentPage) { newPage in
+                // P4: Sayfa değiştiğinde smart suggestions güncelle
+                chatViewModel.updatePageContext(
+                    pageNumber: newPage,
+                    pageText: viewModel.currentPageText,
+                    sectionTitle: nil,
+                    hasTable: false,
+                    hasImage: false
+                )
+            }
             .sheet(isPresented: $showQuiz) {
                 QuizView(textContext: viewModel.extractedText)
             }
@@ -284,11 +316,18 @@ struct PDFReaderView: View {
             .onChange(of: showChat) { isOpen in
                 if isOpen {
                     autoHideTimer?.invalidate()
-                    // Chat açıldığında görsel metadata'yı yükle
+                    // Görsel metadata yüklemesini devre dışı bıraktık - performans sorunu
+                    // Görseller sadece kullanıcı görsel sorusu sorduğunda lazy load edilecek
+                    // Eski kod:
+                    // if let document = viewModel.document {
+                    //     Task {
+                    //         await chatViewModel.loadImageMetadata(document: document)
+                    //     }
+                    // }
+                    
+                    // Sadece PDF referansını aktar (tarama yapmadan)
                     if let document = viewModel.document {
-                        Task {
-                            await chatViewModel.loadImageMetadata(document: document)
-                        }
+                        chatViewModel.pdfDocument = document
                     }
                 } else {
                     startAutoHideTimer()

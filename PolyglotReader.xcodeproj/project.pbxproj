@@ -83,6 +83,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 6B9AC8742EF43FC000369EF8 /* Build configuration list for PBXNativeTarget "PolyglotReader" */;
 			buildPhases = (
+				6BC0E8472F090AE600E0CF20 /* ShellScript */,
 				6B9AC8652EF43FBE00369EF8 /* Sources */,
 				6B9AC8662EF43FBE00369EF8 /* Frameworks */,
 				6B9AC8672EF43FBE00369EF8 /* Resources */,
@@ -151,6 +152,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		6BC0E8472F090AE600E0CF20 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# SwiftLint Build Phase - Errors MUST fail build\nif which swiftlint > /dev/null; then\n    swiftlint lint --config \"${SRCROOT}/.swiftlint.yml\"\nelif [ -f \"/opt/homebrew/bin/swiftlint\" ]; then\n    /opt/homebrew/bin/swiftlint lint --config \"${SRCROOT}/.swiftlint.yml\"\nelse\n    echo \"warning: SwiftLint not installed, install with: brew install swiftlint\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		6B9AC8652EF43FBE00369EF8 /* Sources */ = {
@@ -291,6 +313,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = BM9SHU2L8V;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PolyglotReader/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -325,6 +348,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = BM9SHU2L8V;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PolyglotReader/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

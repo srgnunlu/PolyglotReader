@@ -9,7 +9,7 @@ struct PDFImageInfo {
     let screenRect: CGRect       // Ekran koordinatları (popup konumu için)
     let pageNumber: Int          // Sayfa numarası
     let capturedAt: Date         // Yakalama zamanı
-    
+
     init(image: UIImage, rect: CGRect, screenRect: CGRect, pageNumber: Int) {
         self.image = image
         self.rect = rect
@@ -17,12 +17,12 @@ struct PDFImageInfo {
         self.pageNumber = pageNumber
         self.capturedAt = Date()
     }
-    
+
     /// Görseli JPEG olarak döndür (AI için)
     var jpegData: Data? {
         image.jpegData(compressionQuality: 0.85)
     }
-    
+
     /// Görseli PNG olarak döndür (panoya kopyalama için)
     var pngData: Data? {
         image.pngData()

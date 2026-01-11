@@ -1,0 +1,93 @@
+/* Deep search active warning */
+"chat.deep_search_active" = "Derin Arama aktif - Yanıtlar daha yavaş olabilir";
+
+/* Terms and privacy acceptance notice */
+"auth.terms_notice" = "Devam ederek Kullanım Koşulları ve Gizlilik Politikasını kabul etmiş olursunuz.";
+
+/* No tagged files in folder */
+"library.no_tagged_files" = "Bu klasörde etiketli dosya yok";
+
+/* Preparing quiz questions */
+"quiz.preparing_questions" = "Doküman analiz ediliyor ve sorular hazırlanıyor";
+
+/* Question progress format */
+"quiz.question_progress" = "Soru %d / %d";
+
+/* Quiz score summary */
+"quiz.score_summary" = "%d sorudan %d tanesini doğru cevapladınız.";
+
+/* More files button */
+"notebook.more_files" = "+ %d dosya daha";
+
+/* Error Titles */
+"error.title" = "Hata";
+"error.title.critical" = "Kritik Hata";
+
+/* Error Actions */
+"error.action.retry" = "Tekrar Dene";
+"error.action.help" = "Yardım Al";
+"error.action.dismiss" = "Kapat";
+
+/* Generic Error */
+"error.unknown" = "Beklenmeyen bir hata oluştu.";
+"recovery.general.retry" = "Lütfen tekrar deneyin.";
+
+/* Network Errors */
+"error.network.unavailable" = "İnternet bağlantısı yok.";
+"error.network.timeout" = "İstek zaman aşımına uğradı.";
+"error.network.invalid_response" = "Sunucudan beklenen yanıt alınamadı.";
+"error.network.server_error" = "Sunucu hatası (%d).";
+"error.network.server_error_generic" = "Sunucu hatası oluştu.";
+"error.network.rate_limited" = "Çok fazla istek gönderildi.";
+"error.network.cancelled" = "İstek iptal edildi.";
+"recovery.network.wait_retry" = "Biraz bekleyip tekrar deneyin.";
+"recovery.network.check_connection" = "Bağlantınızı kontrol edip tekrar deneyin.";
+
+/* Auth Errors */
+"error.auth.required" = "Oturum açmanız gerekiyor.";
+"error.auth.expired" = "Oturum süresi doldu.";
+"error.auth.invalid" = "Giriş bilgileri geçersiz.";
+"error.auth.forbidden" = "Bu işlem için yetkiniz yok.";
+"recovery.auth.sign_in" = "Lütfen tekrar giriş yapın.";
+"recovery.auth.permissions" = "Yetkilerinizi kontrol edin.";
+
+/* Storage Errors */
+"error.storage.not_found" = "İstenen dosya bulunamadı.";
+"error.storage.access_denied" = "Dosyaya erişim izniniz yok.";
+"error.storage.quota" = "Depolama kotası aşıldı.";
+"error.storage.write_failed" = "Dosya kaydedilemedi.";
+"error.storage.read_failed" = "Dosya okunamadı.";
+"error.storage.corrupted" = "Depolama verisi bozuk.";
+"recovery.storage.free_space" = "Depolama alanınızı boşaltıp tekrar deneyin.";
+"recovery.storage.permissions" = "Dosya izinlerini kontrol edin.";
+"recovery.storage.retry" = "Biraz sonra tekrar deneyin.";
+"recovery.storage.restore" = "Veriyi geri yükleyip tekrar deneyin.";
+
+/* AI Errors */
+"error.ai.no_response" = "AI'dan yanıt alınamadı.";
+"error.ai.parse_failed" = "AI yanıtı işlenemedi.";
+"error.ai.rate_limited" = "AI istek limiti aşıldı.";
+"error.ai.quota" = "AI kullanım kotası aşıldı.";
+"error.ai.unavailable" = "AI servisi şu anda kullanılamıyor.";
+"recovery.ai.retry_later" = "Biraz sonra tekrar deneyin.";
+"recovery.ai.quota" = "Kota yenilendikten sonra tekrar deneyin.";
+
+/* PDF Errors */
+"error.pdf.corrupted" = "PDF dosyası bozuk veya okunamıyor.";
+"error.pdf.empty" = "PDF dosyası boş görünüyor.";
+"error.pdf.encrypted" = "PDF şifreli olduğu için açılamadı.";
+"error.pdf.too_large" = "PDF dosyası çok büyük.";
+"error.pdf.render_failed" = "PDF sayfası görüntülenemedi.";
+"error.pdf.memory" = "Bellek yetersizliği nedeniyle PDF işlenemedi.";
+"error.pdf.unsupported" = "PDF formatı desteklenmiyor.";
+"recovery.pdf.reduce_size" = "Dosya boyutunu küçültüp tekrar deneyin.";
+"recovery.pdf.decrypt" = "PDF şifresini kaldırıp tekrar deneyin.";
+"recovery.pdf.try_another" = "Farklı bir PDF dosyası deneyin.";
+
+/* Chat Error Prefixes */
+"chat.error.prefix" = "Üzgünüm, bir hata oluştu:";
+"chat.image_error.prefix" = "Üzgünüm, görsel analiz edilirken bir hata oluştu:";
+
+/* Auth Errors */
+"auth.session_expired" = "Oturum süresi doldu. Lütfen tekrar giriş yapın.";
+"auth.apple_sign_in_failed" = "Apple ile giriş başarısız.";
