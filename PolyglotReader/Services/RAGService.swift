@@ -66,18 +66,47 @@ class RAGService: ObservableObject {
     ) async throws {
         startIndexing(for: fileId)
         defer { finishIndexing(for: fileId) }
-        logInfo("RAGService", "Doküman indexleniyor", details: "FileID: \(fileId), Images: \(imageMetadata.count)")
 
+        // Metin istatistikleri
+        let wordCount = text.split(separator: " ").count
+        let pageMarkers = text.components(separatedBy: "--- Sayfa ").count - 1
+        logInfo("RAGService", "Doküman indexleniyor",
+                details: "FileID: \(fileId), ~\(wordCount) kelime, \(pageMarkers) sayfa marker, \(imageMetadata.count) görsel")
+
+        // Chunking
         let chunks = createChunks(from: text, fileId: fileId, imageMetadata: imageMetadata)
         guard !chunks.isEmpty else {
-            logWarning("RAGService", "Chunk oluşturulamadı")
+            logWarning("RAGService", "Chunk oluşturulamadı - metin boş olabilir")
             return
         }
 
+        // Chunk istatistikleri
+        let pageNumbers = chunks.compactMap { $0.pageNumber }
+        let minPage = pageNumbers.min() ?? 0
+        let maxPage = pageNumbers.max() ?? 0
+        logInfo("RAGService", "Chunking tamamlandı",
+                details: "\(chunks.count) chunk oluşturuldu (Sayfa \(minPage)-\(maxPage))")
+
+        // Embedding oluşturma
         let chunksWithEmbeddings = await buildEmbeddings(for: chunks)
+
+        // Doğrulama: Tüm chunk'lar için embedding oluşturuldu mu?
+        let successRate = Float(chunksWithEmbeddings.count) / Float(chunks.count) * 100
+        if chunksWithEmbeddings.count < chunks.count {
+            logWarning("RAGService", "Eksik embedding!",
+                       details: "\(chunksWithEmbeddings.count)/\(chunks.count) (%\(Int(successRate)))")
+        }
+
+        // Kaydetme
         try await persistEmbeddings(chunksWithEmbeddings, fileId: fileId)
         indexingProgress = 1.0
-        logInfo("RAGService", "Doküman indexlendi", details: "\(chunksWithEmbeddings.count) chunk kaydedildi")
+
+        // Final rapor
+        let embeddedPages = chunksWithEmbeddings.compactMap { $0.chunk.pageNumber }
+        let embeddedMinPage = embeddedPages.min() ?? 0
+        let embeddedMaxPage = embeddedPages.max() ?? 0
+        logInfo("RAGService", "✅ Doküman indexlendi",
+                details: "\(chunksWithEmbeddings.count) chunk kaydedildi (Sayfa \(embeddedMinPage)-\(embeddedMaxPage), %\(Int(successRate)) başarı)")
     }
 
     private func startIndexing(for fileId: UUID) {
@@ -106,18 +135,70 @@ class RAGService: ObservableObject {
     ) async -> [(chunk: DocumentChunk, embedding: [Float])] {
         currentOperation = "Embedding oluşturuluyor..."
         var chunksWithEmbeddings: [(chunk: DocumentChunk, embedding: [Float])] = []
+        var failedChunks: [(index: Int, chunk: DocumentChunk)] = []
+
+        logInfo("RAGService", "Embedding oluşturma başlıyor", details: "Toplam \(chunks.count) chunk")
 
         for (index, chunk) in chunks.enumerated() {
-            do {
-                let embedding = try await embeddingService.getOrCreateEmbedding(for: chunk.content)
-                chunksWithEmbeddings.append((chunk, embedding))
-                updateIndexingProgress(currentIndex: index, total: chunks.count)
-            } catch {
-                handleEmbeddingError(error, index: index)
+            var success = false
+            var lastError: Error?
+
+            // Retry mekanizması ile embedding oluştur
+            for attempt in 1...RAGConfig.maxRetryAttempts {
+                do {
+                    let embedding = try await embeddingService.getOrCreateEmbedding(for: chunk.content)
+                    chunksWithEmbeddings.append((chunk, embedding))
+                    success = true
+                    break
+                } catch {
+                    lastError = error
+                    if attempt < RAGConfig.maxRetryAttempts {
+                        // Exponential backoff: 500ms, 1s, 2s...
+                        let backoffDelay = RAGConfig.retryDelayBase * UInt64(1 << (attempt - 1))
+                        logWarning("RAGService", "Embedding retry \(attempt)/\(RAGConfig.maxRetryAttempts)",
+                                   details: "Chunk \(index), bekleniyor: \(backoffDelay / 1_000_000)ms")
+                        try? await Task.sleep(nanoseconds: backoffDelay)
+                    }
+                }
             }
 
+            if !success {
+                failedChunks.append((index, chunk))
+                handleEmbeddingError(lastError!, index: index)
+            }
+
+            updateIndexingProgress(currentIndex: index, total: chunks.count)
+
+            // Rate limiting: Her chunk arasında bekle
             if index < chunks.count - 1 {
                 try? await Task.sleep(nanoseconds: RAGConfig.rateLimitDelay)
+            }
+
+            // Her 20 chunk'ta bir durumu logla
+            if (index + 1) % 20 == 0 {
+                logInfo("RAGService", "Embedding ilerleme",
+                        details: "\(index + 1)/\(chunks.count) (\(failedChunks.count) başarısız)")
+            }
+        }
+
+        // Final rapor
+        logInfo("RAGService", "Embedding tamamlandı",
+                details: "Başarılı: \(chunksWithEmbeddings.count)/\(chunks.count), Başarısız: \(failedChunks.count)")
+
+        // Başarısız chunk'ları tekrar dene (son şans)
+        if !failedChunks.isEmpty {
+            logWarning("RAGService", "Başarısız chunk'lar için son deneme", details: "\(failedChunks.count) chunk")
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 saniye bekle
+
+            for (index, chunk) in failedChunks {
+                do {
+                    let embedding = try await embeddingService.getOrCreateEmbedding(for: chunk.content)
+                    chunksWithEmbeddings.append((chunk, embedding))
+                    logInfo("RAGService", "Son denemede başarılı", details: "Chunk \(index)")
+                } catch {
+                    logError("RAGService", "Chunk kalıcı olarak başarısız: \(index)", error: error)
+                }
+                try? await Task.sleep(nanoseconds: RAGConfig.rateLimitDelay * 2)
             }
         }
 

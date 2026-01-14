@@ -33,7 +33,10 @@ enum RAGConfig {
     // MARK: - API Settings
     static let embeddingModel = "text-embedding-004"
     static let embeddingDimension = 768
-    static let rateLimitDelay: UInt64 = 25_000_000 // 30→25ms (daha hızlı)
+    static let rateLimitDelay: UInt64 = 100_000_000 // 100ms - Rate limit koruması
+    static let batchSize = 5                         // Batch embedding boyutu
+    static let maxRetryAttempts = 3                  // Hata durumunda retry sayısı
+    static let retryDelayBase: UInt64 = 500_000_000  // 500ms - Exponential backoff başlangıç
 
     // MARK: - Query Enhancement (Always Active)
     static let enableQueryExpansionForShortQueries = true  // < 5 kelime için otomatik

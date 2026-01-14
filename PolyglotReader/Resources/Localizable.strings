@@ -1,23 +1,367 @@
-/* Deep search active warning */
-"chat.deep_search_active" = "Derin Arama aktif - Yanıtlar daha yavaş olabilir";
+/* ============================================
+   Corio Docs - Turkish Localization
+   ============================================ */
 
-/* Terms and privacy acceptance notice */
+/* ===========================================
+   MARK: - Common UI Elements
+   =========================================== */
+
+/* Common Actions */
+"common.cancel" = "İptal";
+"common.close" = "Kapat";
+"common.done" = "Tamam";
+"common.ok" = "Tamam";
+"common.save" = "Kaydet";
+"common.delete" = "Sil";
+"common.edit" = "Düzenle";
+"common.retry" = "Tekrar Dene";
+"common.loading" = "Yükleniyor...";
+"common.error" = "Hata";
+"common.success" = "Başarılı";
+"common.next" = "Sonraki";
+"common.previous" = "Önceki";
+"common.finish" = "Bitir";
+"common.search" = "Ara";
+
+/* ===========================================
+   MARK: - Auth Module
+   =========================================== */
+
+/* App Title */
+"auth.app_name" = "Corio Docs";
+"auth.app_subtitle" = "Akıllı Doküman Asistanı";
+
+/* Features */
+"auth.feature.pdf_analysis" = "Doküman Analizi";
+"auth.feature.pdf_analysis.subtitle" = "Yapay zeka ile derinlemesine analiz";
+"auth.feature.translation" = "Akıllı Asistan";
+"auth.feature.translation.subtitle" = "Anında sorular ve cevaplar";
+"auth.feature.quiz" = "Quiz Oluştur";
+"auth.feature.quiz.subtitle" = "AI destekli öğrenme";
+
+/* Sign In */
+"auth.sign_in_google" = "Google ile Giriş Yap";
+"auth.sign_in_apple" = "Apple ile Giriş Yap";
+
+/* Terms */
 "auth.terms_notice" = "Devam ederek Kullanım Koşulları ve Gizlilik Politikasını kabul etmiş olursunuz.";
 
-/* No tagged files in folder */
+/* Errors */
+"auth.session_expired" = "Oturum süresi doldu. Lütfen tekrar giriş yapın.";
+"auth.apple_sign_in_failed" = "Apple ile giriş başarısız.";
+
+/* Accessibility */
+"auth.accessibility.logo" = "Corio Docs logosu";
+"auth.accessibility.apple_button" = "Apple ile giriş yap";
+"auth.accessibility.apple_button.hint" = "Apple hesabınızla giriş yapmak için dokunun";
+"auth.accessibility.google_button" = "Google ile giriş yap";
+"auth.accessibility.google_button.hint" = "Google hesabınızla giriş yapmak için dokunun";
+
+/* ===========================================
+   MARK: - Library Module
+   =========================================== */
+
+/* Navigation */
+"library.title" = "Kütüphane";
+"library.search_placeholder" = "Dosya ara...";
+
+/* Empty State */
+"library.empty.title" = "Kütüphaneniz Boş";
+"library.empty.subtitle" = "PDF yükleyerek başlayın";
+"library.empty.button" = "PDF Yükle";
+"library.no_files_in_folder" = "Bu klasörde dosya yok";
+
+/* Tags */
 "library.no_tagged_files" = "Bu klasörde etiketli dosya yok";
 
-/* Preparing quiz questions */
+/* Upload */
+"library.uploading" = "Yükleniyor... %%%d";
+"library.upload_complete" = "Yükleme tamamlandı";
+
+/* Sorting */
+"library.sort.name" = "İsim";
+"library.sort.date" = "Tarih";
+"library.sort.size" = "Boyut";
+
+/* View Modes */
+"library.view.grid" = "Izgara görünümü";
+"library.view.list" = "Liste görünümü";
+
+/* Actions */
+"library.action.create_folder" = "Klasör Oluştur";
+"library.action.upload" = "PDF Yükle";
+"library.action.delete" = "Sil";
+"library.action.move" = "Taşı";
+"library.action.rename" = "Yeniden Adlandır";
+
+/* Accessibility */
+"library.accessibility.back" = "Geri";
+"library.accessibility.back.hint" = "Üst klasöre dön";
+"library.accessibility.view_mode" = "Görünüm değiştir";
+"library.accessibility.view_mode.hint" = "Izgara ve liste görünümü arasında geçiş yap";
+"library.accessibility.search" = "Ara";
+"library.accessibility.search.hint" = "Dosyalarınızda arama yapın";
+"library.accessibility.create_folder" = "Yeni klasör";
+"library.accessibility.create_folder.hint" = "Yeni bir klasör oluşturun";
+"library.accessibility.upload" = "PDF yükle";
+"library.accessibility.upload.hint" = "Yeni bir PDF dosyası yükleyin";
+
+/* ===========================================
+   MARK: - PDF Card
+   =========================================== */
+
+"pdf_card.pages" = "%d sayfa";
+"pdf_card.page" = "%d sayfa";
+"pdf_card.open" = "Aç";
+"pdf_card.summary" = "Özet";
+"pdf_card.regenerate_summary" = "Özeti Yenile";
+"pdf_card.move_to_folder" = "Klasöre Taşı";
+
+/* ===========================================
+   MARK: - Reader Module
+   =========================================== */
+
+/* Page Navigation */
+"reader.page" = "Sayfa %d / %d";
+"reader.go_to_page" = "Sayfaya Git";
+
+/* Toolbar */
+"reader.toolbar.chat" = "AI Sohbet";
+"reader.toolbar.quiz" = "Quiz";
+"reader.toolbar.notebook" = "Defterim";
+"reader.toolbar.share" = "Paylaş";
+
+/* Text Selection */
+"reader.selection.highlight" = "Vurgula";
+"reader.selection.underline" = "Altını Çiz";
+"reader.selection.strikethrough" = "Üstünü Çiz";
+"reader.selection.note" = "Not Ekle";
+"reader.selection.translate" = "Çevir";
+"reader.selection.ask_ai" = "AI'a Sor";
+"reader.selection.copy" = "Kopyala";
+
+/* Image Selection */
+"reader.image.analyze" = "Görseli Analiz Et";
+"reader.image.ask" = "Bu Görseli Sor";
+
+/* Notes */
+"reader.note.title" = "Not Ekle";
+"reader.note.placeholder" = "Notunuzu yazın...";
+"reader.note.save" = "Kaydet";
+
+/* Accessibility */
+"reader.accessibility.previous_page" = "Önceki sayfa";
+"reader.accessibility.next_page" = "Sonraki sayfa";
+"reader.accessibility.zoom_in" = "Yakınlaştır";
+"reader.accessibility.zoom_out" = "Uzaklaştır";
+"reader.accessibility.chat" = "AI sohbetini aç";
+"reader.accessibility.quiz" = "Quiz oluştur";
+
+/* ===========================================
+   MARK: - Chat Module
+   =========================================== */
+
+/* Navigation */
+"chat.title" = "AI Asistan";
+
+/* Input */
+"chat.placeholder" = "Bir şey sor...";
+"chat.send" = "Gönder";
+
+/* Selected Content */
+"chat.selected_image" = "Seçili Görsel";
+"chat.selected_text" = "Seçili Metin";
+"chat.ask_about_image" = "Bu görseli sor";
+"chat.ask_about_text" = "Bu metni sor";
+"chat.ask_image_prompt" = "Bu görsel nedir? Bana açıklar mısın?";
+"chat.ask_text_prompt" = "Şu metin hakkında bilgi ver:";
+
+/* Deep Search */
+"chat.deep_search" = "Derin Arama";
+"chat.deep_search_active" = "Derin Arama aktif - Yanıtlar daha yavaş olabilir";
+
+/* Indexing Status */
+"chat.indexing.checking" = "Doküman kontrol ediliyor...";
+"chat.indexing.indexing" = "Doküman hazırlanıyor... %%%d";
+"chat.indexing.not_indexed" = "Doküman henüz hazır değil";
+"chat.indexing.failed" = "Hazırlık başarısız";
+"chat.indexing.ready" = "Doküman hazır";
+"chat.indexing.subtitle.indexing" = "Sorularınız yakında daha doğru yanıtlanacak";
+"chat.indexing.subtitle.not_indexed" = "Genel yanıtlar alacaksınız";
+
+/* Messages */
+"chat.context_indicator" = "📝 Seçili metin ile";
+
+/* Accessibility */
+"chat.accessibility.send" = "Mesaj gönder";
+"chat.accessibility.send.hint" = "Mesajınızı AI asistana gönderin";
+"chat.accessibility.deep_search" = "Derin arama";
+"chat.accessibility.deep_search.on" = "Derin arama açık";
+"chat.accessibility.deep_search.off" = "Derin arama kapalı";
+"chat.accessibility.close" = "Sohbeti kapat";
+"chat.accessibility.your_message" = "Sizin mesajınız";
+"chat.accessibility.ai_response" = "AI yanıtı";
+"chat.accessibility.clear_selection" = "Seçimi temizle";
+
+/* Error Prefixes */
+"chat.error.prefix" = "Üzgünüm, bir hata oluştu:";
+"chat.image_error.prefix" = "Üzgünüm, görsel analiz edilirken bir hata oluştu:";
+
+/* ===========================================
+   MARK: - Settings Module
+   =========================================== */
+
+/* Navigation */
+"settings.title" = "Ayarlar";
+
+/* Sections */
+"settings.section.appearance" = "Görünüm";
+"settings.section.features" = "Özellikler";
+"settings.section.about" = "Hakkında";
+
+/* Appearance */
+"settings.theme" = "Tema";
+"settings.theme.system" = "Sistem";
+"settings.theme.light" = "Açık";
+"settings.theme.dark" = "Koyu";
+
+/* Features */
+"settings.auto_summary" = "Otomatik Özet";
+"settings.notifications" = "Bildirimler";
+"settings.default_language" = "Varsayılan Dil";
+"settings.language.turkish" = "Türkçe";
+"settings.language.english" = "English";
+
+/* About */
+"settings.version" = "Versiyon";
+"settings.debug_logs" = "Debug Logları";
+"settings.privacy_policy" = "Gizlilik Politikası";
+"settings.terms_of_service" = "Kullanım Koşulları";
+
+/* Account */
+"settings.sign_out" = "Çıkış Yap";
+
+/* Accessibility */
+"settings.accessibility.theme" = "Tema seçimi";
+"settings.accessibility.auto_summary" = "Otomatik özet";
+"settings.accessibility.auto_summary.hint" = "PDF'ler açıldığında otomatik özet oluştur";
+"settings.accessibility.notifications" = "Bildirimler";
+"settings.accessibility.notifications.hint" = "Uygulama bildirimlerini aç veya kapat";
+"settings.accessibility.sign_out" = "Çıkış yap";
+"settings.accessibility.sign_out.hint" = "Hesabınızdan çıkış yapın";
+
+/* ===========================================
+   MARK: - Quiz Module
+   =========================================== */
+
+/* Navigation */
+"quiz.title" = "AI Quiz";
+
+/* States */
+"quiz.loading.title" = "Quiz Oluşturuluyor...";
 "quiz.preparing_questions" = "Doküman analiz ediliyor ve sorular hazırlanıyor";
+"quiz.error.title" = "Quiz oluşturulamadı";
 
-/* Question progress format */
+/* Progress */
 "quiz.question_progress" = "Soru %d / %d";
+"quiz.score" = "Puan: %d";
 
-/* Quiz score summary */
+/* Question */
+"quiz.explanation" = "Açıklama";
+
+/* Result */
+"quiz.complete.title" = "Quiz Tamamlandı!";
 "quiz.score_summary" = "%d sorudan %d tanesini doğru cevapladınız.";
 
-/* More files button */
+/* Accessibility */
+"quiz.accessibility.option" = "Seçenek %d";
+"quiz.accessibility.correct" = "Doğru cevap";
+"quiz.accessibility.incorrect" = "Yanlış cevap";
+"quiz.accessibility.next" = "Sonraki soru";
+"quiz.accessibility.finish" = "Quiz'i bitir";
+
+/* ===========================================
+   MARK: - Notebook Module
+   =========================================== */
+
+/* Navigation */
+"notebook.title" = "Defterim";
+"notebook.all_files" = "Tüm Dosyalar";
+"notebook.file_notes" = "Dosya Notları";
+
+/* Loading */
+"notebook.loading" = "Notlar yükleniyor...";
+
+/* Empty State */
+"notebook.empty.title" = "Henüz Not Yok";
+"notebook.empty.subtitle" = "PDF'lerinizde metin seçerek\nnot almaya başlayın";
+"notebook.empty.filtered.title" = "Sonuç Bulunamadı";
+"notebook.empty.filtered.subtitle" = "Farklı filtre seçenekleri deneyin";
+"notebook.clear_filters" = "Filtreleri Temizle";
+
+/* More Files */
 "notebook.more_files" = "+ %d dosya daha";
+
+/* Errors */
+"notebook.error.file_not_found" = "Dosya bilgisi bulunamadı";
+"notebook.error.file_open" = "Dosya açılırken hata:";
+
+/* Accessibility */
+"notebook.accessibility.refresh" = "Yenile";
+"notebook.accessibility.refresh.hint" = "Notları yeniden yükle";
+"notebook.accessibility.category" = "%@ kategorisi";
+"notebook.accessibility.annotation_count" = "%d not";
+
+/* ===========================================
+   MARK: - Offline / Network
+   =========================================== */
+
+/* Status */
+"offline.title" = "Çevrimdışı";
+"offline.connected" = "Bağlı";
+"offline.syncing" = "Senkronize ediliyor... %%%d";
+"offline.pending" = "%d bekleyen işlem";
+
+/* Subtitle */
+"offline.subtitle.offline" = "Değişiklikler bağlantı sağlandığında senkronize edilecek";
+"offline.subtitle.syncing" = "İşlemler arka planda tamamlanıyor";
+
+/* Features */
+"offline.feature.pdf_reading" = "PDF Okuma";
+"offline.feature.pdf_reading.subtitle" = "Önbelleğe alınmış dosyalar okunabilir";
+"offline.feature.notes" = "Notlar";
+"offline.feature.notes.subtitle" = "Yerel olarak kaydedilir";
+"offline.feature.ai" = "AI Özellikler";
+"offline.feature.ai.subtitle" = "İnternet bağlantısı gerekli";
+"offline.feature.upload" = "Dosya Yükleme";
+"offline.feature.upload.subtitle" = "İnternet bağlantısı gerekli";
+
+/* Connection */
+"offline.connection" = "Bağlantı:";
+"offline.mobile_data" = "Mobil veri kullanılıyor";
+"offline.pending_sync" = "%d işlem senkronize edilecek";
+
+/* Actions */
+"offline.sync_now" = "Şimdi Senkronize Et";
+
+/* Connection Types */
+"offline.connection.wifi" = "WiFi";
+"offline.connection.cellular" = "Mobil";
+"offline.connection.ethernet" = "Ethernet";
+"offline.connection.unknown" = "Bilinmiyor";
+
+/* ===========================================
+   MARK: - Folders
+   =========================================== */
+
+"folder.create.title" = "Yeni Klasör";
+"folder.create.placeholder" = "Klasör adı";
+"folder.create.button" = "Oluştur";
+"folder.delete.confirm" = "Bu klasörü silmek istediğinizden emin misiniz?";
+
+/* ===========================================
+   MARK: - Error Messages
+   =========================================== */
 
 /* Error Titles */
 "error.title" = "Hata";
@@ -84,10 +428,30 @@
 "recovery.pdf.decrypt" = "PDF şifresini kaldırıp tekrar deneyin.";
 "recovery.pdf.try_another" = "Farklı bir PDF dosyası deneyin.";
 
-/* Chat Error Prefixes */
-"chat.error.prefix" = "Üzgünüm, bir hata oluştu:";
-"chat.image_error.prefix" = "Üzgünüm, görsel analiz edilirken bir hata oluştu:";
+/* ===========================================
+   MARK: - Accessibility General
+   =========================================== */
 
-/* Auth Errors */
-"auth.session_expired" = "Oturum süresi doldu. Lütfen tekrar giriş yapın.";
-"auth.apple_sign_in_failed" = "Apple ile giriş başarısız.";
+"accessibility.button" = "Düğme";
+"accessibility.selected" = "Seçili";
+"accessibility.not_selected" = "Seçili değil";
+"accessibility.expanded" = "Genişletildi";
+"accessibility.collapsed" = "Daraltıldı";
+"accessibility.loading" = "Yükleniyor";
+"accessibility.double_tap" = "Etkinleştirmek için çift dokunun";
+"accessibility.swipe_actions" = "İşlemler için sola kaydırın";
+
+/* ===========================================
+   MARK: - Debug
+   =========================================== */
+
+"debug.logs.title" = "Debug Logları";
+"debug.logs.clear" = "Logları Temizle";
+"debug.logs.export" = "Logları Paylaş";
+"debug.logs.empty" = "Log bulunamadı";
+"debug.logs.filter" = "Filtrele";
+"debug.logs.total" = "Toplam";
+"debug.logs.errors" = "Hata";
+"debug.logs.warnings" = "Uyarı";
+"debug.logs.all" = "Tümü";
+"debug.logs.search_source" = "Kaynak ara...";

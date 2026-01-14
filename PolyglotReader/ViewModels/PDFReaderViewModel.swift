@@ -23,6 +23,9 @@ class PDFReaderViewModel: ObservableObject {
     @Published var showTranslationPopup = false
     @Published var extractedText = ""
 
+    // MARK: - Network Status (Phase 6)
+    @Published private(set) var isOffline = false  // Çevrimdışı durumu
+
     // Hızlı Çeviri Modu
     @Published var isQuickTranslationMode = false
     @Published var showQuickTranslation = false
@@ -41,10 +44,39 @@ class PDFReaderViewModel: ObservableObject {
     // MARK: - Page Pre-rendering
     private var pagePreRenderingTask: Task<Void, Never>?
     private var progressUpdateTask: Task<Void, Never>?
+    private var networkObserver: AnyCancellable?
     private let adjacentPagesToPreRender = 1  // Pre-render 1 page ahead/behind
 
     init(file: PDFDocumentMetadata) {
         self.fileMetadata = file
+        setupNetworkObserver()
+        #if DEBUG
+        MemoryDebugger.shared.logInit(self)
+        #endif
+    }
+
+    deinit {
+        #if DEBUG
+        // Log deinit immediately without creating a Task that could hold references
+        print("[MemoryDebugger] [DEINIT] PDFReaderViewModel")
+        #endif
+        pagePreRenderingTask?.cancel()
+        progressUpdateTask?.cancel()
+        networkObserver?.cancel()
+    }
+
+    // MARK: - Network Observer (Phase 6)
+
+    private func setupNetworkObserver() {
+        networkObserver = NetworkMonitor.shared.$isConnected
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isConnected in
+                self?.isOffline = !isConnected
+                if isConnected {
+                    logInfo("PDFReaderVM", "Network restored - syncing pending annotations")
+                    SyncQueue.shared.processQueue()
+                }
+            }
     }
 
     // MARK: - Load Document
@@ -421,7 +453,17 @@ class PDFReaderViewModel: ObservableObject {
         annotations.append(annotation)
 
         do {
-            try await supabaseService.saveAnnotation(annotation)
+            // Phase 6: Queue if offline
+            if NetworkMonitor.shared.isConnected {
+                try await supabaseService.saveAnnotation(annotation)
+            } else {
+                try SyncQueue.shared.enqueue(
+                    type: .annotationCreate,
+                    object: annotation,
+                    fileId: fileMetadata.id
+                )
+                logInfo("PDFReaderVM", "Annotation queued for sync (offline)")
+            }
         } catch {
             logError("PDFReaderVM", "Failed to save annotation", error: error)
         }
@@ -444,8 +486,20 @@ class PDFReaderViewModel: ObservableObject {
 
         // Supabase'de güncelle
         do {
-            try await supabaseService.updateAnnotation(id: annotationId, note: note)
-            logInfo("PDFReaderVM", "Not güncellendi", details: "ID: \(annotationId)")
+            // Phase 6: Queue if offline
+            if NetworkMonitor.shared.isConnected {
+                try await supabaseService.updateAnnotation(id: annotationId, note: note)
+                logInfo("PDFReaderVM", "Not güncellendi", details: "ID: \(annotationId)")
+            } else {
+                if let annotation = annotations.first(where: { $0.id == annotationId }) {
+                    try SyncQueue.shared.enqueue(
+                        type: .annotationUpdate,
+                        object: annotation,
+                        fileId: fileMetadata.id
+                    )
+                    logInfo("PDFReaderVM", "Annotation update queued (offline)")
+                }
+            }
         } catch {
             logError("PDFReaderVM", "Not güncelleme hatası", error: error)
         }
@@ -459,8 +513,18 @@ class PDFReaderViewModel: ObservableObject {
 
         // Supabase'den sil
         do {
-            try await supabaseService.deleteAnnotation(id: annotationId)
-            logInfo("PDFReaderVM", "Annotation silindi", details: "ID: \(annotationId)")
+            // Phase 6: Queue if offline
+            if NetworkMonitor.shared.isConnected {
+                try await supabaseService.deleteAnnotation(id: annotationId)
+                logInfo("PDFReaderVM", "Annotation silindi", details: "ID: \(annotationId)")
+            } else {
+                SyncQueue.shared.enqueue(
+                    type: .annotationDelete,
+                    payload: Data(annotationId.utf8),
+                    fileId: fileMetadata.id
+                )
+                logInfo("PDFReaderVM", "Annotation deletion queued (offline)")
+            }
         } catch {
             logError("PDFReaderVM", "Annotation silme hatası", error: error)
         }

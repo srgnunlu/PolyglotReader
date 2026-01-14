@@ -39,17 +39,24 @@ export async function saveChatMessage(
 ): Promise<void> {
     const supabase = getSupabase();
 
+    // Get current user for user_id
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        console.error('❌ Error saving chat message: No authenticated user');
+        throw new Error('No authenticated user');
+    }
+
     const { error } = await supabase
         .from('chats')
         .insert({
             file_id: fileId,
+            user_id: user.id,
             role,
             content
-            // user_id otomatik olarak RLS policy tarafından set ediliyor
         });
 
     if (error) {
-        console.error('❌ Error saving chat message:', error);
+        console.error('❌ Error saving chat message:', error.message || JSON.stringify(error));
         throw error;
     }
 }

@@ -22,9 +22,9 @@ export default function HomePage() {
   return (
     <div className={styles.container}>
       <div className={styles.content}>
-        <div className={styles.logo}>📚</div>
-        <h1 className={styles.title}>PolyglotReader</h1>
-        <p className={styles.subtitle}>AI-powered PDF reading & analysis</p>
+        <div className={styles.logo}>📄</div>
+        <h1 className={styles.title}>Corio Docs</h1>
+        <p className={styles.subtitle}>Akıllı Doküman Asistanı</p>
         <div className="spinner" style={{ width: 32, height: 32 }} />
       </div>
     </div>

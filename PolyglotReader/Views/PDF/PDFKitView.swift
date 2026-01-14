@@ -145,14 +145,17 @@ struct PDFKitView: UIViewRepresentable {
     }
 
     private func animateDocumentLoad(_ pdfView: CustomPDFView, coordinator: PDFKitCoordinator) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            pdfView.layoutIfNeeded()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
-                    pdfView.alpha = 1
-                } completion: { _ in
-                    coordinator.onRenderComplete?()
-                }
+        // Layout'u hemen zorla - büyük PDF'lerde bile hızlı olmalı
+        pdfView.layoutIfNeeded()
+
+        // Minimal delay sonra fade-in animasyonu başlat
+        // Eski: 0.3 + 0.2 + 0.25 = 0.75s toplam bekleme
+        // Yeni: 0.1 + 0.2 = 0.3s toplam - 60% daha hızlı
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseOut) {
+                pdfView.alpha = 1
+            } completion: { _ in
+                coordinator.onRenderComplete?()
             }
         }
     }

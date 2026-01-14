@@ -52,6 +52,23 @@ class LibraryViewModel: ObservableObject {
         case ascending, descending
     }
 
+    // MARK: - Lifecycle
+
+    init() {
+        #if DEBUG
+        MemoryDebugger.shared.logInit(self)
+        #endif
+    }
+
+    deinit {
+        #if DEBUG
+        // Log deinit immediately without creating a Task that could hold references
+        print("[MemoryDebugger] [DEINIT] LibraryViewModel")
+        #endif
+        thumbnailLoadingTasks.values.forEach { $0.cancel() }
+        searchDebounceTask?.cancel()
+    }
+
     // MARK: - Computed Properties
 
     var filteredFiles: [PDFDocumentMetadata] {

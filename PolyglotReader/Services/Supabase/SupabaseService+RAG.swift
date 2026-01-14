@@ -128,4 +128,62 @@ extension SupabaseService {
             .execute()
             .value
     }
+
+    // MARK: - Page & Content Based Search
+
+    /// Belirli sayfa numaralarındaki chunk'ları getir
+    func fetchChunksByPageNumbers(
+        fileId: String,
+        pageNumbers: [Int],
+        limit: Int
+    ) async throws -> [SupabaseChunkSlice] {
+        guard !pageNumbers.isEmpty else { return [] }
+
+        return try await perform(category: .database) {
+            try await client
+                .from("document_chunks")
+                .select("id, file_id, chunk_index, content, page_number")
+                .eq("file_id", value: fileId)
+                .in("page_number", values: pageNumbers)
+                .order("page_number", ascending: true)
+                .order("chunk_index", ascending: true)
+                .limit(limit)
+                .execute()
+                .value
+        }
+    }
+
+    /// İçerik araması ile chunk'ları getir (Figure, Table referansları için)
+    func fetchChunksByContentSearch(
+        fileId: String,
+        searchTerms: [String],
+        limit: Int
+    ) async throws -> [SupabaseChunkSlice] {
+        guard !searchTerms.isEmpty else { return [] }
+
+        // ILIKE araması için OR koşulu oluştur
+        // PostgreSQL'de: content ILIKE '%Figure 2-1%' OR content ILIKE '%Fig. 2-1%'
+        let likePatterns = searchTerms.map { "%\($0)%" }
+
+        return try await perform(category: .database) {
+            var query = client
+                .from("document_chunks")
+                .select("id, file_id, chunk_index, content, page_number")
+                .eq("file_id", value: fileId)
+
+            // İlk pattern
+            if let firstPattern = likePatterns.first {
+                query = query.ilike("content", pattern: firstPattern)
+            }
+
+            // Not: Supabase Swift SDK'da OR desteği sınırlı
+            // Birden fazla ILIKE için RPC fonksiyonu gerekebilir
+
+            return try await query
+                .order("page_number", ascending: true)
+                .limit(limit)
+                .execute()
+                .value
+        }
+    }
 }

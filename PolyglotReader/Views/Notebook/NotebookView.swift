@@ -7,6 +7,7 @@ struct NotebookView: View {
     @State private var showingCategory: NotebookCategory?
     @State private var showingFileId: String?
     @State private var showingAllFiles = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isDetailViewActive: Bool {
         showingAllFiles || showingCategory != nil || showingFileId != nil
@@ -35,18 +36,18 @@ struct NotebookView: View {
                     AllFilesView(
                         files: viewModel.fileAnnotationCounts,
                         onSelectFile: { fileId in
-                            withAnimation(.spring(response: 0.3)) {
+                            withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
                                 showingAllFiles = false
                                 showingFileId = fileId
                             }
                         },
                         onDismiss: {
-                            withAnimation(.spring(response: 0.3)) {
+                            withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
                                 showingAllFiles = false
                             }
                         }
                     )
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
                 } else if showingCategory != nil || showingFileId != nil {
                     // Kategori veya dosya detay view
                     NotebookCategoryView(
@@ -57,13 +58,13 @@ struct NotebookView: View {
                             navigateToFile(annotation: annotation)
                         },
                         onDismiss: {
-                            withAnimation(.spring(response: 0.3)) {
+                            withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
                                 showingCategory = nil
                                 showingFileId = nil
                             }
                         }
                     )
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
                 } else if viewModel.annotations.isEmpty {
                     EmptyNotebookView(
                         hasFilters: false
@@ -73,12 +74,12 @@ struct NotebookView: View {
                     NotebookDashboardView(
                         viewModel: viewModel,
                         onSelectCategory: { category in
-                            withAnimation(.spring(response: 0.3)) {
+                            withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
                                 showingCategory = category
                             }
                         },
                         onSelectFile: { fileId in
-                            withAnimation(.spring(response: 0.3)) {
+                            withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
                                 showingFileId = fileId
                             }
                         },
@@ -86,7 +87,7 @@ struct NotebookView: View {
                             navigateToFile(annotation: annotation)
                         },
                         onShowAllFiles: {
-                            withAnimation(.spring(response: 0.3)) {
+                            withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
                                 showingAllFiles = true
                             }
                         }
@@ -94,7 +95,7 @@ struct NotebookView: View {
                     .transition(.opacity)
                 }
             }
-            .navigationTitle(isDetailViewActive ? "" : "Defterim")
+            .navigationTitle(isDetailViewActive ? "" : "notebook.title".localized)
             .navigationBarTitleDisplayMode(isDetailViewActive ? .inline : .large)
             .navigationBarHidden(isDetailViewActive)
             .toolbar {
@@ -108,7 +109,11 @@ struct NotebookView: View {
                             Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundStyle(.secondary)
+                                .frame(minWidth: 44, minHeight: 44)
                         }
+                        .accessibilityLabel("notebook.accessibility.refresh".localized)
+                        .accessibilityHint("notebook.accessibility.refresh.hint".localized)
+                        .accessibilityIdentifier("refresh_notebook_button")
                     }
                 }
             }
@@ -118,11 +123,11 @@ struct NotebookView: View {
             .refreshable {
                 await viewModel.refreshAnnotations()
             }
-            .alert("Hata", isPresented: .init(
+            .alert("common.error".localized, isPresented: .init(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
             )) {
-                Button("Tamam", role: .cancel) { }
+                Button("common.ok".localized, role: .cancel) { }
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
@@ -134,15 +139,15 @@ struct NotebookView: View {
 
     private var navigationTitle: String {
         if showingAllFiles {
-            return "Tüm Dosyalar"
+            return "notebook.all_files".localized
         }
         if let category = showingCategory {
             return category.rawValue
         }
         if showingFileId != nil {
-            return "Dosya Notlari"
+            return "notebook.file_notes".localized
         }
-        return "Defterim"
+        return "notebook.title".localized
     }
 
     // MARK: - Navigation
@@ -157,12 +162,12 @@ struct NotebookView: View {
                     }
                 } else {
                     await MainActor.run {
-                        viewModel.errorMessage = "Dosya bilgisi bulunamadi"
+                        viewModel.errorMessage = "notebook.error.file_not_found".localized
                     }
                 }
             } catch {
                 await MainActor.run {
-                    viewModel.errorMessage = "Dosya acilirken hata: \(error.localizedDescription)"
+                    viewModel.errorMessage = "\("notebook.error.file_open".localized) \(error.localizedDescription)"
                 }
             }
         }
@@ -172,6 +177,7 @@ struct NotebookView: View {
 // MARK: - Premium Loading View
 struct NotebookLoadingView: View {
     @State private var isAnimating = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 20) {
@@ -199,13 +205,19 @@ struct NotebookLoadingView: View {
                     )
                     .frame(width: 50, height: 50)
                     .rotationEffect(.degrees(isAnimating ? 360 : 0))
-                    .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isAnimating)
+                    .animation(
+                        reduceMotion ? nil : .linear(duration: 1).repeatForever(autoreverses: false),
+                        value: isAnimating
+                    )
             }
+            .accessibilityHidden(true)
 
-            Text("Notlar yukleniyor...")
+            Text("notebook.loading".localized)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("notebook.loading".localized)
         .onAppear { isAnimating = true }
     }
 }
@@ -215,15 +227,16 @@ struct EmptyNotebookView: View {
     let hasFilters: Bool
     let onResetFilters: () -> Void
     @State private var isAnimating = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var emptyTitle: String {
-        hasFilters ? "Sonuc Bulunamadi" : "Henuz Not Yok"
+        hasFilters ? "notebook.empty.filtered.title".localized : "notebook.empty.title".localized
     }
 
     private var emptySubtitle: String {
         hasFilters
-            ? "Farkli filtre secenekleri deneyin"
-            : "PDF'lerinizde metin secerek\nnot almaya baslayin"
+            ? "notebook.empty.filtered.subtitle".localized
+            : "notebook.empty.subtitle".localized
     }
 
     var body: some View {
@@ -242,7 +255,10 @@ struct EmptyNotebookView: View {
                     )
                     .frame(width: 140, height: 140)
                     .scaleEffect(isAnimating ? 1.15 : 0.95)
-                    .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: isAnimating)
+                    .animation(
+                        reduceMotion ? nil : .easeInOut(duration: 2.5).repeatForever(autoreverses: true),
+                        value: isAnimating
+                    )
 
                 // Secondary glow
                 Circle()
@@ -256,7 +272,10 @@ struct EmptyNotebookView: View {
                     )
                     .frame(width: 100, height: 100)
                     .scaleEffect(isAnimating ? 1.0 : 1.1)
-                    .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true).delay(0.5), value: isAnimating)
+                    .animation(
+                        reduceMotion ? nil : .easeInOut(duration: 2).repeatForever(autoreverses: true).delay(0.5),
+                        value: isAnimating
+                    )
 
                 // Icon
                 Image(systemName: hasFilters ? "bookmark.slash" : "bookmark.square")
@@ -269,11 +288,12 @@ struct EmptyNotebookView: View {
                         )
                     )
             }
+            .accessibilityHidden(true)
 
             VStack(spacing: 10) {
                 Text(emptyTitle)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.title2.bold())
+                    .accessibilityAddTraits(.isHeader)
 
                 Text(emptySubtitle)
                     .font(.subheadline)
@@ -287,12 +307,13 @@ struct EmptyNotebookView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 14))
-                        Text("Filtreleri Temizle")
+                        Text("notebook.clear_filters".localized)
                             .font(.subheadline.weight(.semibold))
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 14)
+                    .frame(minHeight: 44)
                     .background {
                         Capsule()
                             .fill(
@@ -306,6 +327,7 @@ struct EmptyNotebookView: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("clear_filters_button")
             }
         }
         .padding()

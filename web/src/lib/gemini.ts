@@ -4,7 +4,7 @@ const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!);
 
 function getModel(): GenerativeModel {
     return genAI.getGenerativeModel({
-        model: process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-1.5-flash'
+        model: process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-3-flash-preview'
     });
 }
 
@@ -100,21 +100,21 @@ function shouldTranslateQuery(query: string): boolean {
         console.log(`🔒 Query contains structural reference, skipping translation: "${query}"`);
         return false;
     }
-    
+
     // Çok kısa sorguları çevirme (3 kelime veya daha az)
     const wordCount = query.trim().split(/\s+/).length;
     if (wordCount <= 3) {
         console.log(`🔒 Query too short (${wordCount} words), skipping translation: "${query}"`);
         return false;
     }
-    
+
     // Karmaşık tıbbi/teknik terimler varsa çevir
     const complexTerms = /\b(kardiyovasküler|pulmoner|nörolojik|travma|resüsitasyon|patofizyoloji|farmakoloji)\b/i;
     if (complexTerms.test(query)) {
         console.log(`🔄 Query contains complex medical terms, will translate: "${query}"`);
         return true;
     }
-    
+
     // Varsayılan: Türkçe karakter varsa ama yapısal referans yoksa çevirme
     // Basit sorular için direkt Türkçe arama daha iyi sonuç verir
     console.log(`🔒 Using original query without translation: "${query}"`);
@@ -127,7 +127,7 @@ function shouldTranslateQuery(query: string): boolean {
  */
 export async function translateAndExpandQuery(query: string): Promise<string> {
     const model = getModel();
-    
+
     const prompt = `Sen bir tıbbi terminoloji uzmanısın. Aşağıdaki Türkçe sorguyu İngilizce'ye çevir ve tıbbi terimlerle genişlet.
 
 Türkçe sorgu: "${query}"
@@ -235,7 +235,7 @@ export async function* streamChatWithRAGAndHistory(
     // GÜNCELLEME: Sadece karmaşık sorguları çevir/genişlet, yapısal referansları koru
     let searchQuery = message;
     const hasTurkishChars = /[çğıöşüÇĞİÖŞÜ]/.test(message);
-    
+
     // Akıllı çeviri: "Tablo 2-1" gibi referansları korur
     if (hasTurkishChars && shouldTranslateQuery(message)) {
         try {

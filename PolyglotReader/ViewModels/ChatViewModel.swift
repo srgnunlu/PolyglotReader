@@ -29,6 +29,9 @@ class ChatViewModel: ObservableObject {
     @Published var indexingProgress: Float = 0    // İndexleme ilerlemesi (0-1)
     @Published var indexingStatus: IndexingStatus = .unknown
 
+    // MARK: - Network Status (Phase 6)
+    @Published private(set) var isOffline = false  // Çevrimdışı durumu
+
     enum IndexingStatus: Equatable {
         case unknown           // Henüz kontrol edilmedi
         case checking          // Kontrol ediliyor
@@ -127,12 +130,53 @@ class ChatViewModel: ObservableObject {
 
     private var indexingObserver: AnyCancellable?
     private var progressObserver: AnyCancellable?
+    private var networkObserver: AnyCancellable?
 
     init(fileId: String) {
         self.fileId = fileId
         self.fileUUID = UUID(uuidString: fileId)
         addWelcomeMessage()
         setupIndexingObservers()
+        setupNetworkObserver()
+        #if DEBUG
+        MemoryDebugger.shared.logInit(self)
+        #endif
+    }
+
+    deinit {
+        #if DEBUG
+        // Log deinit immediately without creating a Task that could hold references
+        print("[MemoryDebugger] [DEINIT] ChatViewModel")
+        #endif
+        indexingObserver?.cancel()
+        progressObserver?.cancel()
+        networkObserver?.cancel()
+    }
+
+    // MARK: - Network Observer (Phase 6)
+
+    private func setupNetworkObserver() {
+        networkObserver = NetworkMonitor.shared.$isConnected
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isConnected in
+                self?.isOffline = !isConnected
+                if isConnected {
+                    logInfo("ChatViewModel", "Network restored - chat ready")
+                } else {
+                    logWarning("ChatViewModel", "Network lost - AI features disabled")
+                }
+            }
+    }
+
+    /// Whether AI features are available (requires network)
+    var canUseAIFeatures: Bool {
+        !isOffline
+    }
+
+    /// Get offline message for AI features
+    var offlineMessage: String? {
+        guard isOffline else { return nil }
+        return "🔌 Çevrimdışısınız. AI özellikleri internet bağlantısı gerektirir."
     }
 
     private func addWelcomeMessage() {

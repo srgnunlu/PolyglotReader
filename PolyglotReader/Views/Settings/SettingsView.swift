@@ -23,10 +23,10 @@ struct SettingsView: View {
                                     .frame(width: 60, height: 60)
 
                                 Text(String(user.name.prefix(1)).uppercased())
-                                    .font(.title2)
-                                    .fontWeight(.bold)
+                                    .font(.title2.bold())
                                     .foregroundStyle(.white)
                             }
+                            .accessibilityHidden(true)
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(user.name)
@@ -38,14 +38,16 @@ struct SettingsView: View {
                             }
                         }
                         .padding(.vertical, 8)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("\(user.name), \(user.email)")
                     }
                 }
 
                 // Appearance Section
-                Section("Görünüm") {
+                Section("settings.section.appearance".localized) {
                     // Theme Picker
                     HStack {
-                        Label("Tema", systemImage: "paintbrush")
+                        Label("settings.theme".localized, systemImage: "paintbrush")
 
                         Spacer()
 
@@ -56,52 +58,72 @@ struct SettingsView: View {
                         }
                         .pickerStyle(.menu)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("settings.accessibility.theme".localized)
+                    .accessibilityValue(settingsViewModel.preferences.theme.displayName)
+                    .accessibilityIdentifier("theme_picker")
                 }
 
                 // Features Section
-                Section("Özellikler") {
+                Section("settings.section.features".localized) {
                     Toggle(isOn: $settingsViewModel.preferences.autoSummary) {
-                        Label("Otomatik Özet", systemImage: "doc.text.magnifyingglass")
+                        Label("settings.auto_summary".localized, systemImage: "doc.text.magnifyingglass")
                     }
                     .tint(.indigo)
+                    .accessibilityLabel("settings.accessibility.auto_summary".localized)
+                    .accessibilityHint("settings.accessibility.auto_summary.hint".localized)
+                    .accessibilityIdentifier("auto_summary_toggle")
 
                     Toggle(isOn: $settingsViewModel.preferences.enableNotifications) {
-                        Label("Bildirimler", systemImage: "bell")
+                        Label("settings.notifications".localized, systemImage: "bell")
                     }
                     .tint(.indigo)
+                    .accessibilityLabel("settings.accessibility.notifications".localized)
+                    .accessibilityHint("settings.accessibility.notifications.hint".localized)
+                    .accessibilityIdentifier("notifications_toggle")
 
                     HStack {
-                        Label("Varsayılan Dil", systemImage: "globe")
+                        Label("settings.default_language".localized, systemImage: "globe")
 
                         Spacer()
 
                         Picker("", selection: $settingsViewModel.preferences.defaultLanguage) {
-                            Text("Türkçe").tag("tr")
-                            Text("English").tag("en")
+                            Text("settings.language.turkish".localized).tag("tr")
+                            Text("settings.language.english".localized).tag("en")
                         }
                         .pickerStyle(.menu)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("settings.default_language".localized)
+                    .accessibilityValue(
+                        settingsViewModel.preferences.defaultLanguage == "tr"
+                            ? "settings.language.turkish".localized
+                            : "settings.language.english".localized
+                    )
+                    .accessibilityIdentifier("language_picker")
                 }
 
                 // About Section
-                Section("Hakkında") {
+                Section("settings.section.about".localized) {
                     HStack {
-                        Label("Versiyon", systemImage: "info.circle")
+                        Label("settings.version".localized, systemImage: "info.circle")
                         Spacer()
                         Text("1.0.0")
                             .foregroundStyle(.secondary)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("settings.version".localized)
+                    .accessibilityValue("1.0.0")
 
                     NavigationLink {
                         DebugLogsView()
                     } label: {
                         HStack {
-                            Label("Debug Logları", systemImage: "ladybug")
+                            Label("settings.debug_logs".localized, systemImage: "ladybug")
                             Spacer()
                             if LoggingService.shared.errorCount > 0 {
                                 Text(String(LoggingService.shared.errorCount))
-                                    .font(.caption2)
-                                    .fontWeight(.medium)
+                                    .font(.caption2.weight(.medium))
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
@@ -110,17 +132,20 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    .accessibilityIdentifier("debug_logs_link")
 
                     if let privacyURL = URL(string: "https://polyglotreader.app/privacy") {
                         Link(destination: privacyURL) {
-                            Label("Gizlilik Politikası", systemImage: "hand.raised")
+                            Label("settings.privacy_policy".localized, systemImage: "hand.raised")
                         }
+                        .accessibilityIdentifier("privacy_policy_link")
                     }
 
                     if let termsURL = URL(string: "https://polyglotreader.app/terms") {
                         Link(destination: termsURL) {
-                            Label("Kullanım Koşulları", systemImage: "doc.text")
+                            Label("settings.terms_of_service".localized, systemImage: "doc.text")
                         }
+                        .accessibilityIdentifier("terms_link")
                     }
                 }
 
@@ -133,13 +158,16 @@ struct SettingsView: View {
                     } label: {
                         HStack {
                             Spacer()
-                            Label("Çıkış Yap", systemImage: "rectangle.portrait.and.arrow.right")
+                            Label("settings.sign_out".localized, systemImage: "rectangle.portrait.and.arrow.right")
                             Spacer()
                         }
                     }
+                    .accessibilityLabel("settings.accessibility.sign_out".localized)
+                    .accessibilityHint("settings.accessibility.sign_out.hint".localized)
+                    .accessibilityIdentifier("sign_out_button")
                 }
             }
-            .navigationTitle("Ayarlar")
+            .navigationTitle("settings.title".localized)
         }
     }
 }

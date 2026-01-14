@@ -286,7 +286,9 @@ async function createEmbedding(text: string): Promise<number[]> {
     );
 
     if (!response.ok) {
-        throw new Error(`Embedding failed: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('Embedding API error:', errorText);
+        throw new Error(`Embedding failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();

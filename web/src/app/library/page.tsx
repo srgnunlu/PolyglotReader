@@ -65,8 +65,8 @@ function LibraryContent() {
             <aside className={styles.sidebar}>
                 <div className={styles.sidebarHeader}>
                     <div className={styles.logo}>
-                        <span className={styles.logoIcon}>📚</span>
-                        <span className={styles.logoText}>PolyglotReader</span>
+                        <span className={styles.logoIcon}>📄</span>
+                        <span className={styles.logoText}>Corio Docs</span>
                     </div>
                 </div>
 

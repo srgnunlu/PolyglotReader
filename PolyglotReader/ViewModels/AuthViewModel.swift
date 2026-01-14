@@ -37,6 +37,19 @@ class AuthViewModel: ObservableObject {
         Task {
             await checkExistingSession()
         }
+
+        #if DEBUG
+        MemoryDebugger.shared.logInit(self)
+        #endif
+    }
+
+    deinit {
+        #if DEBUG
+        // Log deinit immediately without creating a Task that could hold references
+        print("[MemoryDebugger] [DEINIT] AuthViewModel")
+        #endif
+        NotificationCenter.default.removeObserver(self)
+        cancellables.removeAll()
     }
 
     // MARK: - Check Existing Session

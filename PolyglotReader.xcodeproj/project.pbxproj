@@ -12,9 +12,28 @@
 		6B9AC8C52EF44AA200369EF8 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = 6B9AC8C42EF44AA200369EF8 /* GoogleGenerativeAI */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		6BCA40C92F16E12700735204 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6B9AC8612EF43FBE00369EF8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6B9AC8682EF43FBE00369EF8;
+			remoteInfo = PolyglotReader;
+		};
+		6BCA410E2F16E1EB00735204 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6B9AC8612EF43FBE00369EF8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6B9AC8682EF43FBE00369EF8;
+			remoteInfo = PolyglotReader;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		6B8FDF582F009B5500C2FB33 /* AI_HIGHLIGHT_CRASH_FIXES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AI_HIGHLIGHT_CRASH_FIXES.md; sourceTree = "<group>"; };
 		6B9AC8692EF43FBE00369EF8 /* PolyglotReader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PolyglotReader.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6BCA40C52F16E12700735204 /* PolyglotReaderTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PolyglotReaderTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6BCA41082F16E1EB00735204 /* PolyglotReaderUİTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = "PolyglotReaderUİTests.xctest"; path = PolyglotReaderUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -36,6 +55,16 @@
 			path = PolyglotReader;
 			sourceTree = "<group>";
 		};
+		6BCA40C62F16E12700735204 /* PolyglotReaderTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PolyglotReaderTests;
+			sourceTree = "<group>";
+		};
+		6BCA41092F16E1EB00735204 /* PolyglotReaderUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PolyglotReaderUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,6 +77,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6BCA40C22F16E12700735204 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6BCA41052F16E1EB00735204 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -55,6 +98,8 @@
 			isa = PBXGroup;
 			children = (
 				6B9AC86B2EF43FBE00369EF8 /* PolyglotReader */,
+				6BCA40C62F16E12700735204 /* PolyglotReaderTests */,
+				6BCA41092F16E1EB00735204 /* PolyglotReaderUITests */,
 				6B9AC8BC2EF4446400369EF8 /* Frameworks */,
 				6B9AC86A2EF43FBE00369EF8 /* Products */,
 				6B8FDF582F009B5500C2FB33 /* AI_HIGHLIGHT_CRASH_FIXES.md */,
@@ -65,6 +110,8 @@
 			isa = PBXGroup;
 			children = (
 				6B9AC8692EF43FBE00369EF8 /* PolyglotReader.app */,
+				6BCA40C52F16E12700735204 /* PolyglotReaderTests.xctest */,
+				6BCA41082F16E1EB00735204 /* PolyglotReaderUİTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -104,6 +151,52 @@
 			productReference = 6B9AC8692EF43FBE00369EF8 /* PolyglotReader.app */;
 			productType = "com.apple.product-type.application";
 		};
+		6BCA40C42F16E12700735204 /* PolyglotReaderTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6BCA40CB2F16E12700735204 /* Build configuration list for PBXNativeTarget "PolyglotReaderTests" */;
+			buildPhases = (
+				6BCA40C12F16E12700735204 /* Sources */,
+				6BCA40C22F16E12700735204 /* Frameworks */,
+				6BCA40C32F16E12700735204 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6BCA40CA2F16E12700735204 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				6BCA40C62F16E12700735204 /* PolyglotReaderTests */,
+			);
+			name = PolyglotReaderTests;
+			packageProductDependencies = (
+			);
+			productName = PolyglotReaderTests;
+			productReference = 6BCA40C52F16E12700735204 /* PolyglotReaderTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		6BCA41072F16E1EB00735204 /* PolyglotReaderUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6BCA41102F16E1EB00735204 /* Build configuration list for PBXNativeTarget "PolyglotReaderUITests" */;
+			buildPhases = (
+				6BCA41042F16E1EB00735204 /* Sources */,
+				6BCA41052F16E1EB00735204 /* Frameworks */,
+				6BCA41062F16E1EB00735204 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6BCA410F2F16E1EB00735204 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				6BCA41092F16E1EB00735204 /* PolyglotReaderUITests */,
+			);
+			name = PolyglotReaderUITests;
+			packageProductDependencies = (
+			);
+			productName = PolyglotReaderUITests;
+			productReference = 6BCA41082F16E1EB00735204 /* PolyglotReaderUİTests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -116,6 +209,14 @@
 				TargetAttributes = {
 					6B9AC8682EF43FBE00369EF8 = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					6BCA40C42F16E12700735204 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 6B9AC8682EF43FBE00369EF8;
+					};
+					6BCA41072F16E1EB00735204 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 6B9AC8682EF43FBE00369EF8;
 					};
 				};
 			};
@@ -138,6 +239,8 @@
 			projectRoot = "";
 			targets = (
 				6B9AC8682EF43FBE00369EF8 /* PolyglotReader */,
+				6BCA40C42F16E12700735204 /* PolyglotReaderTests */,
+				6BCA41072F16E1EB00735204 /* PolyglotReaderUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -148,6 +251,20 @@
 			buildActionMask = 2147483647;
 			files = (
 				6B8FDF592F009B5600C2FB33 /* AI_HIGHLIGHT_CRASH_FIXES.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6BCA40C32F16E12700735204 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6BCA41062F16E1EB00735204 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -182,7 +299,34 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6BCA40C12F16E12700735204 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6BCA41042F16E1EB00735204 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6BCA40CA2F16E12700735204 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6B9AC8682EF43FBE00369EF8 /* PolyglotReader */;
+			targetProxy = 6BCA40C92F16E12700735204 /* PBXContainerItemProxy */;
+		};
+		6BCA410F2F16E1EB00735204 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6B9AC8682EF43FBE00369EF8 /* PolyglotReader */;
+			targetProxy = 6BCA410E2F16E1EB00735204 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		6B9AC8722EF43FC000369EF8 /* Debug */ = {
@@ -374,6 +518,92 @@
 			};
 			name = Release;
 		};
+		6BCA40CC2F16E12700735204 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BM9SHU2L8V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = corio.PolyglotReaderTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PolyglotReader.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PolyglotReader";
+			};
+			name = Debug;
+		};
+		6BCA40CD2F16E12700735204 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BM9SHU2L8V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = corio.PolyglotReaderTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PolyglotReader.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PolyglotReader";
+			};
+			name = Release;
+		};
+		6BCA41112F16E1EB00735204 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BM9SHU2L8V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "corio.PolyglotReaderUI-Tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = PolyglotReader;
+			};
+			name = Debug;
+		};
+		6BCA41122F16E1EB00735204 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BM9SHU2L8V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "corio.PolyglotReaderUI-Tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = PolyglotReader;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -391,6 +621,24 @@
 			buildConfigurations = (
 				6B9AC8752EF43FC000369EF8 /* Debug */,
 				6B9AC8762EF43FC000369EF8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6BCA40CB2F16E12700735204 /* Build configuration list for PBXNativeTarget "PolyglotReaderTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6BCA40CC2F16E12700735204 /* Debug */,
+				6BCA40CD2F16E12700735204 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6BCA41102F16E1EB00735204 /* Build configuration list for PBXNativeTarget "PolyglotReaderUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6BCA41112F16E1EB00735204 /* Debug */,
+				6BCA41122F16E1EB00735204 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

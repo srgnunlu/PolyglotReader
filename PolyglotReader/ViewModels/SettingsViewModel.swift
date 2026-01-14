@@ -28,6 +28,16 @@ class SettingsViewModel: ObservableObject {
         } else {
             self.preferences = UserPreferences()
         }
+        #if DEBUG
+        MemoryDebugger.shared.logInit(self)
+        #endif
+    }
+
+    deinit {
+        #if DEBUG
+        // Log deinit immediately without creating a Task that could hold references
+        print("[MemoryDebugger] [DEINIT] SettingsViewModel")
+        #endif
     }
 
     private func savePreferences() {

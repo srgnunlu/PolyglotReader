@@ -6,6 +6,7 @@ struct ChatView: View {
     let onNavigateToPage: (Int) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isInputFocused: Bool
     
     // Scroll throttle için debounce state
@@ -48,7 +49,7 @@ struct ChatView: View {
                     .scrollDismissesKeyboard(.interactively)
                     .onChange(of: viewModel.messages.count) { _ in
                         if let lastMessage = viewModel.messages.last {
-                            withAnimation {
+                            withAnimation(reduceMotion ? nil : .default) {
                                 proxy.scrollTo(lastMessage.id, anchor: .bottom)
                             }
                         }
@@ -89,10 +90,12 @@ struct ChatView: View {
                                     .fontWeight(.medium)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 8)
+                                    .frame(minHeight: 44)
                                     .background(Color(.tertiarySystemFill))
                                     .clipShape(RoundedRectangle(cornerRadius: 16))
                                 }
                                 .foregroundStyle(.primary)
+                                .accessibilityLabel(suggestion.label)
                             }
                         }
                         .padding(.horizontal)
@@ -106,7 +109,7 @@ struct ChatView: View {
                         HStack {
                             Image(systemName: "photo.fill")
                                 .foregroundStyle(.indigo)
-                            Text("Seçili Görsel")
+                            Text("chat.selected_image".localized)
                                 .font(.caption)
                                 .fontWeight(.medium)
                                 .foregroundStyle(.secondary)
@@ -116,7 +119,9 @@ struct ChatView: View {
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundStyle(.secondary)
+                                    .frame(minWidth: 44, minHeight: 44)
                             }
+                            .accessibilityLabel("chat.accessibility.clear_selection".localized)
                         }
 
                         // Görsel önizlemesi
@@ -129,6 +134,7 @@ struct ChatView: View {
                                 RoundedRectangle(cornerRadius: 8)
                                     .stroke(Color(.separator), lineWidth: 1)
                             )
+                            .accessibilityLabel("chat.selected_image".localized)
 
                         Button {
                             UIApplication.shared.sendAction(
@@ -138,18 +144,20 @@ struct ChatView: View {
                                 for: nil
                             )
                             Task {
-                                await viewModel.sendMessageWithImage("Bu görsel nedir? Bana açıklar mısın?")
+                                await viewModel.sendMessageWithImage("chat.ask_image_prompt".localized)
                             }
                         } label: {
-                            Label("Bu görseli sor", systemImage: "sparkles")
+                            Label("chat.ask_about_image".localized, systemImage: "sparkles")
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
+                                .frame(minHeight: 44)
                                 .background(Color.indigo.opacity(0.1))
                                 .foregroundStyle(.indigo)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
+                        .accessibilityIdentifier("ask_about_image_button")
                     }
                     .padding()
                     .background(Color(.systemBackground))
@@ -159,7 +167,7 @@ struct ChatView: View {
                             .frame(height: 1),
                         alignment: .top
                     )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                 }
 
                 // Text Selection Info Bar
@@ -168,10 +176,9 @@ struct ChatView: View {
                         HStack {
                             Image(systemName: "text.magnifyingglass")
                                 .foregroundStyle(.indigo)
-                            Text("Seçili Metin")
+                            Text("chat.selected_text".localized)
                                 .font(.caption)
                                 .fontWeight(.medium)
-
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Button {
@@ -179,7 +186,9 @@ struct ChatView: View {
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundStyle(.secondary)
+                                    .frame(minWidth: 44, minHeight: 44)
                             }
+                            .accessibilityLabel("chat.accessibility.clear_selection".localized)
                         }
 
                         Text(selectedText)
@@ -199,20 +208,22 @@ struct ChatView: View {
                                 for: nil
                             )
                             Task {
-                                let query = "Şu metin hakkında bilgi ver: \"\(selectedText)\""
+                                let query = "\("chat.ask_text_prompt".localized) \"\(selectedText)\""
                                 await viewModel.sendMessage(query)
                                 viewModel.selectedText = nil
                             }
                         } label: {
-                            Label("Bu metni sor", systemImage: "sparkles")
+                            Label("chat.ask_about_text".localized, systemImage: "sparkles")
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
+                                .frame(minHeight: 44)
                                 .background(Color.indigo.opacity(0.1))
                                 .foregroundStyle(.indigo)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
+                        .accessibilityIdentifier("ask_about_text_button")
                     }
                     .padding()
                     .background(Color(.systemBackground))
@@ -222,13 +233,13 @@ struct ChatView: View {
                             .frame(height: 1),
                         alignment: .top
                     )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                 }
 
                 HStack(alignment: .bottom, spacing: 12) {
                     // Derin Arama Toggle
                     Button {
-                        withAnimation(.spring(response: 0.3)) {
+                        withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
                             viewModel.isDeepSearchEnabled.toggle()
                         }
                     } label: {
@@ -240,17 +251,24 @@ struct ChatView: View {
                             .font(.title2)
                             .foregroundStyle(viewModel.isDeepSearchEnabled ? .purple : .secondary)
                             .scaleEffect(viewModel.isDeepSearchEnabled ? 1.1 : 1.0)
+                            .frame(minWidth: 44, minHeight: 44)
                     }
-                    .accessibilityLabel("Derin Arama")
-                    .accessibilityHint(viewModel.isDeepSearchEnabled ? "Açık" : "Kapalı")
+                    .accessibilityLabel("chat.accessibility.deep_search".localized)
+                    .accessibilityValue(
+                        viewModel.isDeepSearchEnabled
+                            ? "chat.accessibility.deep_search.on".localized
+                            : "chat.accessibility.deep_search.off".localized
+                    )
+                    .accessibilityIdentifier("deep_search_toggle")
 
-                    TextField("Bir şey sor...", text: $viewModel.inputText)
+                    TextField("chat.placeholder".localized, text: $viewModel.inputText)
                         .textFieldStyle(.plain)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .background(Color(.tertiarySystemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 25))
                         .focused($isInputFocused)
+                        .accessibilityIdentifier("chat_input_field")
 
                     Button {
                         Task {
@@ -265,8 +283,12 @@ struct ChatView: View {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.title)
                             .foregroundStyle(.indigo)
+                            .frame(minWidth: 44, minHeight: 44)
                     }
                     .disabled(viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty || !viewModel.canSendMessage)
+                    .accessibilityLabel("chat.accessibility.send".localized)
+                    .accessibilityHint("chat.accessibility.send.hint".localized)
+                    .accessibilityIdentifier("send_message_button")
                 }
                 .padding()
                 .background(.ultraThinMaterial)
@@ -276,20 +298,17 @@ struct ChatView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "brain.head.profile")
                             .font(.caption2)
-                        Text(NSLocalizedString(
-                            "chat.deep_search_active",
-                            comment: "Deep search active warning"
-                        ))
+                        Text("chat.deep_search_active".localized)
                             .font(.caption2)
                     }
                     .foregroundStyle(.purple)
                     .padding(.horizontal)
                     .padding(.bottom, 8)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                 }
             }
                 }
-            .navigationTitle("AI Asistan")
+            .navigationTitle("chat.title".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -298,7 +317,10 @@ struct ChatView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
+                            .frame(minWidth: 44, minHeight: 44)
                     }
+                    .accessibilityLabel("chat.accessibility.close".localized)
+                    .accessibilityIdentifier("close_chat_button")
                 }
             }
             }
@@ -318,7 +340,7 @@ struct MessageBubble: View {
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
                 // Context indicator for user messages
                 if message.role == .user && message.text.hasPrefix("Bağlam:") {
-                    Text("📝 Seçili metin ile")
+                    Text("chat.context_indicator".localized)
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.7))
                 }
@@ -347,6 +369,13 @@ struct MessageBubble: View {
 
             if message.role == .model { Spacer() }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            message.role == .user
+                ? "chat.accessibility.your_message".localized
+                : "chat.accessibility.ai_response".localized
+        )
+        .accessibilityValue(message.text)
     }
 }
 
@@ -364,6 +393,7 @@ struct MessageContent: View {
 // MARK: - Typing Indicator
 struct TypingIndicator: View {
     @State private var isAnimating = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack {
@@ -374,9 +404,11 @@ struct TypingIndicator: View {
                         .frame(width: 8, height: 8)
                         .scaleEffect(isAnimating ? 1.0 : 0.5)
                         .animation(
-                            .easeInOut(duration: 0.6)
-                            .repeatForever()
-                            .delay(Double(index) * 0.2),
+                            reduceMotion
+                                ? nil
+                                : .easeInOut(duration: 0.6)
+                                    .repeatForever()
+                                    .delay(Double(index) * 0.2),
                             value: isAnimating
                         )
                 }
@@ -388,6 +420,7 @@ struct TypingIndicator: View {
 
             Spacer()
         }
+        .accessibilityLabel("accessibility.loading".localized)
         .onAppear {
             isAnimating = true
         }
@@ -412,6 +445,7 @@ struct SuggestionChip: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
+            .frame(minHeight: 44)
             .background(isHighlighted ? Color.indigo.opacity(0.15) : Color(.tertiarySystemBackground))
             .foregroundStyle(isHighlighted ? .indigo : .secondary)
             .clipShape(RoundedRectangle(cornerRadius: 20))
@@ -420,6 +454,8 @@ struct SuggestionChip: View {
                     .stroke(isHighlighted ? Color.indigo.opacity(0.3) : Color.clear, lineWidth: 1)
             )
         }
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(isHighlighted ? .isSelected : [])
     }
 }
 
@@ -433,6 +469,7 @@ extension View {
 // MARK: - Indexleme Durumu Banner (P0)
 struct IndexingStatusBanner: View {
     @ObservedObject var viewModel: ChatViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         // Sadece belirli durumlarda göster
@@ -462,8 +499,10 @@ struct IndexingStatusBanner: View {
                         } label: {
                             Image(systemName: "arrow.clockwise")
                                 .font(.caption)
+                                .frame(minWidth: 44, minHeight: 44)
                         }
                         .foregroundStyle(.secondary)
+                        .accessibilityLabel("common.retry".localized)
                     }
                 }
 
@@ -477,8 +516,10 @@ struct IndexingStatusBanner: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(backgroundColor)
-            .transition(.move(edge: .top).combined(with: .opacity))
-            .animation(.spring(response: 0.3), value: viewModel.indexingStatus)
+            .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+            .animation(reduceMotion ? nil : .spring(response: 0.3), value: viewModel.indexingStatus)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(statusTitle)
         }
     }
 
@@ -512,21 +553,22 @@ struct IndexingStatusBanner: View {
             }
         }
         .font(.body)
+        .accessibilityHidden(true)
     }
 
     private var statusTitle: String {
         switch viewModel.indexingStatus {
         case .checking:
-            return "Doküman kontrol ediliyor..."
+            return "chat.indexing.checking".localized
         case .indexing:
             let percent = Int(viewModel.indexingProgress * 100)
-            return "Doküman hazırlanıyor... %\(percent)"
+            return "chat.indexing.indexing".localized(with: percent)
         case .notIndexed:
-            return "Doküman henüz hazır değil"
+            return "chat.indexing.not_indexed".localized
         case .failed:
-            return "Hazırlık başarısız"
+            return "chat.indexing.failed".localized
         case .ready:
-            return "Doküman hazır"
+            return "chat.indexing.ready".localized
         case .unknown:
             return ""
         }
@@ -535,9 +577,9 @@ struct IndexingStatusBanner: View {
     private var statusSubtitle: String? {
         switch viewModel.indexingStatus {
         case .indexing:
-            return "Sorularınız yakında daha doğru yanıtlanacak"
+            return "chat.indexing.subtitle.indexing".localized
         case .notIndexed:
-            return "Genel yanıtlar alacaksınız"
+            return "chat.indexing.subtitle.not_indexed".localized
         case .failed(let error):
             return error
         default:

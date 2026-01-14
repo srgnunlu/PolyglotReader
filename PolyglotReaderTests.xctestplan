@@ -1,0 +1,67 @@
+{
+  "configurations" : [
+    {
+      "id" : "86A58E4F-5E1F-4C68-B7A4-7A8E9F2D3C5B",
+      "name" : "Configuration 1",
+      "options" : {
+        "codeCoverage" : true,
+        "codeCoverageTargets" : [
+          {
+            "containerPath" : "container:PolyglotReader.xcodeproj",
+            "identifier" : "6B9AC8682EF43FBE00369EF8",
+            "name" : "PolyglotReader"
+          }
+        ],
+        "environmentVariableEntries" : [
+          {
+            "key" : "TESTING",
+            "value" : "1"
+          }
+        ],
+        "testRepetitionMode" : "none"
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : true,
+    "commandLineArgumentEntries" : [
+      {
+        "argument" : "--uitesting"
+      }
+    ],
+    "environmentVariableEntries" : [
+      {
+        "key" : "TESTING",
+        "value" : "1"
+      }
+    ],
+    "language" : "tr",
+    "region" : "TR",
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:PolyglotReader.xcodeproj",
+      "identifier" : "6B9AC8682EF43FBE00369EF8",
+      "name" : "PolyglotReader"
+    },
+    "testExecutionOrdering" : "random",
+    "testTimeoutsEnabled" : true
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:PolyglotReader.xcodeproj",
+        "identifier" : "PolyglotReaderTests",
+        "name" : "PolyglotReaderTests"
+      }
+    },
+    {
+      "parallelizable" : false,
+      "target" : {
+        "containerPath" : "container:PolyglotReader.xcodeproj",
+        "identifier" : "PolyglotReaderUITests",
+        "name" : "PolyglotReaderUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

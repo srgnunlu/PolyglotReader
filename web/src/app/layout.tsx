@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PolyglotReader",
-  description: "AI-powered PDF reader and analysis application",
-  keywords: ["PDF reader", "translation", "AI", "notes", "annotations"],
+  title: "Corio Docs",
+  description: "Akıllı Doküman Asistanı - AI-powered document analysis",
+  keywords: ["PDF reader", "document analysis", "AI", "notes", "annotations", "Corio"],
 };
 
 export default function RootLayout({

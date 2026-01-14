@@ -61,6 +61,7 @@ struct PDFReaderView: View {
                             },
                             onRenderComplete: {
                                 // PDF render tamamlandı - loading overlay'i kapat
+                                logDebug("UI", "PDF render tamamlandı - overlay kapatılıyor")
                                 withAnimation(.easeOut(duration: 0.2)) {
                                     isPDFRendering = false
                                 }

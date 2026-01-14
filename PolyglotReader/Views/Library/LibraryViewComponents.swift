@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Loading View
 struct LoadingView: View {
     @State private var isAnimating = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 20) {
@@ -16,13 +17,19 @@ struct LoadingView: View {
                     .stroke(.indigo, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                     .frame(width: 50, height: 50)
                     .rotationEffect(.degrees(isAnimating ? 360 : 0))
-                    .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isAnimating)
+                    .animation(
+                        reduceMotion ? nil : .linear(duration: 1).repeatForever(autoreverses: false),
+                        value: isAnimating
+                    )
             }
+            .accessibilityHidden(true)
 
-            Text("Yükleniyor...")
+            Text("common.loading".localized)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("accessibility.loading".localized)
         .onAppear { isAnimating = true }
     }
 }
@@ -31,6 +38,7 @@ struct LoadingView: View {
 struct EmptyLibraryView: View {
     let onUpload: () -> Void
     @State private var isAnimating = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 28) {
@@ -46,7 +54,10 @@ struct EmptyLibraryView: View {
                     )
                     .frame(width: 120, height: 120)
                     .scaleEffect(isAnimating ? 1.1 : 1.0)
-                    .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: isAnimating)
+                    .animation(
+                        reduceMotion ? nil : .easeInOut(duration: 2).repeatForever(autoreverses: true),
+                        value: isAnimating
+                    )
 
                 Image(systemName: "doc.text.magnifyingglass")
                     .font(.system(size: 50, weight: .light))
@@ -58,13 +69,14 @@ struct EmptyLibraryView: View {
                         )
                     )
             }
+            .accessibilityHidden(true)
 
             VStack(spacing: 10) {
-                Text("Kütüphaneniz Boş")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                Text("library.empty.title".localized)
+                    .font(.title2.bold())
+                    .accessibilityAddTraits(.isHeader)
 
-                Text("PDF yükleyerek başlayın")
+                Text("library.empty.subtitle".localized)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -72,11 +84,12 @@ struct EmptyLibraryView: View {
             Button(action: onUpload) {
                 HStack(spacing: 8) {
                     Image(systemName: "plus.circle.fill")
-                    Text("PDF Yükle")
+                    Text("library.empty.button".localized)
                 }
                 .font(.headline)
                 .padding(.horizontal, 28)
                 .padding(.vertical, 16)
+                .frame(minWidth: 44, minHeight: 44)
                 .background {
                     Capsule()
                         .fill(
@@ -90,6 +103,9 @@ struct EmptyLibraryView: View {
                 .foregroundStyle(.white)
                 .shadow(color: .indigo.opacity(0.4), radius: 12, x: 0, y: 6)
             }
+            .accessibilityLabel("library.empty.button".localized)
+            .accessibilityHint("library.accessibility.upload.hint".localized)
+            .accessibilityIdentifier("empty_library_upload_button")
         }
         .onAppear { isAnimating = true }
     }
@@ -113,6 +129,8 @@ struct SortControlsView: View {
                             viewModel.toggleSort(option)
                         }
                     }
+                    .accessibilityLabel(option.rawValue)
+                    .accessibilityAddTraits(viewModel.sortBy == option ? .isSelected : [])
                 }
 
                 Spacer()
@@ -125,6 +143,7 @@ struct SortControlsView: View {
 struct UploadingOverlay: View {
     let progress: Double
     @State private var isAnimating = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let clampedProgress = min(max(progress, 0), 1)
@@ -145,10 +164,14 @@ struct UploadingOverlay: View {
                         .stroke(.white, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                         .frame(width: 50, height: 50)
                         .rotationEffect(.degrees(isAnimating ? 360 : 0))
-                        .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isAnimating)
+                        .animation(
+                            reduceMotion ? nil : .linear(duration: 1).repeatForever(autoreverses: false),
+                            value: isAnimating
+                        )
                 }
+                .accessibilityHidden(true)
 
-                Text("Yükleniyor... %\(percent)")
+                Text("library.uploading".localized(with: percent))
                     .font(.headline)
                     .foregroundStyle(.white)
 
@@ -168,6 +191,8 @@ struct UploadingOverlay: View {
             .clipShape(RoundedRectangle(cornerRadius: 24))
             .shadow(color: .black.opacity(0.25), radius: 30, x: 0, y: 15)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("library.uploading".localized(with: percent))
         .onAppear { isAnimating = true }
     }
 }

@@ -8,10 +8,10 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.PolyglotReader</string>
+			<string>com.corio.docs</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>polyglotreader</string>
+				<string>coriodocs</string>
 			</array>
 		</dict>
 	</array>

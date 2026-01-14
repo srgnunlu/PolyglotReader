@@ -50,8 +50,8 @@ export default function LoginPage() {
 
             <div className={styles.card}>
                 <div className={styles.logo}>
-                    <div className={styles.logoIcon}>📚</div>
-                    <h1 className={styles.logoText}>PolyglotReader</h1>
+                    <div className={styles.logoIcon}>📄</div>
+                    <h1 className={styles.logoText}>Corio Docs</h1>
                 </div>
 
                 <p className={styles.subtitle}>

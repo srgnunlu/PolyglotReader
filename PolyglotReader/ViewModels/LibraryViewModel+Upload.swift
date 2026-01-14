@@ -6,6 +6,13 @@ extension LibraryViewModel {
     // MARK: - Upload File
 
     func uploadFile(url: URL, userId: String) async {
+        // Phase 6: Check network before upload
+        guard NetworkMonitor.shared.isConnected else {
+            errorMessage = "📤 Çevrimdışısınız. Dosya yüklemek için internet bağlantısı gerekli."
+            logWarning("LibraryViewModel", "Upload blocked - offline")
+            return
+        }
+
         isUploading = true
         uploadProgress = 0.0
         defer {

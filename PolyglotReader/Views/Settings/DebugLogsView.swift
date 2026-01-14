@@ -5,6 +5,7 @@ struct DebugLogsView: View {
     @State private var selectedLevel: LogLevel?
     @State private var searchText = ""
     @State private var showShareSheet = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var filteredLogs: [LogEntry] {
         loggingService.filteredLogs(level: selectedLevel, source: searchText)
@@ -16,9 +17,9 @@ struct DebugLogsView: View {
             VStack(spacing: 0) {
                 // Stats Bar
                 HStack(spacing: 20) {
-                    StatBadge(count: loggingService.logs.count, label: "Toplam", color: .gray)
-                    StatBadge(count: loggingService.errorCount, label: "Hata", color: .red)
-                    StatBadge(count: loggingService.warningCount, label: "Uyarı", color: .orange)
+                    StatBadge(count: loggingService.logs.count, label: "debug.logs.total".localized, color: .gray)
+                    StatBadge(count: loggingService.errorCount, label: "debug.logs.errors".localized, color: .red)
+                    StatBadge(count: loggingService.warningCount, label: "debug.logs.warnings".localized, color: .orange)
                 }
                 .padding()
                 .background(Color(.secondarySystemBackground))
@@ -29,17 +30,19 @@ struct DebugLogsView: View {
                     HStack {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(.secondary)
-                        TextField("Kaynak ara...", text: $searchText)
+                            .accessibilityHidden(true)
+                        TextField("debug.logs.search_source".localized, text: $searchText)
                             .textFieldStyle(.plain)
                     }
                     .padding(10)
                     .background(Color(.tertiarySystemBackground))
                     .cornerRadius(10)
+                    .accessibilityIdentifier("log_search_field")
 
                     // Level Filter
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            FilterChip(label: "Tümü", isSelected: selectedLevel == nil) {
+                            FilterChip(label: "debug.logs.all".localized, isSelected: selectedLevel == nil) {
                                 selectedLevel = nil
                             }
 
@@ -66,10 +69,12 @@ struct DebugLogsView: View {
                         Image(systemName: "doc.text.magnifyingglass")
                             .font(.system(size: 50))
                             .foregroundStyle(.secondary)
-                        Text("Log bulunamadı")
+                            .accessibilityHidden(true)
+                        Text("debug.logs.empty".localized)
                             .font(.headline)
                             .foregroundStyle(.secondary)
                     }
+                    .accessibilityElement(children: .combine)
                     Spacer()
                 } else {
                     ScrollView {
@@ -82,7 +87,7 @@ struct DebugLogsView: View {
                     }
                 }
             }
-            .navigationTitle("Debug Logları")
+            .navigationTitle("debug.logs.title".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -90,17 +95,20 @@ struct DebugLogsView: View {
                         Button {
                             showShareSheet = true
                         } label: {
-                            Label("Logları Paylaş", systemImage: "square.and.arrow.up")
+                            Label("debug.logs.export".localized, systemImage: "square.and.arrow.up")
                         }
 
                         Button(role: .destructive) {
                             loggingService.clearLogs()
                         } label: {
-                            Label("Logları Temizle", systemImage: "trash")
+                            Label("debug.logs.clear".localized, systemImage: "trash")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
+                            .frame(minWidth: 44, minHeight: 44)
                     }
+                    .accessibilityLabel("debug.logs.filter".localized)
+                    .accessibilityIdentifier("logs_menu_button")
                 }
             }
             .sheet(isPresented: $showShareSheet) {
@@ -118,6 +126,7 @@ struct DebugLogsView: View {
 struct LogEntryRow: View {
     let entry: LogEntry
     @State private var isExpanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var backgroundColor: Color {
         switch entry.level {
@@ -133,6 +142,7 @@ struct LogEntryRow: View {
             HStack {
                 Text(entry.level.emoji)
                     .font(.caption)
+                    .accessibilityHidden(true)
 
                 Text(entry.formattedTimestamp)
                     .font(.caption2)
@@ -154,6 +164,7 @@ struct LogEntryRow: View {
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                 }
             }
 
@@ -177,11 +188,15 @@ struct LogEntryRow: View {
         .contentShape(Rectangle())
         .onTapGesture {
             if entry.details != nil {
-                withAnimation(.spring(response: 0.3)) {
+                withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
                     isExpanded.toggle()
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(entry.level.rawValue): \(entry.source), \(entry.message)")
+        .accessibilityHint(entry.details != nil ? "accessibility.double_tap".localized : "")
+        .accessibilityValue(isExpanded ? "accessibility.expanded".localized : "")
     }
 }
 
@@ -194,13 +209,14 @@ struct StatBadge: View {
     var body: some View {
         VStack(spacing: 2) {
             Text("\(count)")
-                .font(.title2)
-                .fontWeight(.bold)
+                .font(.title2.bold())
                 .foregroundStyle(color)
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(count) \(label)")
     }
 }
 
@@ -217,10 +233,13 @@ struct FilterChip: View {
                 .fontWeight(.medium)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
+                .frame(minHeight: 44)
                 .background(isSelected ? Color.indigo : Color(.tertiarySystemBackground))
                 .foregroundStyle(isSelected ? .white : .primary)
                 .cornerRadius(16)
         }
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

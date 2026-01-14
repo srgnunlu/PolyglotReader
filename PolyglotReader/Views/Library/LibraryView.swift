@@ -10,11 +10,12 @@ struct LibraryView: View {
     @State private var showCreateFolder = false
     @State private var isSearchActive = false
     @State private var searchInput = ""  // Local state for immediate input
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
             libraryContent
-                .navigationTitle(viewModel.currentFolder?.name ?? "Kütüphane")
+                .navigationTitle(viewModel.currentFolder?.name ?? "library.title".localized)
                 .toolbar {
                     libraryToolbar
                 }
@@ -80,23 +81,24 @@ struct LibraryView: View {
                     HStack {
                         LiquidGlassSearchBar(
                             text: $searchInput,
-                            placeholder: "Dosya ara..."
+                            placeholder: "library.search_placeholder".localized
                         )
                         .onChange(of: searchInput) { newValue in
                             viewModel.updateSearchQuery(newValue)
                         }
 
                         Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8)) {
                                 isSearchActive = false
                                 searchInput = ""
                                 viewModel.updateSearchQuery("")
                             }
                         } label: {
-                            Text("İptal")
+                            Text("common.cancel".localized)
                                 .font(.subheadline)
                                 .foregroundStyle(.indigo)
                         }
+                        .accessibilityLabel("common.cancel".localized)
                     }
                     .padding(.horizontal)
                     .transition(.asymmetric(
@@ -125,10 +127,12 @@ struct LibraryView: View {
                         Image(systemName: "doc.text")
                             .font(.system(size: 40))
                             .foregroundStyle(.secondary)
-                        Text("Bu klasörde dosya yok")
+                            .accessibilityHidden(true)
+                        Text("library.no_files_in_folder".localized)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.top, 40)
+                    .accessibilityElement(children: .combine)
                 } else if viewModel.viewMode == .grid {
                     fileGrid
                 } else {
@@ -190,6 +194,7 @@ struct LibraryView: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.indigo)
                             .frame(width: 36, height: 36)
+                            .frame(minWidth: 44, minHeight: 44)
                             .background {
                                 Circle()
                                     .fill(.ultraThinMaterial)
@@ -200,11 +205,14 @@ struct LibraryView: View {
                             }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("library.accessibility.back".localized)
+                    .accessibilityHint("library.accessibility.back.hint".localized)
+                    .accessibilityIdentifier("back_button")
                 }
 
                 // Görünüm modu değiştir
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7)) {
                         viewModel.viewMode = viewModel.viewMode == .grid ? .list : .grid
                     }
                 } label: {
@@ -212,6 +220,7 @@ struct LibraryView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.primary.opacity(0.7))
                         .frame(width: 36, height: 36)
+                        .frame(minWidth: 44, minHeight: 44)
                         .background {
                             Circle()
                                 .fill(.ultraThinMaterial)
@@ -222,6 +231,9 @@ struct LibraryView: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("library.accessibility.view_mode".localized)
+                .accessibilityHint("library.accessibility.view_mode.hint".localized)
+                .accessibilityIdentifier("view_mode_button")
             }
         }
 
@@ -229,7 +241,7 @@ struct LibraryView: View {
             HStack(spacing: 8) {
                 // Arama butonu
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8)) {
                         isSearchActive.toggle()
                         if !isSearchActive {
                             searchInput = ""
@@ -241,6 +253,7 @@ struct LibraryView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(isSearchActive ? Color.indigo : Color.primary.opacity(0.7))
                         .frame(width: 36, height: 36)
+                        .frame(minWidth: 44, minHeight: 44)
                         .background {
                             Group {
                                 if isSearchActive {
@@ -262,6 +275,9 @@ struct LibraryView: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("library.accessibility.search".localized)
+                .accessibilityHint("library.accessibility.search.hint".localized)
+                .accessibilityIdentifier("search_button")
 
                 // Klasör oluştur butonu
                 Button {
@@ -271,6 +287,7 @@ struct LibraryView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.primary.opacity(0.7))
                         .frame(width: 36, height: 36)
+                        .frame(minWidth: 44, minHeight: 44)
                         .background {
                             Circle()
                                 .fill(.ultraThinMaterial)
@@ -281,6 +298,9 @@ struct LibraryView: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("library.accessibility.create_folder".localized)
+                .accessibilityHint("library.accessibility.create_folder.hint".localized)
+                .accessibilityIdentifier("create_folder_button")
 
                 // PDF yükle butonu
                 Button {
@@ -290,6 +310,7 @@ struct LibraryView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: 36, height: 36)
+                        .frame(minWidth: 44, minHeight: 44)
                         .background {
                             Circle()
                                 .fill(
@@ -303,6 +324,9 @@ struct LibraryView: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("library.accessibility.upload".localized)
+                .accessibilityHint("library.accessibility.upload.hint".localized)
+                .accessibilityIdentifier("upload_button")
             }
         }
     }

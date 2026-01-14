@@ -73,6 +73,9 @@ class NotebookViewModel: ObservableObject {
     @Published var fileAnnotationCounts: [FileAnnotationInfo] = []
     @Published var recentFavorites: [AnnotationWithFile] = []
 
+    // MARK: - Network Status (Phase 6)
+    @Published private(set) var isOffline = false
+
     private let supabaseService = SupabaseService.shared
 
     static let highlightColors = [
@@ -81,6 +84,39 @@ class NotebookViewModel: ObservableObject {
         ("#fbcfe8", "Pembe"),
         ("#bae6fd", "Mavi")
     ]
+
+    // MARK: - Lifecycle
+
+    private var networkObserver: AnyCancellable?
+
+    init() {
+        setupNetworkObserver()
+        #if DEBUG
+        MemoryDebugger.shared.logInit(self)
+        #endif
+    }
+
+    deinit {
+        #if DEBUG
+        // Log deinit immediately without creating a Task that could hold references
+        print("[MemoryDebugger] [DEINIT] NotebookViewModel")
+        #endif
+        networkObserver?.cancel()
+    }
+
+    // MARK: - Network Observer (Phase 6)
+
+    private func setupNetworkObserver() {
+        networkObserver = NetworkMonitor.shared.$isConnected
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isConnected in
+                self?.isOffline = !isConnected
+                if isConnected {
+                    // Refresh annotations when back online
+                    Task { await self?.loadAnnotations() }
+                }
+            }
+    }
 
     /// Benzersiz dosya listesi (filtreleme için)
     var uniqueFiles: [(id: String, name: String)] {
@@ -296,6 +332,19 @@ class NotebookViewModel: ObservableObject {
     }
 
     func deleteAnnotation(_ id: String) async {
+        // Phase 6: Queue if offline
+        guard NetworkMonitor.shared.isConnected else {
+            SyncQueue.shared.enqueue(
+                type: .annotationDelete,
+                payload: Data(id.utf8),
+                fileId: nil
+            )
+            annotations.removeAll { $0.id == id }
+            stats.total = max(0, stats.total - 1)
+            logInfo("NotebookVM", "Annotation deletion queued (offline)")
+            return
+        }
+
         do {
             try await supabaseService.deleteAnnotation(id: id)
             annotations.removeAll { $0.id == id }

@@ -121,8 +121,8 @@ function NotesContent() {
             <aside className={styles.sidebar}>
                 <div className={styles.sidebarHeader}>
                     <div className={styles.logoSection}>
-                        <span className={styles.logoIcon}>📚</span>
-                        <h1 className={styles.logoText}>PolyglotReader</h1>
+                        <span className={styles.logoIcon}>📄</span>
+                        <h1 className={styles.logoText}>Corio Docs</h1>
                     </div>
                 </div>
 
