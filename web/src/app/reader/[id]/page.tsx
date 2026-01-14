@@ -436,6 +436,7 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                 <div ref={viewerRef} className={styles.viewer}>
                     <PDFViewer
                         pdfUrl={pdfUrl}
+                        storagePath={document.storagePath}
                         annotations={annotations}
                         onTextSelect={handleTextSelect}
                         onImageSelect={handleImageSelect}

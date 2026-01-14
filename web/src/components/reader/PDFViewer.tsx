@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Annotation } from '@/types/models';
 import { AnnotationLayer } from './AnnotationLayer';
+import { pdfCache } from '@/lib/pdfCache';
+import { getSupabase } from '@/lib/supabase';
 import '@/lib/pdfjs-config'; // Initialize PDF.js worker configuration
 
 const defaultScale = 1.2;
@@ -15,6 +17,7 @@ const fallbackPageSize = { width: 595, height: 842 };
 
 interface PDFViewerProps {
     pdfUrl: string;
+    storagePath?: string; // Added for cache key
     annotations?: Annotation[];
     onTextSelect?: (
         text: string,
@@ -43,6 +46,7 @@ type DocumentLoadSuccess = pdfjs.PDFDocumentProxy;
 
 export function PDFViewer({
     pdfUrl,
+    storagePath,
     annotations = [],
     onTextSelect,
     onImageSelect,
@@ -69,6 +73,11 @@ export function PDFViewer({
     const zoomTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const initialScaleRef = useRef(initialScroll?.scale || defaultScale);
 
+    // Cache-first PDF loading
+    const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
+    const [isLoadingPDF, setIsLoadingPDF] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+
     const documentOptions = useMemo(() => ({
         cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsVersion}/cmaps/`,
         cMapPacked: true,
@@ -76,32 +85,67 @@ export function PDFViewer({
         verbosity: 0,
     }), []);
 
+    // Cache-first PDF loading
     useEffect(() => {
-        initialScaleRef.current = initialScroll?.scale || defaultScale;
-    }, [initialScroll?.scale]);
+        let objectUrl: string | null = null;
 
-    useEffect(() => {
-        pageRefs.current.clear();
-        setTotalPages(0);
-        setCurrentPage(initialPage);
-        setIsRestored(false);
-        pdfDocumentRef.current = null;
-        setDefaultPageSize(null);
-        const nextScale = initialScaleRef.current;
-        setDisplayScale(nextScale);
-        setRenderScale(nextScale);
+        const loadPDF = async () => {
+            setIsLoadingPDF(true);
+            setLoadError(null);
 
-        return () => {
-            if (pdfDocumentRef.current) {
-                try {
-                    pdfDocumentRef.current.destroy();
-                } catch (e) {
-                    // Ignore errors during cleanup
+            try {
+                // If we have a storagePath, try cache-first strategy
+                if (storagePath) {
+                    // 1. Check cache first
+                    const cachedBlob = await pdfCache.getCachedPDF(storagePath);
+
+                    if (cachedBlob) {
+                        objectUrl = URL.createObjectURL(cachedBlob);
+                        setPdfDataUrl(objectUrl);
+                        setIsLoadingPDF(false);
+                        return;
+                    }
+
+                    // 2. Cache miss - download from Supabase
+                    console.log('[PDFViewer] Cache miss, downloading from Supabase...');
+                    const supabase = getSupabase();
+                    const { data: blob, error } = await supabase.storage
+                        .from('user_files')
+                        .download(storagePath);
+
+                    if (error) throw error;
+                    if (!blob) throw new Error('No blob returned from Supabase');
+
+                    // 3. Cache for next time
+                    await pdfCache.cachePDF(blob, storagePath);
+
+                    // 4. Create object URL and set
+                    objectUrl = URL.createObjectURL(blob);
+                    setPdfDataUrl(objectUrl);
+                } else {
+                    // Fallback: use pdfUrl directly (no caching)
+                    setPdfDataUrl(pdfUrl);
                 }
-                pdfDocumentRef.current = null;
+
+                setIsLoadingPDF(false);
+            } catch (error) {
+                console.error('[PDFViewer] Error loading PDF:', error);
+                setLoadError(error instanceof Error ? error.message : 'Failed to load PDF');
+                setIsLoadingPDF(false);
+                // Fallback to direct URL
+                setPdfDataUrl(pdfUrl);
             }
         };
-    }, [pdfUrl, initialPage]);
+
+        loadPDF();
+
+        // Cleanup: revoke object URL to prevent memory leaks
+        return () => {
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
+    }, [pdfUrl, storagePath]);
 
     useEffect(() => {
         onScaleChange?.(displayScale);
@@ -570,7 +614,7 @@ export function PDFViewer({
                 onContextMenu={handleImageContextMenu}
             >
                 <Document
-                    file={pdfUrl}
+                    file={pdfDataUrl}
                     onLoadSuccess={handleDocumentLoadSuccess}
                     onLoadError={handleDocumentLoadError}
                     onSourceError={handleDocumentLoadError}
