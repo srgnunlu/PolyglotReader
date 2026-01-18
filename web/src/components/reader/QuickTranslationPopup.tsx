@@ -158,6 +158,9 @@ export function QuickTranslationPopup({
             // Don't close if clicking inside the chat panel
             if (target.closest('[data-chat-panel="true"]')) return;
 
+            // Don't close if clicking on PDF toolbar (for quick highlighting)
+            if (target.closest('[data-pdf-toolbar="true"]')) return;
+
             onClose();
         };
 

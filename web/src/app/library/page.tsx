@@ -61,6 +61,12 @@ function LibraryContent() {
 
     return (
         <div className={styles.layout}>
+            {/* Animated Background */}
+            <div className={styles.backgroundOrbs}>
+                <div className={`${styles.orb} ${styles.orb1}`} />
+                <div className={`${styles.orb} ${styles.orb2}`} />
+            </div>
+
             {/* Sidebar */}
             <aside className={styles.sidebar}>
                 <div className={styles.sidebarHeader}>
@@ -184,14 +190,11 @@ function LibraryContent() {
                                     onClick={() => handleDocumentClick(doc.id)}
                                 >
                                     <div className={styles.cardThumbnail}>
-                                        {doc.thumbnailData ? (
-                                            <img
-                                                src={`data:image/png;base64,${doc.thumbnailData}`}
-                                                alt={doc.name}
-                                            />
-                                        ) : (
-                                            <PDFThumbnail storagePath={doc.storagePath} alt={doc.name} />
-                                        )}
+                                        <PDFThumbnail
+                                            storagePath={doc.storagePath}
+                                            alt={doc.name}
+                                            base64Data={doc.thumbnailData}
+                                        />
                                     </div>
                                     <div className={styles.cardInfo}>
                                         <h4 className={styles.cardTitle}>{doc.name}</h4>

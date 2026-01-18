@@ -15,9 +15,17 @@ const pdfjsVersion = pdfjs.version || '5.4.296';
 const overscanPages = 2;
 const fallbackPageSize = { width: 595, height: 842 };
 
+// Highlight colors
+const HIGHLIGHT_COLORS = [
+    { name: 'Sarı', value: '#fef08a', shortcut: '1' },
+    { name: 'Yeşil', value: '#bbf7d0', shortcut: '2' },
+    { name: 'Mavi', value: '#bae6fd', shortcut: '3' },
+    { name: 'Pembe', value: '#fbcfe8', shortcut: '4' },
+];
+
 interface PDFViewerProps {
     pdfUrl: string;
-    storagePath?: string; // Added for cache key
+    storagePath?: string;
     annotations?: Annotation[];
     onTextSelect?: (
         text: string,
@@ -40,6 +48,18 @@ interface PDFViewerProps {
     initialScroll?: { x: number; y: number; scale: number };
     persistentHighlightRects?: { x: number; y: number; width: number; height: number }[];
     persistentHighlightPageNumber?: number | null;
+    // Annotation colors and fullscreen
+    selectedColor?: string;
+    onColorChange?: (color: string) => void;
+    onQuickHighlight?: (color: string) => void; // Quick highlight from toolbar
+    isFullscreen?: boolean;
+    onToggleFullscreen?: () => void;
+    isNavHidden?: boolean;
+    // Translation and chat
+    isQuickTranslationMode?: boolean;
+    onToggleTranslation?: () => void;
+    isChatOpen?: boolean;
+    onToggleChat?: () => void;
 }
 
 type DocumentLoadSuccess = pdfjs.PDFDocumentProxy;
@@ -57,6 +77,16 @@ export function PDFViewer({
     initialScroll,
     persistentHighlightRects = [],
     persistentHighlightPageNumber = null,
+    selectedColor = '#fef08a',
+    onColorChange,
+    onQuickHighlight,
+    isFullscreen = false,
+    onToggleFullscreen,
+    isNavHidden = false,
+    isQuickTranslationMode = false,
+    onToggleTranslation,
+    isChatOpen = false,
+    onToggleChat,
 }: PDFViewerProps) {
     const wrapperRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -569,12 +599,14 @@ export function PDFViewer({
 
     return (
         <div ref={wrapperRef} className="pdf-viewer-wrapper">
-            <div className="pdf-toolbar">
+            <div className={`pdf-toolbar ${isNavHidden ? 'toolbar-hidden' : ''}`} data-pdf-toolbar="true">
+                {/* Page Navigation */}
                 <div className="pdf-toolbar-group">
                     <button
                         className="pdf-toolbar-btn"
                         onClick={() => goToPage(currentPage - 1)}
                         disabled={currentPage <= 1}
+                        title="Önceki sayfa"
                     >
                         ←
                     </button>
@@ -593,16 +625,64 @@ export function PDFViewer({
                         className="pdf-toolbar-btn"
                         onClick={() => goToPage(currentPage + 1)}
                         disabled={currentPage >= totalPages}
+                        title="Sonraki sayfa"
                     >
                         →
                     </button>
                 </div>
 
+                {/* Zoom Controls */}
                 <div className="pdf-toolbar-group">
-                    <button className="pdf-toolbar-btn" onClick={zoomOut}>−</button>
+                    <button className="pdf-toolbar-btn" onClick={zoomOut} title="Uzaklaştır">−</button>
                     <span className="pdf-zoom-info">{Math.round(displayScale * 100)}%</span>
-                    <button className="pdf-toolbar-btn" onClick={zoomIn}>+</button>
-                    <button className="pdf-toolbar-btn" onClick={resetZoom}>↺</button>
+                    <button className="pdf-toolbar-btn" onClick={zoomIn} title="Yakınlaştır">+</button>
+                    <button className="pdf-toolbar-btn" onClick={resetZoom} title="Sıfırla">↺</button>
+                </div>
+
+                {/* Color Picker - Click to highlight selection */}
+                <div className="pdf-toolbar-group pdf-color-group">
+                    {HIGHLIGHT_COLORS.map(({ name, value, shortcut }) => (
+                        <button
+                            key={value}
+                            className={`pdf-color-btn ${selectedColor === value ? 'active' : ''}`}
+                            style={{ backgroundColor: value }}
+                            onMouseDown={(e) => e.preventDefault()} // Preserve text selection
+                            onClick={() => {
+                                onColorChange?.(value);
+                                onQuickHighlight?.(value);
+                            }}
+                            title={`${name} (${shortcut})`}
+                        />
+                    ))}
+                </div>
+
+                {/* Translation Toggle */}
+                <div className="pdf-toolbar-group">
+                    <button
+                        className={`pdf-toolbar-btn pdf-translation-btn ${isQuickTranslationMode ? 'active' : ''}`}
+                        onClick={onToggleTranslation}
+                        title={isQuickTranslationMode ? 'Hızlı çeviri modu açık' : 'Hızlı çeviri modu'}
+                    >
+                        🌐
+                    </button>
+                    <button
+                        className={`pdf-toolbar-btn pdf-chat-btn ${isChatOpen ? 'active' : ''}`}
+                        onClick={onToggleChat}
+                        title="AI Sohbet"
+                    >
+                        ✨
+                    </button>
+                </div>
+
+                {/* Fullscreen Button */}
+                <div className="pdf-toolbar-group">
+                    <button
+                        className={`pdf-toolbar-btn pdf-fullscreen-btn ${isFullscreen ? 'active' : ''}`}
+                        onClick={onToggleFullscreen}
+                        title={isFullscreen ? 'Tam ekrandan çık (ESC)' : 'Tam ekran (F11)'}
+                    >
+                        {isFullscreen ? '⛶' : '⛶'}
+                    </button>
                 </div>
             </div>
 
@@ -699,6 +779,8 @@ export function PDFViewer({
           padding: 12px 16px;
           background: var(--bg-secondary);
           border-bottom: 1px solid var(--border-color);
+          transition: opacity 0.3s ease, transform 0.3s ease;
+          z-index: 100;
         }
 
         .pdf-toolbar-group {
@@ -731,6 +813,55 @@ export function PDFViewer({
         .pdf-toolbar-btn:disabled {
           opacity: 0.4;
           cursor: not-allowed;
+        }
+
+        /* Auto-hide toolbar */
+        .toolbar-hidden {
+          opacity: 0;
+          pointer-events: none;
+          transform: translateY(-100%);
+        }
+
+        /* Color picker buttons */
+        .pdf-color-group {
+          gap: 6px;
+          padding: 0 8px;
+          border-left: 1px solid var(--border-color);
+          border-right: 1px solid var(--border-color);
+        }
+
+        .pdf-color-btn {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          border: 2px solid transparent;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .pdf-color-btn:hover {
+          transform: scale(1.15);
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        .pdf-color-btn.active {
+          border-color: var(--text-primary);
+          transform: scale(1.1);
+          box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--color-primary-500);
+        }
+
+        /* Fullscreen button */
+        .pdf-fullscreen-btn {
+          font-size: 1.25rem;
+        }
+
+        .pdf-fullscreen-btn.active,
+        .pdf-translation-btn.active,
+        .pdf-chat-btn.active {
+          background: var(--color-primary-500);
+          color: white;
+          border-color: var(--color-primary-500);
         }
 
         .pdf-page-info {

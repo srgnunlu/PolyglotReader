@@ -118,6 +118,11 @@ export function SelectionPopup({
                 return;
             }
 
+            // Don't close popup if clicking on PDF toolbar (for quick highlighting)
+            if (target.closest('[data-pdf-toolbar="true"]')) {
+                return;
+            }
+
             onClose();
         };
 

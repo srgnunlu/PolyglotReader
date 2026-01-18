@@ -8,18 +8,39 @@ import { loadChatHistory, saveChatMessage, clearChatHistory } from '@/lib/chatSy
 import styles from './ChatPanel.module.css';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import {
+    CorioLogo,
+    NewChatIcon,
+    HistoryIcon,
+    CloseIcon,
+    SendIcon,
+    UserAvatarIcon,
+    AIAvatarIcon,
+    SparkleIcon,
+    TrashIcon,
+    QuoteIcon,
+    MessageIcon,
+} from './ChatIcons';
 
 interface ChatPanelProps {
     isOpen: boolean;
     onClose: () => void;
     documentId?: string;
-    documentContext?: string; // Kept for backward compatibility
+    documentContext?: string;
     initialMessage?: string;
     initialImage?: string;
     activeSelection?: string | null;
     onClearInitialMessage?: () => void;
     onClearSelection?: () => void;
 }
+
+// Default suggestions for empty state
+const DEFAULT_SUGGESTIONS = [
+    "Bu belgenin ana konusu nedir?",
+    "Bu içeriği özetler misin?",
+    "En önemli noktaları listele",
+    "Bu konuyu basitçe açıkla",
+];
 
 export function ChatPanel({
     isOpen,
@@ -36,9 +57,11 @@ export function ChatPanel({
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [pendingAttachment, setPendingAttachment] = useState<string | null>(null);
+    const [showHistory, setShowHistory] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const [panelWidth, setPanelWidth] = useState(360);
+    const [panelWidth, setPanelWidth] = useState(380);
     const resizeStartRef = useRef<{ x: number; width: number } | null>(null);
+    const historyRef = useRef<HTMLDivElement>(null);
 
     // Scroll to bottom when new message
     useEffect(() => {
@@ -58,7 +81,6 @@ export function ChatPanel({
             try {
                 const history = await loadChatHistory(documentId);
                 if (isMounted) {
-                    // Convert Supabase chat format to ChatMessage format
                     const chatMessages: ChatMessage[] = history.map(h => ({
                         id: h.id || `${h.created_at}-${h.role}`,
                         role: h.role,
@@ -83,17 +105,24 @@ export function ChatPanel({
     useEffect(() => {
         if ((initialMessage || initialImage) && onClearInitialMessage) {
             if (initialImage) {
-                // If there's an image, set it as pending attachment and don't send yet
                 setPendingAttachment(initialImage);
-                // Optional: set a default text or leave empty for user to type
-                // setInput('Bu görsel hakkında bilgi ver.'); 
             } else if (initialMessage) {
-                // If just text, send immediately (or pre-fill input if preferred, but existing behavior was send)
                 handleSendMessage(initialMessage);
             }
             onClearInitialMessage();
         }
     }, [initialMessage, initialImage]);
+
+    // Close history dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (historyRef.current && !historyRef.current.contains(event.target as Node)) {
+                setShowHistory(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const handleSendMessage = async (messageText?: string) => {
         const text = messageText || input.trim();
@@ -116,25 +145,16 @@ export function ChatPanel({
             } : undefined
         };
 
-        // Add temporary image display support via extended text or custom rendering
-        // For this implementation, we will assume ChatMessage just holds text.
-        // But we want to show the image in the UI. 
-        // Let's rely on the fact that we process it. 
-        // To show it in UI, we might need to extend ChatMessage type.
-        // Since we can't change types/models.ts easily without seeing it, let's keep it simple.
-
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         setPendingAttachment(null);
 
-        // Clear selection after sending if it was used
         if (activeSelection && onClearSelection) {
             onClearSelection();
         }
 
         setIsLoading(true);
 
-        // Create placeholder for AI response
         const aiMessageId = (Date.now() + 1).toString();
         const aiMessage: ChatMessage = {
             id: aiMessageId,
@@ -145,12 +165,8 @@ export function ChatPanel({
         setMessages(prev => [...prev, aiMessage]);
 
         try {
-            // Use streaming for real-time response
             let fullResponse = '';
-
-            // Build conversation history for memory (exclude the just-added messages)
-            // We need messages BEFORE the current user message and AI placeholder
-            const historyMessages = messages.slice(0, -2); // Exclude last 2 (user + ai placeholder)
+            const historyMessages = messages.slice(0, -2);
             const chatHistory: ChatHistoryMessage[] = historyMessages.map(m => ({
                 role: m.role as 'user' | 'model',
                 text: m.text
@@ -159,7 +175,6 @@ export function ChatPanel({
             let stream: AsyncGenerator<string, void, unknown>;
 
             if (img) {
-                // Image chat - use existing function with context
                 let context = documentContext;
                 if (documentId) {
                     try {
@@ -170,11 +185,8 @@ export function ChatPanel({
                 }
                 stream = streamChatWithImage(messageContent, img, context);
             } else if (documentId) {
-                // Document chat with RAG + Memory
-                // Uses hybrid search (vector + BM25) and conversation history
                 stream = streamChatWithRAGAndHistory(messageContent, documentId, chatHistory);
             } else {
-                // Simple chat without document
                 stream = streamChat(messageContent, documentContext);
             }
 
@@ -187,14 +199,12 @@ export function ChatPanel({
                 );
             }
 
-            // Save both user and AI messages to Supabase after successful response
             if (documentId) {
                 try {
                     await saveChatMessage(documentId, 'user', messageContent);
                     await saveChatMessage(documentId, 'model', fullResponse);
                 } catch (saveError) {
                     console.error('Failed to save chat messages:', saveError);
-                    // Non-blocking error, chat still works locally
                 }
             }
         } catch (err) {
@@ -218,22 +228,23 @@ export function ChatPanel({
         }
     };
 
-    const clearChat = async () => {
+    const handleNewChat = async () => {
         setMessages([]);
-
-        // Also clear from Supabase
         if (documentId) {
             try {
                 await clearChatHistory(documentId);
             } catch (error) {
-                console.error('Failed to clear chat history from Supabase:', error);
+                console.error('Failed to clear chat history:', error);
             }
         }
     };
 
+    const handleSuggestionClick = (suggestion: string) => {
+        handleSendMessage(suggestion);
+    };
+
     if (!isOpen) return null;
 
-    // Prevent clicks inside chat panel from clearing PDF selection
     const handlePanelMouseDown = (e: React.MouseEvent) => {
         e.stopPropagation();
     };
@@ -245,7 +256,7 @@ export function ChatPanel({
         const startWidth = panelWidth;
         resizeStartRef.current = { x: e.clientX, width: startWidth };
 
-        const minWidth = 280;
+        const minWidth = 320;
         const maxWidth = Math.max(minWidth, Math.min(760, window.innerWidth - 240));
 
         const handlePointerMove = (event: PointerEvent) => {
@@ -284,34 +295,92 @@ export function ChatPanel({
                 onPointerDown={handleResizeStart}
                 aria-hidden="true"
             />
+
+            {/* Header */}
             <div className={styles.header}>
-                <h3 className={styles.title}>
-                    <span className={styles.titleIcon}>✨</span>
-                    AI Asistan
-                </h3>
+                <div className={styles.headerLeft}>
+                    <div className={styles.logo}>
+                        <CorioLogo size={28} className={styles.logoIcon} />
+                        <span className={styles.logoText}>Corio AI</span>
+                    </div>
+                </div>
                 <div className={styles.headerActions}>
                     <button
-                        className={styles.headerBtn}
-                        onClick={clearChat}
+                        className={styles.iconBtn}
+                        onClick={handleNewChat}
+                        title="Yeni Sohbet"
+                    >
+                        <NewChatIcon size={18} />
+                    </button>
+                    <div className={styles.historyContainer} ref={historyRef}>
+                        <button
+                            className={styles.iconBtn}
+                            onClick={() => setShowHistory(!showHistory)}
+                            title="Sohbet Geçmişi"
+                        >
+                            <HistoryIcon size={18} />
+                        </button>
+                        {showHistory && (
+                            <div className={styles.historyDropdown}>
+                                <div className={styles.historyHeader}>Sohbet Geçmişi</div>
+                                {messages.length > 0 ? (
+                                    <div className={styles.historyItem}>
+                                        <MessageIcon size={20} className={styles.historyItemIcon} />
+                                        <div className={styles.historyItemText}>
+                                            <div className={styles.historyItemTitle}>
+                                                {messages[0]?.text?.substring(0, 40) || 'Mevcut Sohbet'}...
+                                            </div>
+                                            <div className={styles.historyItemDate}>
+                                                {new Date().toLocaleDateString('tr-TR')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className={styles.historyEmpty}>
+                                        Henüz sohbet geçmişi yok
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    <button
+                        className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
+                        onClick={handleNewChat}
                         title="Sohbeti Temizle"
                     >
-                        🗑️
+                        <TrashIcon size={18} />
                     </button>
                     <button
-                        className={styles.headerBtn}
+                        className={styles.iconBtn}
                         onClick={onClose}
+                        title="Kapat"
                     >
-                        ✕
+                        <CloseIcon size={18} />
                     </button>
                 </div>
             </div>
 
+            {/* Messages */}
             <div className={styles.messages}>
                 {messages.length === 0 ? (
                     <div className={styles.emptyState}>
-                        <span className={styles.emptyIcon}>💬</span>
-                        <h4>Merhaba!</h4>
-                        <p>Dokümandan metin veya görsel seçerek başlayabilirsiniz.</p>
+                        <MessageIcon size={56} className={styles.emptyIcon} />
+                        <h3 className={styles.emptyTitle}>Merhaba! Ben Corio AI</h3>
+                        <p className={styles.emptySubtitle}>
+                            Belgeniz hakkında sorular sorabilir, özetler isteyebilir veya herhangi bir konuda yardım alabilirsiniz.
+                        </p>
+                        <div className={styles.suggestions}>
+                            {DEFAULT_SUGGESTIONS.map((suggestion, index) => (
+                                <button
+                                    key={index}
+                                    className={styles.suggestionChip}
+                                    onClick={() => handleSuggestionClick(suggestion)}
+                                >
+                                    <SparkleIcon size={16} className={styles.suggestionIcon} />
+                                    <span className={styles.suggestionText}>{suggestion}</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 ) : (
                     messages.map(message => (
@@ -320,9 +389,13 @@ export function ChatPanel({
                             className={`${styles.message} ${styles[message.role]}`}
                         >
                             <div className={styles.messageAvatar}>
-                                {message.role === 'user' ? '👤' : '✨'}
+                                {message.role === 'user' ? (
+                                    <UserAvatarIcon size={28} />
+                                ) : (
+                                    <AIAvatarIcon size={28} />
+                                )}
                             </div>
-                            <div className={styles.messageContent}>
+                            <div className={styles.messageBubble}>
                                 {message.attachment && message.attachment.type === 'image' && (
                                     <div className={styles.messageImageContainer}>
                                         <img
@@ -332,11 +405,19 @@ export function ChatPanel({
                                         />
                                     </div>
                                 )}
-                                <div className={styles.messageMarkdown}>
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                        {message.text}
-                                    </ReactMarkdown>
-                                </div>
+                                {message.text ? (
+                                    <div className={styles.messageMarkdown}>
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            {message.text}
+                                        </ReactMarkdown>
+                                    </div>
+                                ) : (
+                                    <div className={styles.typingIndicator}>
+                                        <span className={styles.typingDot} />
+                                        <span className={styles.typingDot} />
+                                        <span className={styles.typingDot} />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))
@@ -344,49 +425,61 @@ export function ChatPanel({
                 <div ref={messagesEndRef} />
             </div>
 
+            {/* Input Area */}
             <div className={styles.inputArea}>
-                <div className={styles.inputContainer}>
-                    {activeSelection && (
-                        <div className={styles.activeSelection}>
-                            "{activeSelection}"
-                            <button
-                                className={styles.activeSelectionClose}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onClearSelection?.();
-                                }}
-                                title="Seçimi kaldır"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    )}
-                    {pendingAttachment && (
-                        <div className={styles.pendingAttachment}>
-                            <img
-                                src={`data:image/png;base64,${pendingAttachment}`}
-                                alt="Eklenecek görsel"
-                                className={styles.pendingImage}
-                            />
-                            <button
-                                className={styles.removeAttachmentBtn}
-                                onClick={() => setPendingAttachment(null)}
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    )}
-                    <textarea
-                        className={styles.input}
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onFocus={(e) => e.stopPropagation()}
-                        placeholder={pendingAttachment ? "Görsel hakkında soru sorun..." : activeSelection ? "Seçili metin hakkında soru sorun..." : "Bir soru sorun..."}
-                        rows={1}
-                        disabled={isLoading}
-                    />
+                <div className={styles.inputWrapper}>
+                    <div className={styles.inputContainer}>
+                        {activeSelection && (
+                            <div className={styles.selectedQuote}>
+                                <QuoteIcon size={16} className={styles.quoteIcon} />
+                                <div className={styles.quoteContent}>
+                                    <div className={styles.quoteText}>"{activeSelection}"</div>
+                                </div>
+                                <button
+                                    className={styles.quoteClose}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onClearSelection?.();
+                                    }}
+                                    title="Seçimi kaldır"
+                                >
+                                    <CloseIcon size={14} />
+                                </button>
+                            </div>
+                        )}
+                        {pendingAttachment && (
+                            <div className={styles.pendingAttachment}>
+                                <img
+                                    src={`data:image/png;base64,${pendingAttachment}`}
+                                    alt="Eklenecek görsel"
+                                    className={styles.pendingImage}
+                                />
+                                <button
+                                    className={styles.removeAttachmentBtn}
+                                    onClick={() => setPendingAttachment(null)}
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        )}
+                        <textarea
+                            className={styles.input}
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onFocus={(e) => e.stopPropagation()}
+                            placeholder={
+                                pendingAttachment
+                                    ? "Görsel hakkında soru sorun..."
+                                    : activeSelection
+                                        ? "Seçili metin hakkında soru sorun..."
+                                        : "Mesajınızı yazın..."
+                            }
+                            rows={1}
+                            disabled={isLoading}
+                        />
+                    </div>
                 </div>
                 <button
                     className={styles.sendBtn}
@@ -396,7 +489,7 @@ export function ChatPanel({
                     {isLoading ? (
                         <span className={styles.spinner} />
                     ) : (
-                        '→'
+                        <SendIcon size={20} />
                     )}
                 </button>
             </div>

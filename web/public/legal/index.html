@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yasal Belgeler - Corio Docs</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.35);
+        }
+
+        .card h2 {
+            color: var(--primary);
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .links a {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--primary);
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .links a:hover {
+            background: rgba(99, 102, 241, 0.35);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .footer p {
+            color: var(--text-muted);
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">📄</div>
+            <h1>Corio Docs</h1>
+            <p class="subtitle">Yasal Belgeler / Legal Documents</p>
+        </div>
+
+        <div class="card-grid">
+            <div class="card">
+                <h2>🔒 Gizlilik Politikası</h2>
+                <p>Kişisel verilerinizi nasıl topladığımızı, kullandığımızı ve koruduğumuzu öğrenin.</p>
+                <div class="links">
+                    <a href="privacy-policy.html">🇹🇷 Türkçe</a>
+                    <a href="privacy-policy-en.html">🇬🇧 English</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📜 Kullanım Koşulları</h2>
+                <p>Uygulamayı kullanırken kabul ettiğiniz kurallar ve koşullar.</p>
+                <div class="links">
+                    <a href="terms-of-service.html">🇹🇷 Türkçe</a>
+                    <a href="terms-of-service-en.html">🇬🇧 English</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>⚖️ Son Kullanıcı Lisans Sözleşmesi</h2>
+                <p>App Store gereksinimleri için EULA (End User License Agreement).</p>
+                <div class="links">
+                    <a href="eula.html">🇹🇷 Türkçe</a>
+                    <a href="eula-en.html">🇬🇧 English</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🗑️ Veri Silme Politikası</h2>
+                <p>Hesabınızı ve verilerinizi nasıl silebileceğinizi öğrenin.</p>
+                <div class="links">
+                    <a href="data-deletion.html">🇹🇷 Türkçe</a>
+                    <a href="data-deletion-en.html">🇬🇧 English</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>© 2026 Corio Docs. Tüm hakları saklıdır.</p>
+            <p style="margin-top: 0.5rem;">
+                <a href="mailto:docs@corioscan.com">docs@corioscan.com</a> |
+                <a href="https://docs.corioscan.com">docs.corioscan.com</a>
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

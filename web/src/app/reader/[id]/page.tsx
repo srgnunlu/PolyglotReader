@@ -15,9 +15,8 @@ import { SelectionPopup } from '@/components/reader/SelectionPopup';
 import { ImageSelectionPopup } from '@/components/reader/ImageSelectionPopup';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { AnnotationProvider, useAnnotations } from '@/contexts/AnnotationContext';
-import { AnnotationToolbar } from '@/components/annotations/AnnotationToolbar';
 import { getSupabase } from '@/lib/supabase';
-import { PDFDocumentMetadata, Annotation } from '@/types/models';
+import { PDFDocumentMetadata } from '@/types/models';
 import styles from './reader.module.css';
 
 interface PageParams {
@@ -43,7 +42,8 @@ function ReaderContent({ documentId }: ReaderContentProps) {
     const router = useRouter();
     const supabase = getSupabase();
     const viewerRef = useRef<HTMLDivElement>(null);
-    const { annotations, selectedTool, selectedColor, addAnnotation } = useAnnotations();
+    const mouseIdleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const { annotations, selectedColor, setSelectedColor, addAnnotation } = useAnnotations();
 
     const [document, setDocument] = useState<PDFDocumentMetadata | null>(null);
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -78,6 +78,10 @@ function ReaderContent({ documentId }: ReaderContentProps) {
     const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>();
     const [chatInitialImage, setChatInitialImage] = useState<string | undefined>();
     const [documentContext, setDocumentContext] = useState<string>('');
+
+    // Fullscreen and auto-hide state
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isNavHidden, setIsNavHidden] = useState(false);
 
     // ... (existing code)
 
@@ -314,7 +318,7 @@ function ReaderContent({ documentId }: ReaderContentProps) {
     // Handle highlight - save via annotation context
     const handleHighlight = useCallback(async (color: string) => {
         if (!selectedText || !documentId || !selectionRects || selectionRects.length === 0) {
-            console.error('Invalid selection for highlighting');
+            // Silently return if no selection - this is expected for toolbar color changes
             return;
         }
 
@@ -325,7 +329,7 @@ function ReaderContent({ documentId }: ReaderContentProps) {
             await addAnnotation({
                 fileId: documentId,
                 pageNumber: selectedPageNumber,
-                type: selectedTool || 'highlight',
+                type: 'highlight',
                 color: color || selectedColor,  // Popup color takes priority
                 rects: selectionRects,  // Percentage coords for web, iOS ignores and uses text search
                 text: selectedText,  // Required for iOS text search fallback
@@ -337,7 +341,7 @@ function ReaderContent({ documentId }: ReaderContentProps) {
         } catch (err) {
             console.error('Highlight error:', err);
         }
-    }, [addAnnotation, clearSelection, documentId, selectedPageNumber, selectedText, selectionRects, selectedTool, selectedColor]);
+    }, [addAnnotation, clearSelection, documentId, selectedPageNumber, selectedText, selectionRects, selectedColor]);
 
     const toggleQuickTranslationMode = useCallback(() => {
         setIsQuickTranslationMode(prev => !prev);
@@ -370,6 +374,92 @@ function ReaderContent({ documentId }: ReaderContentProps) {
             console.error('Error saving progress:', err);
         }
     }, [documentId, supabase]);
+
+    // Fullscreen toggle handler
+    const toggleFullscreen = useCallback(() => {
+        if (!viewerRef.current) return;
+
+        if (!globalThis.document.fullscreenElement) {
+            viewerRef.current.requestFullscreen().catch(err => {
+                console.error('Fullscreen error:', err);
+            });
+        } else {
+            globalThis.document.exitFullscreen();
+        }
+    }, []);
+
+    // Listen for fullscreen changes
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!globalThis.document.fullscreenElement);
+            // Reset nav visibility when exiting fullscreen
+            if (!globalThis.document.fullscreenElement) {
+                setIsNavHidden(false);
+            }
+        };
+
+        globalThis.document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => globalThis.document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    // Auto-hide navigation on mouse idle (only in fullscreen)
+    const handleMouseMove = useCallback(() => {
+        if (!isFullscreen) return;
+
+        // Show navbar on mouse move
+        setIsNavHidden(false);
+
+        // Clear existing timeout
+        if (mouseIdleTimeoutRef.current) {
+            clearTimeout(mouseIdleTimeoutRef.current);
+        }
+
+        // Hide after 3 seconds of inactivity
+        mouseIdleTimeoutRef.current = setTimeout(() => {
+            if (isFullscreen) {
+                setIsNavHidden(true);
+            }
+        }, 3000);
+    }, [isFullscreen]);
+
+    // Cleanup mouse idle timeout
+    useEffect(() => {
+        return () => {
+            if (mouseIdleTimeoutRef.current) {
+                clearTimeout(mouseIdleTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    // Keyboard shortcuts (F11 for fullscreen, ESC handled by browser, 1-4 for colors)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // F11 - Toggle fullscreen
+            if (e.key === 'F11') {
+                e.preventDefault();
+                toggleFullscreen();
+                return;
+            }
+
+            // Color shortcuts (1-4) when not typing in input
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+            const colorMap: Record<string, string> = {
+                '1': '#fef08a', // Yellow
+                '2': '#bbf7d0', // Green
+                '3': '#bae6fd', // Blue
+                '4': '#fbcfe8', // Pink
+            };
+
+            if (colorMap[e.key]) {
+                setSelectedColor(colorMap[e.key]);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [toggleFullscreen, setSelectedColor]);
 
     if (isLoading) {
         return (
@@ -404,34 +494,10 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                 </button>
 
                 <h1 className={styles.title}>{document.name}</h1>
-
-                <div className={styles.headerActions}>
-                    <button
-                        className={`${styles.translationToggle} ${isQuickTranslationMode ? styles.translationToggleActive : ''}`}
-                        onClick={toggleQuickTranslationMode}
-                        title={isQuickTranslationMode ? 'Hızlı çeviri modu açık' : 'Hızlı çeviri modu kapalı'}
-                    >
-                        <span className={styles.translationIcon}>🌐</span>
-                        {isQuickTranslationMode && (
-                            <span className={styles.translationLabel}>Çeviri Açık</span>
-                        )}
-                    </button>
-                    <button
-                        className={`${styles.headerBtn} ${isChatOpen ? styles.headerBtnActive : ''}`}
-                        onClick={() => setIsChatOpen(!isChatOpen)}
-                        title="AI Sohbet"
-                    >
-                        ✨
-                    </button>
-                </div>
             </header>
 
-            {/* Annotation Toolbar */}
-            <AnnotationToolbar />
-
             {/* Main content */}
-            <div className={styles.content}>
-                {/* PDF Viewer */}
+            <div className={styles.content} onMouseMove={handleMouseMove}>
                 {/* PDF Viewer */}
                 <div ref={viewerRef} className={styles.viewer}>
                     <PDFViewer
@@ -450,6 +516,16 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                         } : undefined}
                         persistentHighlightRects={persistentHighlightRects}
                         persistentHighlightPageNumber={persistentHighlightPage}
+                        selectedColor={selectedColor}
+                        onColorChange={setSelectedColor}
+                        onQuickHighlight={handleHighlight}
+                        isFullscreen={isFullscreen}
+                        onToggleFullscreen={toggleFullscreen}
+                        isNavHidden={isNavHidden}
+                        isQuickTranslationMode={isQuickTranslationMode}
+                        onToggleTranslation={toggleQuickTranslationMode}
+                        isChatOpen={isChatOpen}
+                        onToggleChat={() => setIsChatOpen(!isChatOpen)}
                     />
 
                     {/* Text Selection Popup */}

@@ -7,15 +7,26 @@
 
 const CACHE_NAME = 'pdf-thumbnails-v1';
 const CACHE_TTL_DAYS = 7;
+// Cache API requires valid URL scheme - use a fake https URL
+const CACHE_URL_PREFIX = 'https://thumbnail.cache.local/';
 
 class ThumbnailCacheService {
+    /**
+     * Convert storage path to valid cache URL
+     */
+    private toCacheUrl(storagePath: string): string {
+        // Encode the path to handle special characters
+        return `${CACHE_URL_PREFIX}${encodeURIComponent(storagePath)}`;
+    }
+
     /**
      * Get cached thumbnail blob
      */
     async getCachedThumbnail(cacheKey: string): Promise<Blob | null> {
         try {
             const cache = await caches.open(CACHE_NAME);
-            const response = await cache.match(cacheKey);
+            const cacheUrl = this.toCacheUrl(cacheKey);
+            const response = await cache.match(cacheUrl);
 
             if (!response) {
                 console.log('[ThumbnailCache] Cache miss:', cacheKey);
@@ -30,7 +41,7 @@ class ThumbnailCacheService {
 
                 if (cacheAge > maxAge) {
                     console.log('[ThumbnailCache] Cache expired:', cacheKey);
-                    await cache.delete(cacheKey);
+                    await cache.delete(cacheUrl);
                     return null;
                 }
             }
@@ -49,16 +60,17 @@ class ThumbnailCacheService {
     async cacheThumbnail(cacheKey: string, blob: Blob): Promise<void> {
         try {
             const cache = await caches.open(CACHE_NAME);
+            const cacheUrl = this.toCacheUrl(cacheKey);
 
             // Create response with custom header for expiration tracking
             const headers = new Headers({
-                'Content-Type': blob.type,
+                'Content-Type': blob.type || 'application/pdf',
                 'X-Cached-At': Date.now().toString(),
             });
 
             const response = new Response(blob, { headers });
 
-            await cache.put(cacheKey, response);
+            await cache.put(cacheUrl, response);
             console.log('[ThumbnailCache] ✅ Cached:', cacheKey);
         } catch (error) {
             console.error('[ThumbnailCache] cacheThumbnail error:', error);
@@ -88,7 +100,8 @@ class ThumbnailCacheService {
     async removeCached(cacheKey: string): Promise<void> {
         try {
             const cache = await caches.open(CACHE_NAME);
-            const deleted = await cache.delete(cacheKey);
+            const cacheUrl = this.toCacheUrl(cacheKey);
+            const deleted = await cache.delete(cacheUrl);
             if (deleted) {
                 console.log('[ThumbnailCache] Removed:', cacheKey);
             }

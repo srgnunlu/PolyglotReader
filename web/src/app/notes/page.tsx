@@ -117,6 +117,12 @@ function NotesContent() {
 
     return (
         <div className={styles.layout}>
+            {/* Animated Background */}
+            <div className={styles.backgroundOrbs}>
+                <div className={`${styles.orb} ${styles.orb1}`} />
+                <div className={`${styles.orb} ${styles.orb2}`} />
+            </div>
+
             {/* Sidebar */}
             <aside className={styles.sidebar}>
                 <div className={styles.sidebarHeader}>
