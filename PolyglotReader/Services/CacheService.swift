@@ -91,17 +91,41 @@ final class CacheService {
         "\(fileId)_\(pageNumber)_\(Int(scale * 100))" as NSString
     }
 
-    /// Get rendered PDF page from cache
+    /// Get rendered PDF page from cache (checks memory first, then disk)
     func getPDFPage(fileId: String, pageNumber: Int, scale: CGFloat = 1.0) -> UIImage? {
         let key = pdfPageKey(fileId: fileId, pageNumber: pageNumber, scale: scale)
-        return pdfPageCache.object(forKey: key)
+
+        // 1. Check memory cache first (fastest)
+        if let cachedImage = pdfPageCache.object(forKey: key) {
+            return cachedImage
+        }
+
+        // 2. Check disk cache for first 3 pages (persistent across app restarts)
+        if pageNumber <= 3 {
+            if let diskImage = PDFPageCacheService.shared.getCachedPageImage(fileId: fileId, pageNumber: pageNumber) {
+                // Store in memory cache for faster subsequent access
+                let cost = Int(diskImage.size.width * diskImage.size.height * diskImage.scale * 4)
+                pdfPageCache.setObject(diskImage, forKey: key, cost: cost)
+                logDebug("CacheService", "Disk cache'den memory'e yüklendi", details: "Page \(pageNumber)")
+                return diskImage
+            }
+        }
+
+        return nil
     }
 
-    /// Store rendered PDF page in cache
+    /// Store rendered PDF page in cache (memory + disk for first pages)
     func setPDFPage(_ image: UIImage, fileId: String, pageNumber: Int, scale: CGFloat = 1.0) {
         let key = pdfPageKey(fileId: fileId, pageNumber: pageNumber, scale: scale)
         let cost = Int(image.size.width * image.size.height * image.scale * 4)  // Approximate bytes
+
+        // Store in memory cache
         pdfPageCache.setObject(image, forKey: key, cost: cost)
+
+        // Also persist first 3 pages to disk for instant loading on next app open
+        if pageNumber <= 3 {
+            PDFPageCacheService.shared.cachePageImage(image, fileId: fileId, pageNumber: pageNumber)
+        }
     }
 
     /// Remove all pages for a specific file
@@ -109,6 +133,7 @@ final class CacheService {
         // NSCache doesn't support iteration, so we just clear the whole cache
         // In practice, this is called when closing a document
         pdfPageCache.removeAllObjects()
+        // Note: We don't remove disk cache here - it persists for instant loading
     }
 
     // MARK: - Image Cache Methods

@@ -84,16 +84,46 @@ struct PDFReaderView: View {
                             logDebug("UI", "PDFKitView appeared in hierarchy")
                         }
                         
-                        // Render tamamlanana kadar loading overlay göster
+                        // Render tamamlanana kadar loading overlay veya cached image göster
                         if isPDFRendering {
-                            Color(.systemGroupedBackground)
-                                .ignoresSafeArea()
-                            VStack(spacing: 16) {
-                                ProgressView()
-                                    .scaleEffect(1.2)
-                                Text("Sayfa hazırlanıyor...")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                            ZStack {
+                                Color(.systemGroupedBackground)
+                                    .ignoresSafeArea()
+
+                                // Eğer disk cache'de ilk sayfa varsa, onu göster (instant feedback)
+                                if let cachedImage = viewModel.cachedFirstPageImage {
+                                    GeometryReader { geometry in
+                                        Image(uiImage: cachedImage)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)
+                                            .frame(width: geometry.size.width, height: geometry.size.height)
+                                            .background(Color.white)
+                                            .overlay(alignment: .bottom) {
+                                                // Subtle loading indicator at bottom
+                                                HStack(spacing: 8) {
+                                                    ProgressView()
+                                                        .scaleEffect(0.8)
+                                                    Text("Yükleniyor...")
+                                                        .font(.caption2)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 6)
+                                                .background(.ultraThinMaterial, in: Capsule())
+                                                .padding(.bottom, 20)
+                                            }
+                                    }
+                                } else {
+                                    // Cache'de yoksa normal spinner göster
+                                    VStack(spacing: 16) {
+                                        ProgressView()
+                                            .scaleEffect(1.2)
+                                        Text("Sayfa hazırlanıyor...")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                             }
                         }
                         
