@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var settingsViewModel: SettingsViewModel
+    @StateObject private var keepAliveService = KeepAliveService.shared
 
     var body: some View {
         NavigationStack {
@@ -101,6 +102,64 @@ struct SettingsView: View {
                             : "settings.language.english".localized
                     )
                     .accessibilityIdentifier("language_picker")
+                }
+
+                // Cloud Section (Admin Only)
+                if authViewModel.currentUser?.isAdmin == true {
+                    Section {
+                        Toggle(isOn: $keepAliveService.isEnabled) {
+                            Label("Supabase Keep-Alive", systemImage: "cloud")
+                        }
+                        .tint(.indigo)
+
+                        if keepAliveService.isEnabled {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Son Ping:")
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(keepAliveService.lastPingStatus.displayText)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                if let daysRemaining = keepAliveService.daysUntilPause {
+                                    HStack {
+                                        Text("Duraklatmaya Kalan:")
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Text("\(daysRemaining) gün")
+                                            .font(.caption)
+                                            .foregroundStyle(daysRemaining < 3 ? .red : .secondary)
+                                    }
+                                }
+
+                                Button {
+                                    Task {
+                                        await keepAliveService.ping()
+                                    }
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        if case .pinging = keepAliveService.lastPingStatus {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                        }
+                                        Text("Şimdi Ping Gönder")
+                                        Spacer()
+                                    }
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(keepAliveService.lastPingStatus == .pinging)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    } header: {
+                        Text("settings.section.cloud".localized)
+                    } footer: {
+                        Text("settings.section.cloud.footer".localized)
+                            .font(.caption)
+                    }
                 }
 
                 // About Section

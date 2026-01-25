@@ -30,6 +30,12 @@ struct User: Codable, Identifiable {
         self.email = email
         self.avatarURL = avatarURL
     }
+
+    /// Check if the user is an admin/developer
+    var isAdmin: Bool {
+        let adminEmails = ["sergennunluu@gmail.com"]
+        return adminEmails.contains(email.lowercased())
+    }
 }
 
 // MARK: - User Preferences

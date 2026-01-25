@@ -101,6 +101,11 @@ struct ContentView: View {
                 currentScreen: authViewModel.isAuthenticated ? "MainTab" : "Auth",
                 isAuthenticated: authViewModel.isAuthenticated
             )
+
+            // Trigger keep-alive ping if needed
+            Task {
+                await KeepAliveService.shared.pingIfNeeded()
+            }
         }
         .onChange(of: authViewModel.isAuthenticated) { newValue in
             errorHandlingService.recordAppState(

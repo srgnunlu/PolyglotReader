@@ -217,6 +217,8 @@
 /* Sections */
 "settings.section.appearance" = "Görünüm";
 "settings.section.features" = "Özellikler";
+"settings.section.cloud" = "Bulut Depolama";
+"settings.section.cloud.footer" = "Supabase ücretsiz planı 7 günden fazla kullanılmayan projeleri duraklatır. Keep-Alive özelliği düzenli ping göndererek projenizi aktif tutar.";
 "settings.section.about" = "Hakkında";
 
 /* Appearance */
