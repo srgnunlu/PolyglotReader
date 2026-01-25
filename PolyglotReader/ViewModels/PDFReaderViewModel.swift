@@ -26,6 +26,9 @@ class PDFReaderViewModel: ObservableObject {
     // MARK: - Network Status (Phase 6)
     @Published private(set) var isOffline = false  // Çevrimdışı durumu
 
+    // MARK: - Page Cache for Instant Loading
+    @Published var cachedFirstPageImage: UIImage?  // İlk sayfa için önbellek görseli
+
     // Hızlı Çeviri Modu
     @Published var isQuickTranslationMode = false
     @Published var showQuickTranslation = false
@@ -85,9 +88,12 @@ class PDFReaderViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
+        // İlk sayfa görseli disk cache'de varsa hemen yükle (instant placeholder)
+        loadCachedFirstPageImage()
+
         do {
             logInfo("PDFReaderVM", "PDF yükleniyor: \(fileMetadata.name)")
-            
+
             // Cache-first strategy: Try disk cache first, then network
             let (data, url) = try await loadPdfDataWithCache()
             let pdfDocument = try createPdfDocument(from: data)
@@ -96,6 +102,9 @@ class PDFReaderViewModel: ObservableObject {
             loadAnnotationsAsync()
             loadReadingProgressAsync()
             prepareChatAsync(url: url)
+
+            // İlk sayfayı arka planda cache'e kaydet (bir sonraki açılış için)
+            cacheFirstPageAsync(document: pdfDocument)
         } catch {
             let appError = ErrorHandlingService.mapToAppError(error)
             logError("PDFReaderVM", "Doküman yükleme hatası", error: appError)
@@ -109,6 +118,48 @@ class PDFReaderViewModel: ObservableObject {
                     return
                 }
             )
+        }
+    }
+
+    /// Disk cache'den ilk sayfa görselini yükle (instant loading için)
+    private func loadCachedFirstPageImage() {
+        if let cachedImage = PDFPageCacheService.shared.getCachedPageImage(fileId: fileMetadata.id, pageNumber: 1) {
+            cachedFirstPageImage = cachedImage
+            logInfo("PDFReaderVM", "📦 İlk sayfa görseli cache'den yüklendi (instant)")
+        }
+    }
+
+    /// İlk sayfayı disk cache'e kaydet (sonraki açılışlar için)
+    private func cacheFirstPageAsync(document: PDFDocument) {
+        Task.detached(priority: .utility) { [weak self] in
+            guard let self = self else { return }
+
+            // İlk 3 sayfayı cache'le (instant loading için)
+            for pageNum in 1...min(3, document.pageCount) {
+                guard let page = document.page(at: pageNum - 1) else { continue }
+
+                // Cache'de zaten varsa atla
+                if PDFPageCacheService.shared.isCached(fileId: self.fileMetadata.id, pageNumber: pageNum) {
+                    continue
+                }
+
+                do {
+                    // Render page at 1.5x scale (good balance between quality and size)
+                    let image = try PDFService.shared.renderPageAsImage(page: page, scale: 1.5)
+                    PDFPageCacheService.shared.cachePageImage(image, fileId: self.fileMetadata.id, pageNumber: pageNum)
+
+                    // İlk sayfa ise published property'yi güncelle
+                    if pageNum == 1 {
+                        await MainActor.run {
+                            self.cachedFirstPageImage = image
+                        }
+                    }
+
+                    logDebug("PDFReaderVM", "Sayfa \(pageNum) cache'e kaydedildi")
+                } catch {
+                    logDebug("PDFReaderVM", "Sayfa \(pageNum) cache'e kaydedilemedi", details: error.localizedDescription)
+                }
+            }
         }
     }
     
