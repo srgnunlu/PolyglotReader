@@ -41,10 +41,21 @@ final class PDFPageCacheService {
         // Create directory if needed
         if !fileManager.fileExists(atPath: pageCacheDir.path) {
             do {
-                try fileManager.createDirectory(at: pageCacheDir, withIntermediateDirectories: true)
-                logInfo("PDFPageCacheService", "Page cache dizini oluşturuldu", details: pageCacheDir.path)
+                try fileManager.createDirectory(
+                    at: pageCacheDir,
+                    withIntermediateDirectories: true
+                )
+                logInfo(
+                    "PDFPageCacheService",
+                    "Page cache dizini oluşturuldu",
+                    details: pageCacheDir.path
+                )
             } catch {
-                logWarning("PDFPageCacheService", "Page cache dizini oluşturulamadı", details: error.localizedDescription)
+                logWarning(
+                    "PDFPageCacheService",
+                    "Page cache dizini oluşturulamadı",
+                    details: error.localizedDescription
+                )
                 return nil
             }
         }
@@ -119,7 +130,15 @@ final class PDFPageCacheService {
                 }
 
                 try jpegData.write(to: cacheURL, options: .atomic)
-                logInfo("PDFPageCacheService", "Page cached ✓", details: "File: \(fileId), Page: \(pageNumber), Size: \(ByteCountFormatter.string(fromByteCount: Int64(jpegData.count), countStyle: .file))")
+                let sizeStr = ByteCountFormatter.string(
+                    fromByteCount: Int64(jpegData.count),
+                    countStyle: .file
+                )
+                logInfo(
+                    "PDFPageCacheService",
+                    "Page cached ✓",
+                    details: "File: \(fileId), Page: \(pageNumber), Size: \(sizeStr)"
+                )
             } catch {
                 logWarning("PDFPageCacheService", "Page cache yazma hatası", details: error.localizedDescription)
             }
@@ -138,11 +157,9 @@ final class PDFPageCacheService {
                 let files = try self.fileManager.contentsOfDirectory(at: cacheDir, includingPropertiesForKeys: nil)
                 var deletedCount = 0
 
-                for file in files {
-                    if file.lastPathComponent.hasPrefix(prefix) {
-                        try self.fileManager.removeItem(at: file)
-                        deletedCount += 1
-                    }
+                for file in files where file.lastPathComponent.hasPrefix(prefix) {
+                    try self.fileManager.removeItem(at: file)
+                    deletedCount += 1
                 }
 
                 if deletedCount > 0 {
@@ -241,8 +258,11 @@ final class PDFPageCacheService {
 
             // Sort by modification date (oldest first = LRU)
             let sortedFiles = files.sorted { url1, url2 in
-                let date1 = (try? url1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
-                let date2 = (try? url2.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
+                let keys: Set<URLResourceKey> = [.contentModificationDateKey]
+                let date1 = (try? url1.resourceValues(forKeys: keys))?.contentModificationDate
+                    ?? Date.distantPast
+                let date2 = (try? url2.resourceValues(forKeys: keys))?.contentModificationDate
+                    ?? Date.distantPast
                 return date1 < date2
             }
 
@@ -257,7 +277,8 @@ final class PDFPageCacheService {
                 }
             }
 
-            logInfo("PDFPageCacheService", "LRU temizleme tamamlandı", details: ByteCountFormatter.string(fromByteCount: freedBytes, countStyle: .file))
+            let freedStr = ByteCountFormatter.string(fromByteCount: freedBytes, countStyle: .file)
+            logInfo("PDFPageCacheService", "LRU temizleme tamamlandı", details: freedStr)
         } catch {
             logWarning("PDFPageCacheService", "LRU eviction hatası", details: error.localizedDescription)
         }
@@ -274,7 +295,11 @@ final class PDFPageCacheService {
     private func cleanupExpiredFiles() {
         guard let cacheDir = cacheDirectory else { return }
 
-        let expirationDate = Calendar.current.date(byAdding: .day, value: -cacheExpirationDays, to: Date()) ?? Date.distantPast
+        let expirationDate = Calendar.current.date(
+            byAdding: .day,
+            value: -cacheExpirationDays,
+            to: Date()
+        ) ?? Date.distantPast
 
         do {
             let files = try fileManager.contentsOfDirectory(
@@ -283,16 +308,21 @@ final class PDFPageCacheService {
             )
 
             var deletedCount = 0
-            for file in files {
-                if let modDate = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-                   modDate < expirationDate {
-                    try fileManager.removeItem(at: file)
-                    deletedCount += 1
+            let keys: Set<URLResourceKey> = [.contentModificationDateKey]
+            let expiredFiles = files.filter { file in
+                guard let modDate = try? file.resourceValues(forKeys: keys).contentModificationDate else {
+                    return false
                 }
+                return modDate < expirationDate
+            }
+            for file in expiredFiles {
+                try fileManager.removeItem(at: file)
+                deletedCount += 1
             }
 
             if deletedCount > 0 {
-                logInfo("PDFPageCacheService", "Eski sayfa görselleri temizlendi", details: "\(deletedCount) dosya (\(cacheExpirationDays) günden eski)")
+                let details = "\(deletedCount) dosya (\(cacheExpirationDays) günden eski)"
+                logInfo("PDFPageCacheService", "Eski sayfa görselleri temizlendi", details: details)
             }
         } catch {
             logWarning("PDFPageCacheService", "Temizleme hatası", details: error.localizedDescription)
