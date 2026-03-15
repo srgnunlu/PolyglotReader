@@ -186,8 +186,7 @@ export function ChatPanel({
 
         try {
             let fullResponse = '';
-            const historyMessages = messages.slice(0, -2);
-            const chatHistory: ChatHistoryMessage[] = historyMessages.map(m => ({
+            const chatHistory: ChatHistoryMessage[] = messages.map(m => ({
                 role: m.role as 'user' | 'model',
                 text: m.text
             }));

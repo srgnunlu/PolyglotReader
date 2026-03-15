@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { translateText } from '@/lib/gemini';
+import { getAccessToken } from '@/lib/supabase';
 import styles from './SelectionPopup.module.css';
 
 interface SelectionPopupProps {
@@ -44,8 +44,18 @@ export function SelectionPopup({
 
         setIsTranslating(true);
         try {
-            const result = await translateText(text, 'tr');
-            setTranslation(result);
+            const token = await getAccessToken();
+            const response = await fetch('/api/translate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({ text, targetLang: 'tr' }),
+            });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+            setTranslation(data.translation.trim());
         } catch (err) {
             console.error('Translation error:', err);
             setTranslation('Çeviri yapılamadı');
