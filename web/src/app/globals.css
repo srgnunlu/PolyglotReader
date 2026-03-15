@@ -466,6 +466,7 @@ a:hover {
   caret-color: CanvasText;
   z-index: 2;
   pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .textLayer :is(span, br) {
@@ -477,6 +478,7 @@ a:hover {
   pointer-events: auto;
   user-select: text;
   -webkit-user-select: text;
+  -webkit-touch-callout: default;
 }
 
 .textLayer span.markedContent {
@@ -527,14 +529,13 @@ a:hover {
   background: rgba(99, 102, 241, 0.5);
 }
 
-/* PDF Page transitions for smooth zoom */
+/* PDF Page rendering */
 .react-pdf__Page {
-  transition: transform 0.15s ease-out;
-  will-change: transform;
+  position: relative;
 }
 
 .react-pdf__Page__canvas {
-  transition: opacity 0.1s ease-in;
+  display: block;
 }
 
 .pdf-page {

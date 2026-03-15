@@ -185,29 +185,73 @@
 
 @media (max-width: 768px) {
     .popup {
-        min-width: 220px;
-        max-width: calc(100vw - 24px);
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        top: auto !important;
+        transform: none !important;
+        min-width: 100%;
+        max-width: 100%;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+        z-index: 150;
+        animation: mobileSlideUp 0.25s ease;
+        padding-bottom: env(safe-area-inset-bottom, 8px);
+    }
+
+    .dragHandle {
+        height: 20px;
+    }
+
+    .dragIndicator {
+        width: 36px;
+        height: 4px;
     }
 
     .actions {
-        gap: 2px;
-        padding: 6px;
+        gap: 4px;
+        padding: 8px 12px;
+        flex-direction: row;
+        justify-content: space-around;
     }
 
     .actionBtn {
-        padding: 8px 8px;
-        font-size: 0.6875rem;
+        padding: 10px 12px;
+        font-size: 0.75rem;
+        min-width: 60px;
     }
 
     .icon {
-        font-size: 1rem;
+        font-size: 1.25rem;
+    }
+
+    .colorPicker {
+        padding: 12px 16px;
+    }
+
+    .colorBtn {
+        width: 32px;
+        height: 32px;
     }
 
     .preview {
-        padding: 8px;
+        padding: 8px 12px;
     }
 
     .translation {
-        padding: 8px;
+        padding: 10px 12px;
+    }
+}
+
+@keyframes mobileSlideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
     }
 }

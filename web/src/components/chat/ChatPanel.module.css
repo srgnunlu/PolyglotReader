@@ -863,7 +863,7 @@
     border-left: 3px solid var(--color-primary-500);
 }
 
-/* Mobile Chat - Full screen overlay */
+/* Mobile Chat - Full screen overlay with slide animation */
 @media (max-width: 768px) {
     .panel {
         position: fixed;
@@ -874,6 +874,7 @@
         z-index: 200;
         border-left: none;
         border-radius: 0;
+        animation: chatSlideIn 0.3s ease;
     }
 
     .resizeHandle {
@@ -881,17 +882,44 @@
     }
 
     .header {
-        padding: 12px 16px;
-        padding-top: calc(12px + env(safe-area-inset-top, 0px));
+        padding: 10px 12px;
+        padding-top: calc(10px + env(safe-area-inset-top, 0px));
     }
 
     .messages {
         padding: 12px;
+        gap: 12px;
     }
 
     .inputArea {
-        padding: 12px 16px;
-        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        padding: 10px 12px;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        gap: 8px;
+    }
+
+    .inputContainer {
+        padding: 10px 14px;
+        border-radius: 14px;
+    }
+
+    .sendBtn {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+    }
+
+    .messageBubble {
+        padding: 10px 14px;
+        border-radius: 14px;
+        font-size: 0.9rem;
+    }
+
+    .message.user .messageBubble {
+        border-bottom-right-radius: 4px;
+    }
+
+    .message.model .messageBubble {
+        border-bottom-left-radius: 4px;
     }
 
     /* Always show action buttons on mobile (no hover) */
@@ -902,5 +930,28 @@
     .iconBtn {
         width: 32px;
         height: 32px;
+    }
+
+    .emptyTitle {
+        font-size: 1rem;
+    }
+
+    .emptySubtitle {
+        font-size: 0.85rem;
+    }
+
+    .suggestionChip {
+        padding: 10px 14px;
+        font-size: 0.8rem;
+    }
+}
+
+@keyframes chatSlideIn {
+    from {
+        transform: translateX(100%);
+    }
+
+    to {
+        transform: translateX(0);
     }
 }
