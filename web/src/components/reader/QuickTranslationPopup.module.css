@@ -127,7 +127,46 @@
 
 @media (max-width: 768px) {
     .popup {
-        max-width: calc(100vw - 16px);
-        min-width: 200px;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        top: auto !important;
+        transform: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 100% !important;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+        z-index: 150;
+        max-height: 40vh !important;
+        animation: mobileSlideUp 0.25s ease;
+        padding-bottom: env(safe-area-inset-bottom, 8px);
+    }
+
+    .dragHandle {
+        height: 24px;
+    }
+
+    .dragIndicator {
+        width: 40px;
+        height: 4px;
+    }
+
+    .text {
+        font-size: 0.95rem !important;
+        line-height: 1.5 !important;
+    }
+}
+
+@keyframes mobileSlideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
     }
 }

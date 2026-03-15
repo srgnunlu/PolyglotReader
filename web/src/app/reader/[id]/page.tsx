@@ -491,8 +491,9 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                 <button
                     className={styles.backBtn}
                     onClick={() => router.push('/library')}
+                    title="Kütüphane"
                 >
-                    ← Kütüphane
+                    ←
                 </button>
 
                 <h1 className={styles.title}>{document.name}</h1>
@@ -500,11 +501,11 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                 <button
                     onClick={() => setShowSummary(true)}
                     style={{
-                        padding: '6px 14px', borderRadius: 8,
+                        padding: '5px 12px', borderRadius: 8,
                         background: 'rgba(99,102,241,0.1)', color: 'var(--color-primary-500)',
                         border: '1px solid rgba(99,102,241,0.2)', cursor: 'pointer',
-                        fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap',
-                        transition: 'all 0.15s',
+                        fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap',
+                        transition: 'all 0.15s', flexShrink: 0,
                     }}
                 >
                     Özetle
