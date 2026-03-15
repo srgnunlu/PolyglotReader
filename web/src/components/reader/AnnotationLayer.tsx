@@ -9,6 +9,7 @@ interface AnnotationLayerProps {
     scale: number;
     pageWidth: number;
     pageHeight: number;
+    onAnnotationClick?: (annotation: Annotation, position: { x: number; y: number }) => void;
 }
 
 const AnnotationLayerInner = ({
@@ -17,6 +18,7 @@ const AnnotationLayerInner = ({
     scale,
     pageWidth,
     pageHeight,
+    onAnnotationClick,
 }: AnnotationLayerProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const offscreenRef = useRef<HTMLCanvasElement | null>(null);
@@ -118,23 +120,61 @@ const AnnotationLayerInner = ({
         });
     }, [pageAnnotations, scale, pageWidth, pageHeight]);
 
+    const getAnnotationBounds = (annotation: Annotation) => {
+        if (annotation.rects.length === 0) return null;
+        let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
+        annotation.rects.forEach(rect => {
+            const isPct = rect.x <= 100 && rect.y <= 100 && rect.width <= 100 && rect.height <= 100;
+            const x = isPct ? (rect.x / 100) * pageWidth : rect.x;
+            const y = isPct ? (rect.y / 100) * pageHeight : (pageHeight - rect.y - rect.height);
+            const w = isPct ? (rect.width / 100) * pageWidth : rect.width;
+            const h = isPct ? (rect.height / 100) * pageHeight : rect.height;
+            minX = Math.min(minX, x); minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h);
+        });
+        return { x: minX * scale, y: minY * scale, w: (maxX - minX) * scale, h: (maxY - minY) * scale };
+    };
+
     return (
-        <canvas
-            ref={canvasRef}
-            width={pageWidth * scale}
-            height={pageHeight * scale}
-            style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                pointerEvents: 'none',
-                zIndex: 1,
-                opacity: isVisible ? 1 : 0,
-                transition: 'opacity 0.15s ease-in',
-            }}
-        />
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}>
+            <canvas
+                ref={canvasRef}
+                width={pageWidth * scale}
+                height={pageHeight * scale}
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none',
+                    opacity: isVisible ? 1 : 0,
+                    transition: 'opacity 0.15s ease-in',
+                }}
+            />
+            {onAnnotationClick && pageAnnotations.map(annotation => {
+                const bounds = getAnnotationBounds(annotation);
+                if (!bounds) return null;
+                return (
+                    <div
+                        key={annotation.id}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onAnnotationClick(annotation, { x: bounds.x + bounds.w / 2, y: bounds.y });
+                        }}
+                        style={{
+                            position: 'absolute',
+                            left: bounds.x,
+                            top: bounds.y,
+                            width: bounds.w,
+                            height: bounds.h,
+                            cursor: 'pointer',
+                            zIndex: 2,
+                        }}
+                    />
+                );
+            })}
+        </div>
     );
 };
 
@@ -144,6 +184,7 @@ export const AnnotationLayer = React.memo(AnnotationLayerInner, (prev, next) => 
         prev.pageNumber === next.pageNumber &&
         prev.scale === next.scale &&
         prev.pageWidth === next.pageWidth &&
-        prev.pageHeight === next.pageHeight
+        prev.pageHeight === next.pageHeight &&
+        prev.onAnnotationClick === next.onAnnotationClick
     );
 });

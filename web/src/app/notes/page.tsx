@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { getSupabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { SkeletonNoteCard, SkeletonStyles } from '@/components/ui/Skeleton';
 import styles from './notes.module.css';
 
 interface Note {
@@ -35,6 +36,7 @@ function NotesContent() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [showAll, setShowAll] = useState(false);
 
     // Fetch notes from Supabase
     useEffect(() => {
@@ -60,12 +62,7 @@ function NotesContent() {
 
                 if (fetchError) throw fetchError;
 
-                // Filter notes that have a note in the data
                 const mappedNotes: Note[] = (data || [])
-                    .filter((item: Record<string, unknown>) => {
-                        const itemData = item.data as { note?: string } | undefined;
-                        return itemData?.note;
-                    })
                     .map((item: Record<string, unknown>) => {
                         const itemData = item.data as { text?: string; note?: string; color?: string };
                         return {
@@ -92,12 +89,14 @@ function NotesContent() {
         fetchNotes();
     }, [supabase]);
 
-    // Filter notes by search
-    const filteredNotes = notes.filter(note =>
-        note.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.note.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.fileName.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Filter notes by search and showAll toggle
+    const filteredNotes = notes.filter(note => {
+        if (!showAll && !note.note) return false;
+        const q = searchQuery.toLowerCase();
+        return !q || note.text.toLowerCase().includes(q) ||
+            note.note.toLowerCase().includes(q) ||
+            note.fileName.toLowerCase().includes(q);
+    });
 
     // Group notes by file
     const groupedNotes = filteredNotes.reduce((acc, note) => {
@@ -166,24 +165,42 @@ function NotesContent() {
             <main className={styles.main}>
                 <header className={styles.header}>
                     <h2 className={styles.title}>📝 Notlarım</h2>
-                    <div className={styles.searchBox}>
-                        <span className={styles.searchIcon}>🔍</span>
-                        <input
-                            type="text"
-                            placeholder="Notlarda ara..."
-                            className={styles.searchInput}
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flex: 1 }}>
+                        <div className={styles.searchBox}>
+                            <span className={styles.searchIcon}>🔍</span>
+                            <input
+                                type="text"
+                                placeholder="Notlarda ara..."
+                                className={styles.searchInput}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <button
+                            onClick={() => setShowAll(!showAll)}
+                            style={{
+                                padding: '8px 14px', borderRadius: 10, whiteSpace: 'nowrap',
+                                background: showAll ? 'var(--color-primary-500)' : 'var(--bg-tertiary)',
+                                color: showAll ? 'white' : 'var(--text-secondary)',
+                                border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600,
+                                transition: 'all 0.2s',
+                            }}
+                        >
+                            {showAll ? 'Tüm İşaretler' : 'Sadece Notlar'}
+                        </button>
                     </div>
                 </header>
 
                 <div className={styles.content}>
                     {isLoading ? (
-                        <div className={styles.loading}>
-                            <div className="spinner" style={{ width: 40, height: 40 }} />
-                            <p>Notlar yükleniyor...</p>
-                        </div>
+                        <>
+                            <SkeletonStyles />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {Array.from({ length: 4 }).map((_, i) => (
+                                    <SkeletonNoteCard key={i} />
+                                ))}
+                            </div>
+                        </>
                     ) : error ? (
                         <div className={styles.error}>
                             <span>⚠️</span>

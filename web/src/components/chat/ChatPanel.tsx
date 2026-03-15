@@ -233,6 +233,13 @@ export function ChatPanel({
                     await saveChatMessage(documentId, 'model', fullResponse);
                 } catch (saveError) {
                     console.error('Failed to save chat messages:', saveError);
+                    setMessages(prev =>
+                        prev.map(m =>
+                            m.id === aiMessageId
+                                ? { ...m, saveError: true }
+                                : m
+                        )
+                    );
                 }
             }
         } catch (err) {
@@ -552,6 +559,27 @@ export function ChatPanel({
                                                 🔄 Tekrar Dene
                                             </button>
                                         )}
+                                    </div>
+                                )}
+                                {message.saveError && (
+                                    <div className={styles.saveErrorBanner}>
+                                        <span>Mesaj kaydedilemedi</span>
+                                        <button
+                                            className={styles.saveRetryBtn}
+                                            onClick={async () => {
+                                                if (!documentId) return;
+                                                try {
+                                                    const userMsg = messages.find(m => m.role === 'user' && m.timestamp <= message.timestamp);
+                                                    if (userMsg) await saveChatMessage(documentId, 'user', userMsg.text);
+                                                    await saveChatMessage(documentId, 'model', message.text);
+                                                    setMessages(prev => prev.map(m => m.id === message.id ? { ...m, saveError: false } : m));
+                                                } catch {
+                                                    // Still failed
+                                                }
+                                            }}
+                                        >
+                                            Tekrar dene
+                                        </button>
                                     </div>
                                 )}
                             </div>

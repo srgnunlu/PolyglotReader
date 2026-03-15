@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { translateText } from '@/lib/gemini';
+import { getAccessToken } from '@/lib/supabase';
 import styles from './SelectionPopup.module.css';
 
 interface SelectionPopupProps {
@@ -44,11 +44,21 @@ export function SelectionPopup({
 
         setIsTranslating(true);
         try {
-            const result = await translateText(text, 'tr');
-            setTranslation(result);
+            const token = await getAccessToken();
+            const res = await fetch('/api/translate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({ text, targetLang: 'tr' }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            setTranslation(data.translation?.trim() || 'Çeviri sonucu boş');
         } catch (err) {
             console.error('Translation error:', err);
-            setTranslation('Çeviri yapılamadı');
+            setTranslation('Çeviri yapılamadı. Lütfen tekrar deneyin.');
         } finally {
             setIsTranslating(false);
         }
@@ -80,16 +90,13 @@ export function SelectionPopup({
                         const viewerRect = viewerElement.getBoundingClientRect();
 
                         // Center horizontally, position above by default
-                        let x = params.left - viewerRect.left + params.width / 2;
-                        let y = params.top - viewerRect.top - 12; // 12px padding above
-
-                        // Check limits if we can get popup dimensions
-                        // For now just basic tracking
+                        const x = params.left - viewerRect.left + params.width / 2;
+                        const y = params.top - viewerRect.top - 12; // 12px padding above
 
                         setCurrentPosition({ x, y });
                     }
                 }
-            } catch (e) {
+            } catch {
                 // Range detached
             }
             animationFrameId = requestAnimationFrame(updatePosition);
