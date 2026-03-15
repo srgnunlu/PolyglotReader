@@ -242,10 +242,23 @@ export function QuickTranslationPopup({
         '--qt-max-height': `${Math.max(120, maxHeight)}px`,
     } as CSSProperties;
 
-    // Calculate final position
-    // We center the popup horizontally on the calculate point, then apply drag offset
-    const finalLeft = currentPosition.x + dragOffset.x;
-    const finalTop = currentPosition.y + dragOffset.y;
+    // Clamp position to viewport boundaries
+    const clampToViewport = (left: number, top: number) => {
+        const popup = popupRef.current;
+        if (!popup || !popup.offsetParent) return { left, top };
+        const parentRect = (popup.offsetParent as HTMLElement).getBoundingClientRect();
+        const popupWidth = popup.offsetWidth || preferredWidth;
+        const maxLeft = parentRect.width - popupWidth / 2;
+        const minLeft = popupWidth / 2;
+        return {
+            left: Math.max(minLeft, Math.min(maxLeft, left)),
+            top: Math.max(16, Math.min(parentRect.height - 80, top)),
+        };
+    };
+
+    const rawLeft = currentPosition.x + dragOffset.x;
+    const rawTop = currentPosition.y + dragOffset.y;
+    const { left: finalLeft, top: finalTop } = clampToViewport(rawLeft, rawTop);
 
     return (
         <div
@@ -254,7 +267,8 @@ export function QuickTranslationPopup({
             style={{
                 left: finalLeft,
                 top: finalTop,
-                transform: 'translateX(-50%)', // Center horizontally
+                transform: 'translateX(-50%)',
+                touchAction: 'none',
                 ...styleVars,
             }}
         >

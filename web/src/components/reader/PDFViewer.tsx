@@ -118,6 +118,8 @@ export function PDFViewer({
     // Cache-first PDF loading
     useEffect(() => {
         let objectUrl: string | null = null;
+        const abortController = new AbortController();
+        const signal = abortController.signal;
 
         const loadPDF = async () => {
             setIsLoadingPDF(true);
@@ -128,6 +130,8 @@ export function PDFViewer({
                 if (storagePath) {
                     // 1. Check cache first
                     const cachedBlob = await pdfCache.getCachedPDF(storagePath);
+
+                    if (signal.aborted) return;
 
                     if (cachedBlob) {
                         objectUrl = URL.createObjectURL(cachedBlob);
@@ -141,13 +145,16 @@ export function PDFViewer({
                     const supabase = getSupabase();
                     const { data: blob, error } = await supabase.storage
                         .from('user_files')
-                        .download(storagePath);
+                        .download(storagePath, { signal });
 
+                    if (signal.aborted) return;
                     if (error) throw error;
                     if (!blob) throw new Error('No blob returned from Supabase');
 
                     // 3. Cache for next time
                     await pdfCache.cachePDF(blob, storagePath);
+
+                    if (signal.aborted) return;
 
                     // 4. Create object URL and set
                     objectUrl = URL.createObjectURL(blob);
@@ -157,8 +164,10 @@ export function PDFViewer({
                     setPdfDataUrl(pdfUrl);
                 }
 
+                if (signal.aborted) return;
                 setIsLoadingPDF(false);
             } catch (error) {
+                if (signal.aborted) return;
                 console.error('[PDFViewer] Error loading PDF:', error);
                 setLoadError(error instanceof Error ? error.message : 'Failed to load PDF');
                 setIsLoadingPDF(false);
@@ -169,8 +178,9 @@ export function PDFViewer({
 
         loadPDF();
 
-        // Cleanup: revoke object URL to prevent memory leaks
+        // Cleanup: abort in-flight requests and revoke object URL to prevent memory leaks
         return () => {
+            abortController.abort();
             if (objectUrl) {
                 URL.revokeObjectURL(objectUrl);
             }
@@ -820,6 +830,10 @@ export function PDFViewer({
           opacity: 0;
           pointer-events: none;
           transform: translateY(-100%);
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
         }
 
         /* Color picker buttons */
@@ -966,6 +980,56 @@ export function PDFViewer({
 
         .pdf-error span {
           font-size: 2rem;
+        }
+
+        /* Mobile toolbar */
+        @media (max-width: 768px) {
+          .pdf-toolbar {
+            gap: 8px;
+            padding: 8px 12px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            justify-content: flex-start;
+          }
+
+          .pdf-toolbar-group {
+            gap: 4px;
+            flex-shrink: 0;
+          }
+
+          .pdf-toolbar-btn {
+            width: 28px;
+            height: 28px;
+            font-size: 0.875rem;
+          }
+
+          .pdf-color-group {
+            padding: 0 4px;
+          }
+
+          .pdf-color-btn {
+            width: 20px;
+            height: 20px;
+          }
+
+          .pdf-page-input {
+            width: 36px;
+            padding: 2px 4px;
+            font-size: 0.75rem;
+          }
+
+          .pdf-page-info {
+            font-size: 0.75rem;
+          }
+
+          .pdf-zoom-info {
+            min-width: 36px;
+            font-size: 0.75rem;
+          }
+
+          .pdf-container {
+            padding: 8px;
+          }
         }
       `}</style>
         </div>

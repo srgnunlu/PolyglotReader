@@ -341,7 +341,7 @@
 /* Content */
 .content {
     flex: 1;
-    padding: 32px;
+    padding: clamp(12px, 3vw, 32px);
 }
 
 .loading,
@@ -384,14 +384,14 @@
 }
 
 .cardGrid {
-    background: rgba(30, 41, 59, 0.6);
-    backdrop-filter: blur(20px);
+    background: rgba(30, 41, 59, 0.85);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 20px;
     overflow: hidden;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     position: relative;
+    contain: layout style paint;
 }
 
 .cardGrid::before {
@@ -408,12 +408,9 @@
 }
 
 .cardGrid:hover {
-    transform: translateY(-8px) scale(1.02);
+    transform: translateY(-4px);
     border-color: rgba(99, 102, 241, 0.4);
-    box-shadow:
-        0 24px 48px rgba(0, 0, 0, 0.3),
-        0 0 0 1px rgba(99, 102, 241, 0.2),
-        0 0 40px rgba(99, 102, 241, 0.15);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);
 }
 
 .cardGrid:hover::before {
@@ -431,11 +428,9 @@
 }
 
 .cardGrid .cardThumbnail img {
-    max-width: 100%;
-    max-height: 100%;
-    width: auto;
-    height: auto;
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     transition: transform 0.4s ease;
 }
 
@@ -454,11 +449,9 @@
 }
 
 .cardThumbnailWrapper canvas {
-    max-width: 100% !important;
-    max-height: 100% !important;
-    width: auto !important;
-    height: auto !important;
-    object-fit: contain;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
 }
 
 /* Skeleton Loader */
@@ -566,8 +559,7 @@
     align-items: center;
     gap: 20px;
     padding: 20px;
-    background: rgba(30, 41, 59, 0.6);
-    backdrop-filter: blur(20px);
+    background: rgba(30, 41, 59, 0.85);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 16px;
     cursor: pointer;
@@ -624,15 +616,71 @@
     line-height: 1.5;
 }
 
-/* Responsive */
+/* Mobile Menu Button */
+.mobileMenuBtn {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.2s ease;
+}
+
+.mobileMenuBtn:hover {
+    background: rgba(99, 102, 241, 0.15);
+}
+
+.hamburgerLine {
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: #94a3b8;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+}
+
+/* Sidebar Overlay */
+.sidebarOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+}
+
+/* Sidebar open state */
+.sidebarOpen {
+    transform: translateX(0) !important;
+}
+
+/* Responsive - Tablet */
+@media (max-width: 1024px) {
+    .grid {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 20px;
+    }
+}
+
+/* Responsive - Mobile */
 @media (max-width: 768px) {
+    .mobileMenuBtn {
+        display: flex;
+    }
+
+    .sidebarOverlay {
+        display: block;
+    }
+
     .sidebar {
         transform: translateX(-100%);
         transition: transform 0.3s ease;
-    }
-
-    .sidebar.open {
-        transform: translateX(0);
     }
 
     .main {
@@ -640,23 +688,111 @@
     }
 
     .header {
-        padding: 16px;
+        padding: 12px 16px;
+        gap: 12px;
     }
 
-    .content {
-        padding: 16px;
+    .searchContainer {
+        max-width: none;
     }
 
     .grid {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
     }
 
     .cardGrid {
-        border-radius: 16px;
+        border-radius: 14px;
     }
 
     .cardGrid .cardInfo {
+        padding: 12px;
+    }
+
+    .cardTitle {
+        font-size: 0.875rem;
+    }
+
+    .cardMeta {
+        font-size: 0.75rem;
+    }
+
+    .cardList {
         padding: 14px;
+        gap: 14px;
+    }
+
+    .cardList .cardThumbnail {
+        width: 56px;
+        height: 72px;
+    }
+
+    /* Background orbs: static on mobile for performance */
+    .backgroundOrbs {
+        display: none;
+    }
+}
+
+/* Responsive - Small Mobile */
+@media (max-width: 480px) {
+    .grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .header {
+        padding: 10px 12px;
+    }
+
+    .viewToggle {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+    }
+
+    .searchInput {
+        padding: 10px 16px 10px 40px;
+        font-size: 0.875rem;
+    }
+
+    .searchIcon {
+        left: 14px;
+        font-size: 1rem;
+    }
+}
+
+/* Load More */
+.loadMoreContainer {
+    display: flex;
+    justify-content: center;
+    padding: 24px 0;
+}
+
+.loadMoreBtn {
+    padding: 10px 32px;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.loadMoreBtn:hover:not(:disabled) {
+    background: var(--color-primary-50);
+    border-color: var(--color-primary-200);
+}
+
+.loadMoreBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+    .loadMoreBtn:hover:not(:disabled) {
+        background: rgba(99, 102, 241, 0.15);
+        border-color: var(--color-primary-700);
     }
 }

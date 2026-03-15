@@ -173,8 +173,25 @@ export function SelectionPopup({
         document.removeEventListener('touchend', handleDragEnd);
     };
 
-    const finalLeft = currentPosition.x + dragOffset.x;
-    const finalTop = currentPosition.y + dragOffset.y;
+    // Clamp position to viewport boundaries
+    const clampToViewport = (left: number, top: number) => {
+        const popup = popupRef.current;
+        if (!popup || !popup.offsetParent) return { left, top };
+        const parentRect = (popup.offsetParent as HTMLElement).getBoundingClientRect();
+        const popupWidth = popup.offsetWidth || 300;
+        const popupHeight = popup.offsetHeight || 200;
+        const maxLeft = parentRect.width - popupWidth / 2;
+        const minLeft = popupWidth / 2;
+        const minTop = popupHeight;
+        return {
+            left: Math.max(minLeft, Math.min(maxLeft, left)),
+            top: Math.max(minTop, Math.min(parentRect.height - 16, top)),
+        };
+    };
+
+    const rawLeft = currentPosition.x + dragOffset.x;
+    const rawTop = currentPosition.y + dragOffset.y;
+    const { left: finalLeft, top: finalTop } = clampToViewport(rawLeft, rawTop);
 
     return (
         <div
@@ -183,7 +200,8 @@ export function SelectionPopup({
             style={{
                 left: finalLeft,
                 top: finalTop,
-                transform: 'translateX(-50%) translateY(-100%)', // Centered and above
+                transform: 'translateX(-50%) translateY(-100%)',
+                touchAction: 'none',
             }}
         >
             <div

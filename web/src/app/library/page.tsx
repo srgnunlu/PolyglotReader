@@ -8,7 +8,7 @@ const PDFThumbnail = dynamic(() => import('@/components/library/PDFThumbnail').t
     ssr: false,
     loading: () => <div className="card-placeholder">📄</div>
 });
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './library.module.css';
 
@@ -30,34 +30,50 @@ function LibraryContent() {
         error,
         selectedFolder,
         searchQuery,
+        hasMore,
+        loadMore,
         setSelectedFolder,
         setSearchQuery,
     } = useDocuments();
 
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    const handleDocumentClick = (id: string) => {
+    const handleDocumentClick = useCallback((id: string) => {
         router.push(`/reader/${id}`);
-    };
+    }, [router]);
 
-    const handleLogout = async () => {
+    const handleLogout = useCallback(async () => {
         await signOut();
         router.push('/login');
-    };
+    }, [signOut, router]);
 
-    const formatFileSize = (bytes: number) => {
+    const formatFileSize = useCallback((bytes: number) => {
         if (bytes < 1024) return `${bytes} B`;
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    };
+    }, []);
 
-    const formatDate = (date: Date) => {
+    const formatDate = useCallback((date: Date) => {
         return date.toLocaleDateString('tr-TR', {
             day: 'numeric',
             month: 'short',
             year: 'numeric',
         });
-    };
+    }, []);
+
+    const handleFolderSelect = useCallback((id: string | null) => {
+        setSelectedFolder(id);
+        setSidebarOpen(false);
+    }, [setSelectedFolder]);
+
+    const documentCards = useMemo(() => {
+        return documents.map(doc => ({
+            ...doc,
+            formattedSize: formatFileSize(doc.size),
+            formattedDate: formatDate(doc.uploadedAt),
+        }));
+    }, [documents, formatFileSize, formatDate]);
 
     return (
         <div className={styles.layout}>
@@ -67,8 +83,16 @@ function LibraryContent() {
                 <div className={`${styles.orb} ${styles.orb2}`} />
             </div>
 
+            {/* Mobile Sidebar Overlay */}
+            {sidebarOpen && (
+                <div
+                    className={styles.sidebarOverlay}
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
-            <aside className={styles.sidebar}>
+            <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
                 <div className={styles.sidebarHeader}>
                     <div className={styles.logo}>
                         <span className={styles.logoIcon}>📄</span>
@@ -79,7 +103,7 @@ function LibraryContent() {
                 <nav className={styles.sidebarNav}>
                     <button
                         className={`${styles.navItem} ${!selectedFolder ? styles.navItemActive : ''}`}
-                        onClick={() => setSelectedFolder(null)}
+                        onClick={() => handleFolderSelect(null)}
                     >
                         <span className={styles.navIcon}>📁</span>
                         <span>Tüm Dosyalar</span>
@@ -88,7 +112,7 @@ function LibraryContent() {
 
                     <button
                         className={styles.navItem}
-                        onClick={() => router.push('/notes')}
+                        onClick={() => { router.push('/notes'); setSidebarOpen(false); }}
                     >
                         <span className={styles.navIcon}>📝</span>
                         <span>Notlarım</span>
@@ -100,7 +124,7 @@ function LibraryContent() {
                             <button
                                 key={folder.id}
                                 className={`${styles.navItem} ${selectedFolder === folder.id ? styles.navItemActive : ''}`}
-                                onClick={() => setSelectedFolder(folder.id)}
+                                onClick={() => handleFolderSelect(folder.id)}
                             >
                                 <span
                                     className={styles.navIcon}
@@ -134,6 +158,17 @@ function LibraryContent() {
             <main className={styles.main}>
                 {/* Header */}
                 <header className={styles.header}>
+                    {/* Mobile hamburger button */}
+                    <button
+                        className={styles.mobileMenuBtn}
+                        onClick={() => setSidebarOpen(true)}
+                        aria-label="Menüyü aç"
+                    >
+                        <span className={styles.hamburgerLine} />
+                        <span className={styles.hamburgerLine} />
+                        <span className={styles.hamburgerLine} />
+                    </button>
+
                     <div className={styles.searchContainer}>
                         <input
                             type="text"
@@ -182,8 +217,9 @@ function LibraryContent() {
                             <p>iOS uygulamasından PDF yükleyerek başlayın</p>
                         </div>
                     ) : (
+                        <>
                         <div className={viewMode === 'grid' ? styles.grid : styles.list}>
-                            {documents.map(doc => (
+                            {documentCards.map(doc => (
                                 <div
                                     key={doc.id}
                                     className={viewMode === 'grid' ? styles.cardGrid : styles.cardList}
@@ -199,9 +235,9 @@ function LibraryContent() {
                                     <div className={styles.cardInfo}>
                                         <h4 className={styles.cardTitle}>{doc.name}</h4>
                                         <div className={styles.cardMeta}>
-                                            <span>{formatFileSize(doc.size)}</span>
+                                            <span>{doc.formattedSize}</span>
                                             <span>•</span>
-                                            <span>{formatDate(doc.uploadedAt)}</span>
+                                            <span>{doc.formattedDate}</span>
                                         </div>
                                         {doc.summary && viewMode === 'list' && (
                                             <p className={styles.cardSummary}>{doc.summary}</p>
@@ -210,6 +246,18 @@ function LibraryContent() {
                                 </div>
                             ))}
                         </div>
+                        {hasMore && (
+                            <div className={styles.loadMoreContainer}>
+                                <button
+                                    className={styles.loadMoreBtn}
+                                    onClick={loadMore}
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? 'Yükleniyor...' : 'Daha Fazla Yükle'}
+                                </button>
+                            </div>
+                        )}
+                        </>
                     )}
                 </div>
             </main>
