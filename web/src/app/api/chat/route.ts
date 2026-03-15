@@ -67,12 +67,12 @@ export async function POST(req: NextRequest) {
     const authHeader = req.headers.get('Authorization');
     const token = authHeader?.replace('Bearer ', '').trim();
     if (!token) {
-        return new Response('Unauthorized', { status: 401 });
+        return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) {
-        return new Response('Server misconfigured', { status: 500 });
+        return Response.json({ error: 'Gemini API key not configured' }, { status: 500 });
     }
 
     let body: {
@@ -85,13 +85,13 @@ export async function POST(req: NextRequest) {
     try {
         body = await req.json();
     } catch {
-        return new Response('Invalid JSON', { status: 400 });
+        return Response.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
     const { message, fileId, history = [], image, context: providedContext } = body;
 
     if (!message || typeof message !== 'string') {
-        return new Response('message is required', { status: 400 });
+        return Response.json({ error: 'message is required' }, { status: 400 });
     }
 
     // --- Supabase (authenticated) ---
@@ -100,13 +100,12 @@ export async function POST(req: NextRequest) {
     // Verify the token is valid
     const { error: authError } = await supabase.auth.getUser();
     if (authError) {
-        return new Response('Unauthorized', { status: 401 });
+        return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const geminiModel = process.env.GEMINI_MODEL || process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-2.0-flash';
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash'
-    });
+    const model = genAI.getGenerativeModel({ model: geminiModel });
 
     // --- Build context ---
     let context = providedContext ?? '';
@@ -118,7 +117,7 @@ export async function POST(req: NextRequest) {
         if (hasTurkishChars && shouldTranslateQuery(message)) {
             try {
                 // Query expansion: inline Gemini call on server
-                const expandModel = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.0-flash' });
+                const expandModel = genAI.getGenerativeModel({ model: geminiModel });
                 const expandPrompt = `Sen bir tıbbi terminoloji uzmanısın. Bu Türkçe sorguyu İngilizce'ye çevir ve tıbbi terimlerle genişlet. SADECE terimleri ver, açıklama yapma, maksimum 10 kelime:\n"${message}"`;
                 const expandResult = await expandModel.generateContent(expandPrompt);
                 searchQuery = expandResult.response.text().trim();
@@ -175,7 +174,8 @@ export async function POST(req: NextRequest) {
                 }
             } catch (err) {
                 console.error('Chat stream error:', err);
-                controller.error(err);
+                const errorMsg = err instanceof Error ? err.message : 'Bilinmeyen hata';
+                controller.enqueue(encoder.encode(`\n\n⚠️ AI yanıtı oluşturulurken hata: ${errorMsg}`));
             } finally {
                 controller.close();
             }

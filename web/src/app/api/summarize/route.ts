@@ -9,9 +9,9 @@ export async function POST(req: NextRequest) {
         return new Response('Unauthorized', { status: 401 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) {
-        return new Response('Server misconfigured', { status: 500 });
+        return Response.json({ error: 'Gemini API key not configured' }, { status: 500 });
     }
 
     let body: { fileId?: string; text?: string };
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+        model: process.env.GEMINI_MODEL || process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-2.0-flash'
     });
 
     const prompt = `Aşağıdaki doküman metnini Türkçe olarak özetle. Özet kapsamlı ama kısa olsun.
@@ -70,7 +70,8 @@ ${text.slice(0, 15000)}`;
                 }
             } catch (err) {
                 console.error('Summarize error:', err);
-                controller.error(err);
+                const errorMsg = err instanceof Error ? err.message : 'Bilinmeyen hata';
+                controller.enqueue(encoder.encode(`\n\n⚠️ Özet oluşturulurken hata: ${errorMsg}`));
             } finally {
                 controller.close();
             }

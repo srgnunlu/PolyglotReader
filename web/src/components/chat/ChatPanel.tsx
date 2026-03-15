@@ -211,7 +211,14 @@ export function ChatPanel({
             });
 
             if (!response.ok || !response.body) {
-                throw new Error(`Chat request failed: ${response.status}`);
+                let errorDetail = `HTTP ${response.status}`;
+                try {
+                    const errBody = await response.json();
+                    errorDetail = errBody.error || errorDetail;
+                } catch {
+                    errorDetail = await response.text().catch(() => errorDetail);
+                }
+                throw new Error(errorDetail);
             }
 
             const reader = response.body.getReader();
