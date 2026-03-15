@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { translateText } from '@/lib/gemini';
+import { getAccessToken } from '@/lib/supabase';
 import styles from './QuickTranslationPopup.module.css';
 
 interface QuickTranslationPopupProps {
@@ -36,7 +36,10 @@ export function QuickTranslationPopup({
         y: anchorBounds.y + anchorBounds.height + 12,
     });
 
-    const [currentPosition, setCurrentPosition] = useState(initialPosition.current);
+    const [currentPosition, setCurrentPosition] = useState(() => ({
+        x: anchorBounds.x + anchorBounds.width / 2,
+        y: anchorBounds.y + anchorBounds.height + 12,
+    }));
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const isDragging = useRef(false);
     const dragStart = useRef({ x: 0, y: 0 });
@@ -94,7 +97,7 @@ export function QuickTranslationPopup({
                         setCurrentPosition({ x, y });
                     }
                 }
-            } catch (e) {
+            } catch (_e) {
                 // Range might be detached
             }
             animationFrameId = requestAnimationFrame(updatePosition);
@@ -120,10 +123,20 @@ export function QuickTranslationPopup({
             setIsLoading(true);
             setError(null);
 
-            translateText(text, targetLang)
-                .then(result => {
+            getAccessToken()
+                .then(token => fetch('/api/translate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    },
+                    body: JSON.stringify({ text, targetLang })
+                }))
+                .then(res => res.json())
+                .then(data => {
                     if (!isActive || requestIdRef.current !== requestId) return;
-                    setTranslation(result.trim());
+                    if (data.error) throw new Error(data.error);
+                    setTranslation(data.translation.trim());
                     setIsLoading(false);
                 })
                 .catch(err => {

@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { ChatMessage } from '@/types/models';
-import { streamChat, streamChatWithImage, streamChatWithRAGAndHistory, ChatHistoryMessage } from '@/lib/gemini';
-import { searchRelevantChunks } from '@/lib/rag';
+import { getAccessToken } from '@/lib/supabase';
+
+type ChatHistoryMessage = { role: 'user' | 'model'; text: string };
 import { loadChatHistory, saveChatMessage, clearChatHistory } from '@/lib/chatSync';
 import styles from './ChatPanel.module.css';
 import ReactMarkdown from 'react-markdown';
@@ -172,26 +173,34 @@ export function ChatPanel({
                 text: m.text
             }));
 
-            let stream: AsyncGenerator<string, void, unknown>;
+            const accessToken = await getAccessToken();
+            if (!accessToken) throw new Error('Not authenticated');
 
-            if (img) {
-                let context = documentContext;
-                if (documentId) {
-                    try {
-                        context = await searchRelevantChunks(documentId, messageContent, 15);
-                    } catch (ragError) {
-                        console.error('RAG search failed:', ragError);
-                    }
-                }
-                stream = streamChatWithImage(messageContent, img, context);
-            } else if (documentId) {
-                stream = streamChatWithRAGAndHistory(messageContent, documentId, chatHistory);
-            } else {
-                stream = streamChat(messageContent, documentContext);
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`
+                },
+                body: JSON.stringify({
+                    message: messageContent,
+                    fileId: documentId,
+                    history: chatHistory,
+                    image: img ?? undefined,
+                    context: !documentId ? documentContext : undefined
+                })
+            });
+
+            if (!response.ok || !response.body) {
+                throw new Error(`Chat request failed: ${response.status}`);
             }
 
-            for await (const chunk of stream) {
-                fullResponse += chunk;
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                fullResponse += decoder.decode(value, { stream: true });
                 setMessages(prev =>
                     prev.map(m =>
                         m.id === aiMessageId ? { ...m, text: fullResponse } : m
@@ -433,7 +442,7 @@ export function ChatPanel({
                             <div className={styles.selectedQuote}>
                                 <QuoteIcon size={16} className={styles.quoteIcon} />
                                 <div className={styles.quoteContent}>
-                                    <div className={styles.quoteText}>"{activeSelection}"</div>
+                                    <div className={styles.quoteText}>&quot;{activeSelection}&quot;</div>
                                 </div>
                                 <button
                                     className={styles.quoteClose}
