@@ -10,6 +10,11 @@ const PDFThumbnail = dynamic(() => import('@/components/library/PDFThumbnail').t
 });
 import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { FileUpload } from '@/components/library/FileUpload';
+import { FolderModal } from '@/components/library/FolderModal';
+import { TagManager } from '@/components/library/TagManager';
+import { FilterBar, SortOption } from '@/components/library/FilterBar';
+import { SkeletonCard, SkeletonStyles } from '@/components/ui/Skeleton';
 import styles from './library.module.css';
 
 export default function LibraryPage() {
@@ -26,18 +31,26 @@ function LibraryContent() {
     const {
         documents,
         folders,
+        tags,
         isLoading,
         error,
         selectedFolder,
+        selectedTag,
         searchQuery,
         hasMore,
         loadMore,
         setSelectedFolder,
+        setSelectedTag,
         setSearchQuery,
+        refresh,
     } = useDocuments();
 
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [folderModal, setFolderModal] = useState<{ open: boolean; folder?: typeof folders[0] | null }>({ open: false });
+    const editingFolder = folderModal.open ? folderModal.folder : undefined;
+    const [sortBy, setSortBy] = useState<SortOption>('date_desc');
+    const [filterTags, setFilterTags] = useState<string[]>([]);
 
     const handleDocumentClick = useCallback((id: string) => {
         router.push(`/reader/${id}`);
@@ -68,12 +81,32 @@ function LibraryContent() {
     }, [setSelectedFolder]);
 
     const documentCards = useMemo(() => {
-        return documents.map(doc => ({
+        let sorted = [...documents];
+
+        // Apply sorting
+        switch (sortBy) {
+            case 'date_asc':
+                sorted.sort((a, b) => a.uploadedAt.getTime() - b.uploadedAt.getTime());
+                break;
+            case 'name_asc':
+                sorted.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+                break;
+            case 'name_desc':
+                sorted.sort((a, b) => b.name.localeCompare(a.name, 'tr'));
+                break;
+            case 'size_desc':
+                sorted.sort((a, b) => b.size - a.size);
+                break;
+            default: // date_desc - already default from server
+                break;
+        }
+
+        return sorted.map(doc => ({
             ...doc,
             formattedSize: formatFileSize(doc.size),
             formattedDate: formatDate(doc.uploadedAt),
         }));
-    }, [documents, formatFileSize, formatDate]);
+    }, [documents, formatFileSize, formatDate, sortBy]);
 
     return (
         <div className={styles.layout}>
@@ -119,12 +152,27 @@ function LibraryContent() {
                     </button>
 
                     <div className={styles.navSection}>
-                        <h3 className={styles.navSectionTitle}>Klasörler</h3>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px', marginBottom: 4 }}>
+                            <h3 className={styles.navSectionTitle} style={{ margin: 0 }}>Klasörler</h3>
+                            <button
+                                onClick={() => setFolderModal({ open: true, folder: null })}
+                                style={{
+                                    background: 'none', border: 'none', cursor: 'pointer',
+                                    color: 'var(--color-primary-500)', fontSize: '1.1rem', padding: 0,
+                                    lineHeight: 1,
+                                }}
+                                title="Yeni klasör"
+                            >
+                                +
+                            </button>
+                        </div>
                         {folders.map(folder => (
                             <button
                                 key={folder.id}
                                 className={`${styles.navItem} ${selectedFolder === folder.id ? styles.navItemActive : ''}`}
                                 onClick={() => handleFolderSelect(folder.id)}
+                                onDoubleClick={() => setFolderModal({ open: true, folder })}
+                                title="Çift tıklayarak düzenle"
                             >
                                 <span
                                     className={styles.navIcon}
@@ -136,9 +184,25 @@ function LibraryContent() {
                             </button>
                         ))}
                     </div>
+
+                    <div className={styles.navSection}>
+                        <TagManager
+                            tags={tags}
+                            selectedTag={selectedTag}
+                            onSelectTag={setSelectedTag}
+                            onRefresh={refresh}
+                        />
+                    </div>
                 </nav>
 
                 <div className={styles.sidebarFooter}>
+                    <button
+                        className={styles.navItem}
+                        onClick={() => { router.push('/settings'); setSidebarOpen(false); }}
+                    >
+                        <span className={styles.navIcon}>&#9881;</span>
+                        <span>Ayarlar</span>
+                    </button>
                     <div className={styles.userInfo}>
                         <div className={styles.userAvatar}>
                             {user?.name?.charAt(0).toUpperCase() || '?'}
@@ -181,6 +245,7 @@ function LibraryContent() {
                     </div>
 
                     <div className={styles.headerActions}>
+                        <FileUpload onUploadComplete={refresh} />
                         <button
                             className={`${styles.viewToggle} ${viewMode === 'grid' ? styles.viewToggleActive : ''}`}
                             onClick={() => setViewMode('grid')}
@@ -200,11 +265,25 @@ function LibraryContent() {
 
                 {/* Content */}
                 <div className={styles.content}>
+                    <FilterBar
+                        tags={tags}
+                        selectedTags={filterTags}
+                        sortBy={sortBy}
+                        onTagToggle={(tagId) => setFilterTags(prev =>
+                            prev.includes(tagId) ? prev.filter(t => t !== tagId) : [...prev, tagId]
+                        )}
+                        onSortChange={setSortBy}
+                        onClearFilters={() => { setFilterTags([]); setSortBy('date_desc'); }}
+                    />
                     {isLoading ? (
-                        <div className={styles.loading}>
-                            <div className="spinner" style={{ width: 40, height: 40 }} />
-                            <p>Dosyalar yükleniyor...</p>
-                        </div>
+                        <>
+                            <SkeletonStyles />
+                            <div className={styles.grid}>
+                                {Array.from({ length: 6 }).map((_, i) => (
+                                    <SkeletonCard key={i} />
+                                ))}
+                            </div>
+                        </>
                     ) : error ? (
                         <div className={styles.error}>
                             <span>⚠️</span>
@@ -214,7 +293,7 @@ function LibraryContent() {
                         <div className={styles.empty}>
                             <span className={styles.emptyIcon}>📭</span>
                             <h3>Henüz dosya yok</h3>
-                            <p>iOS uygulamasından PDF yükleyerek başlayın</p>
+                            <p>Yukarıdaki &quot;Dosya Yükle&quot; butonunu kullanarak PDF yükleyin</p>
                         </div>
                     ) : (
                         <>
@@ -261,6 +340,14 @@ function LibraryContent() {
                     )}
                 </div>
             </main>
+
+            {folderModal.open && (
+                <FolderModal
+                    folder={editingFolder}
+                    onClose={() => setFolderModal({ open: false })}
+                    onSave={refresh}
+                />
+            )}
         </div>
     );
 }

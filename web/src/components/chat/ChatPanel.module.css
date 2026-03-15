@@ -827,6 +827,36 @@
     border-color: rgba(239, 68, 68, 0.3);
 }
 
+/* Save error banner */
+.saveErrorBanner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    margin-top: 6px;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 8px;
+    font-size: 0.75rem;
+    color: var(--color-warning, #d97706);
+}
+
+.saveRetryBtn {
+    background: none;
+    border: none;
+    color: var(--color-primary-500);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.15s ease;
+}
+
+.saveRetryBtn:hover {
+    background: rgba(99, 102, 241, 0.1);
+}
+
 /* Active history item */
 .historyItemActive {
     background: rgba(99, 102, 241, 0.08);

@@ -14,7 +14,10 @@ import { QuickTranslationPopup } from '@/components/reader/QuickTranslationPopup
 import { SelectionPopup } from '@/components/reader/SelectionPopup';
 import { ImageSelectionPopup } from '@/components/reader/ImageSelectionPopup';
 import { ChatPanel } from '@/components/chat/ChatPanel';
+import { AnnotationDetailPopup } from '@/components/reader/AnnotationDetailPopup';
+import { SummaryPanel } from '@/components/reader/SummaryPanel';
 import { AnnotationProvider, useAnnotations } from '@/contexts/AnnotationContext';
+import { Annotation } from '@/types/models';
 import { getSupabase } from '@/lib/supabase';
 import { PDFDocumentMetadata } from '@/types/models';
 import styles from './reader.module.css';
@@ -134,6 +137,16 @@ function ReaderContent({ documentId }: ReaderContentProps) {
     // Fullscreen and auto-hide state
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isNavHidden, setIsNavHidden] = useState(false);
+
+    // Summary panel state
+    const [showSummary, setShowSummary] = useState(false);
+
+    // Annotation detail popup
+    const [selectedAnnotation, setSelectedAnnotation] = useState<{ annotation: Annotation; position: { x: number; y: number } } | null>(null);
+
+    const handleAnnotationClick = useCallback((annotation: Annotation, position: { x: number; y: number }) => {
+        setSelectedAnnotation({ annotation, position });
+    }, []);
 
     // Handle text selection from PDF
     const handleTextSelect = useCallback((
@@ -483,6 +496,19 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                 </button>
 
                 <h1 className={styles.title}>{document.name}</h1>
+
+                <button
+                    onClick={() => setShowSummary(true)}
+                    style={{
+                        padding: '6px 14px', borderRadius: 8,
+                        background: 'rgba(99,102,241,0.1)', color: 'var(--color-primary-500)',
+                        border: '1px solid rgba(99,102,241,0.2)', cursor: 'pointer',
+                        fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap',
+                        transition: 'all 0.15s',
+                    }}
+                >
+                    Özetle
+                </button>
             </header>
 
             {/* Main content */}
@@ -567,6 +593,25 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                     onClearSelection={handleClearChatSelection}
                 />
             </div>
+
+            {/* Summary Panel */}
+            {showSummary && (
+                <SummaryPanel
+                    fileId={documentId}
+                    documentText={documentContext}
+                    existingSummary={document.summary}
+                    onClose={() => setShowSummary(false)}
+                />
+            )}
+
+            {/* Annotation Detail Popup */}
+            {selectedAnnotation && (
+                <AnnotationDetailPopup
+                    annotation={selectedAnnotation.annotation}
+                    position={selectedAnnotation.position}
+                    onClose={() => setSelectedAnnotation(null)}
+                />
+            )}
         </div>
     );
 }
