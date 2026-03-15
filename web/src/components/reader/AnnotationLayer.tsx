@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Annotation, AnnotationType } from '@/types/models';
 
 interface AnnotationLayerProps {
@@ -11,15 +11,22 @@ interface AnnotationLayerProps {
     pageHeight: number;
 }
 
-export function AnnotationLayer({
+const AnnotationLayerInner = ({
     pageNumber,
     annotations,
     scale,
     pageWidth,
     pageHeight,
-}: AnnotationLayerProps) {
+}: AnnotationLayerProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const offscreenRef = useRef<HTMLCanvasElement | null>(null);
     const [isVisible, setIsVisible] = useState(false);
+
+    // Pre-filter annotations for this page so the filter doesn't run on every render
+    const pageAnnotations = useMemo(
+        () => annotations.filter(a => a.pageNumber === pageNumber),
+        [annotations, pageNumber]
+    );
 
     // Fade in after a small delay to ensure canvas is painted
     useEffect(() => {
@@ -38,17 +45,23 @@ export function AnnotationLayer({
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Filter annotations for this page
-        const pageAnnotations = annotations.filter(a => a.pageNumber === pageNumber);
+        // Lazily create the reusable offscreen canvas
+        if (!offscreenRef.current) {
+            offscreenRef.current = document.createElement('canvas');
+        }
+        const offscreen = offscreenRef.current;
 
-        // Draw each annotation using offscreen canvas to prevent overlapping opacity
+        // Resize the offscreen canvas to match the main canvas dimensions
+        offscreen.width = canvas.width;
+        offscreen.height = canvas.height;
+
+        // Draw each annotation using the reusable offscreen canvas to prevent overlapping opacity
         pageAnnotations.forEach(annotation => {
-            // Create offscreen canvas for this annotation
-            const offscreen = document.createElement('canvas');
-            offscreen.width = canvas.width;
-            offscreen.height = canvas.height;
             const offCtx = offscreen.getContext('2d');
             if (!offCtx) return;
+
+            // Clear the offscreen canvas for this annotation
+            offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
 
             // Use solid color for offscreen (we'll apply opacity when compositing)
             offCtx.fillStyle = annotation.color;
@@ -103,7 +116,7 @@ export function AnnotationLayer({
             ctx.drawImage(offscreen, 0, 0);
             ctx.globalAlpha = 1.0; // Reset alpha
         });
-    }, [annotations, pageNumber, scale, pageWidth, pageHeight]);
+    }, [pageAnnotations, scale, pageWidth, pageHeight]);
 
     return (
         <canvas
@@ -123,5 +136,14 @@ export function AnnotationLayer({
             }}
         />
     );
-}
+};
 
+export const AnnotationLayer = React.memo(AnnotationLayerInner, (prev, next) => {
+    return (
+        prev.annotations === next.annotations &&
+        prev.pageNumber === next.pageNumber &&
+        prev.scale === next.scale &&
+        prev.pageWidth === next.pageWidth &&
+        prev.pageHeight === next.pageHeight
+    );
+});

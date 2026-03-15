@@ -182,3 +182,32 @@
     font-style: italic;
     line-height: 1.4;
 }
+
+@media (max-width: 768px) {
+    .popup {
+        min-width: 220px;
+        max-width: calc(100vw - 24px);
+    }
+
+    .actions {
+        gap: 2px;
+        padding: 6px;
+    }
+
+    .actionBtn {
+        padding: 8px 8px;
+        font-size: 0.6875rem;
+    }
+
+    .icon {
+        font-size: 1rem;
+    }
+
+    .preview {
+        padding: 8px;
+    }
+
+    .translation {
+        padding: 8px;
+    }
+}

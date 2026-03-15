@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState, useEffect, useCallback, useRef } from 'react';
+import { use, useState, useEffect, useCallback, useRef, useReducer } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -34,6 +34,73 @@ export default function ReaderPage({ params }: { params: Promise<PageParams> }) 
     );
 }
 
+// Consolidated selection state
+type Rect = { x: number; y: number; width: number; height: number };
+
+interface SelectionState {
+    text: string | null;
+    position: { x: number; y: number } | null;
+    pageNumber: number;
+    rects: Rect[];
+    bounds: Rect | null;
+    range: Range | null;
+    pageDimensions: { width: number; height: number } | null;
+    image: string | null;
+    imagePosition: { x: number; y: number } | null;
+    chatText: string | null;
+    persistentRects: Rect[];
+    persistentPage: number | null;
+}
+
+type SelectionAction =
+    | { type: 'TEXT_SELECT'; text: string; position: { x: number; y: number }; pageNumber: number; rects: Rect[]; bounds: Rect | null; range: Range | null; pageDimensions: { width: number; height: number } | null }
+    | { type: 'IMAGE_SELECT'; image: string; position: { x: number; y: number }; pageNumber: number }
+    | { type: 'CLEAR_ALL' }
+    | { type: 'CLEAR_CHAT' }
+    | { type: 'CLEAR_TEXT_POPUP' };
+
+const initialSelection: SelectionState = {
+    text: null, position: null, pageNumber: 1, rects: [], bounds: null,
+    range: null, pageDimensions: null, image: null, imagePosition: null,
+    chatText: null, persistentRects: [], persistentPage: null,
+};
+
+function selectionReducer(state: SelectionState, action: SelectionAction): SelectionState {
+    switch (action.type) {
+        case 'TEXT_SELECT':
+            return {
+                ...state,
+                text: action.text, position: action.position, pageNumber: action.pageNumber,
+                rects: action.rects, bounds: action.bounds, range: action.range,
+                pageDimensions: action.pageDimensions,
+                chatText: action.text, persistentRects: action.rects, persistentPage: action.pageNumber,
+                image: null, imagePosition: null,
+            };
+        case 'IMAGE_SELECT':
+            return {
+                ...state,
+                image: action.image, imagePosition: action.position, pageNumber: action.pageNumber,
+                text: null, position: null,
+            };
+        case 'CLEAR_ALL':
+            return { ...initialSelection, pageNumber: state.pageNumber };
+        case 'CLEAR_CHAT':
+            return {
+                ...state,
+                chatText: null, text: null, position: null, rects: [], bounds: null,
+                range: null, persistentRects: [], persistentPage: null,
+            };
+        case 'CLEAR_TEXT_POPUP':
+            return {
+                ...state,
+                text: null, position: null, rects: [], bounds: null, range: null,
+                chatText: null, persistentRects: [], persistentPage: null,
+            };
+        default:
+            return state;
+    }
+}
+
 interface ReaderContentProps {
     documentId: string;
 }
@@ -51,23 +118,8 @@ function ReaderContent({ documentId }: ReaderContentProps) {
     const [error, setError] = useState<string | null>(null);
     const [initialProgress, setInitialProgress] = useState<{ page: number; x: number; y: number; scale: number } | null>(null);
 
-    // Selection popup state
-    const [selectedText, setSelectedText] = useState<string | null>(null);
-    const [selectionPosition, setSelectionPosition] = useState<{ x: number; y: number } | null>(null);
-    const [selectedPageNumber, setSelectedPageNumber] = useState<number>(1);
-    const [selectionRects, setSelectionRects] = useState<{ x: number; y: number; width: number; height: number }[]>([]);
-    const [selectionBounds, setSelectionBounds] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-    const [selectionRange, setSelectionRange] = useState<Range | null>(null);
-    const [selectedImage, setSelectedImage] = useState<string | null>(null);
-    const [imageSelectionPos, setImageSelectionPos] = useState<{ x: number; y: number } | null>(null);
-
-    // Persistent chat selection (survives when browser clears visual selection)
-    const [chatSelectedText, setChatSelectedText] = useState<string | null>(null);
-    // Persistent highlight rects for visual indication on PDF when browser selection clears
-    const [persistentHighlightRects, setPersistentHighlightRects] = useState<{ x: number; y: number; width: number; height: number }[]>([]);
-    const [persistentHighlightPage, setPersistentHighlightPage] = useState<number | null>(null);
-    // Store page dimensions for coordinate conversion to iOS format
-    const [currentPageDimensions, setCurrentPageDimensions] = useState<{ width: number; height: number } | null>(null);
+    // Consolidated selection state
+    const [sel, dispatchSel] = useReducer(selectionReducer, initialSelection);
 
     const [isQuickTranslationMode, setIsQuickTranslationMode] = useState(false);
     const [pdfScale, setPdfScale] = useState(1.2);
@@ -83,34 +135,21 @@ function ReaderContent({ documentId }: ReaderContentProps) {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isNavHidden, setIsNavHidden] = useState(false);
 
-    // ... (existing code)
-
     // Handle text selection from PDF
     const handleTextSelect = useCallback((
         text: string,
         pageNumber: number,
         position: { x: number; y: number },
-        rects?: { x: number; y: number; width: number; height: number }[],
-        bounds?: { x: number; y: number; width: number; height: number },
+        rects?: Rect[],
+        bounds?: Rect,
         range?: Range,
         pageDimensions?: { width: number; height: number }
     ) => {
-        setSelectedText(text);
-        setSelectionPosition(position);
-        setSelectedPageNumber(pageNumber);
-        setSelectionRects(rects ?? []);
-        setSelectionBounds(bounds ?? null);
-        setSelectionRange(range ?? null);
-        setCurrentPageDimensions(pageDimensions ?? null); // Store for coordinate conversion
-
-        // Also set persistent chat selection and persistent highlight
-        setChatSelectedText(text);
-        setPersistentHighlightRects(rects ?? []);
-        setPersistentHighlightPage(pageNumber);
-
-        // Clear image selection
-        setSelectedImage(null);
-        setImageSelectionPos(null);
+        dispatchSel({
+            type: 'TEXT_SELECT', text, position, pageNumber,
+            rects: rects ?? [], bounds: bounds ?? null,
+            range: range ?? null, pageDimensions: pageDimensions ?? null,
+        });
     }, []);
 
     // Handle image selection
@@ -119,69 +158,38 @@ function ReaderContent({ documentId }: ReaderContentProps) {
         pageNumber: number,
         position: { x: number; y: number }
     ) => {
-        setSelectedImage(imageBase64);
-        setImageSelectionPos(position);
-        setSelectedPageNumber(pageNumber);
-
-        // Clear text selection
-        setSelectedText(null);
-        setSelectionPosition(null);
+        dispatchSel({ type: 'IMAGE_SELECT', image: imageBase64, position, pageNumber });
         window.getSelection()?.removeAllRanges();
     }, []);
 
     // Handle AI question from selection
     const handleAskAI = useCallback((text: string) => {
         setChatInitialMessage(text);
-        // Clear selections
-        setSelectedText(null);
-        setSelectionPosition(null);
+        dispatchSel({ type: 'CLEAR_TEXT_POPUP' });
         setIsChatOpen(true);
     }, []);
 
     // Handle AI question from image
     const handleAskAIWithImage = useCallback((imageBase64: string) => {
         setChatInitialImage(imageBase64);
-        // Clear selections
-        setSelectedImage(null);
-        setImageSelectionPos(null);
+        dispatchSel({ type: 'CLEAR_ALL' });
         setIsChatOpen(true);
     }, []);
 
     const clearSelection = useCallback(() => {
-        setSelectedText(null);
-        setSelectionPosition(null);
-        setSelectionRects([]);
-        setSelectionBounds(null);
-        setSelectionRange(null);
-        setSelectedImage(null);
-        setImageSelectionPos(null);
-        setSelectedPageNumber(1);
-        // Also clear chat selection and persistent highlight when PDF selection is cleared
-        setChatSelectedText(null);
-        setPersistentHighlightRects([]);
-        setPersistentHighlightPage(null);
+        dispatchSel({ type: 'CLEAR_ALL' });
     }, []);
 
     // Handle clearing chat selection (from chat X button)
     const handleClearChatSelection = useCallback(() => {
-        setChatSelectedText(null);
-        // Also clear browser selection
         window.getSelection()?.removeAllRanges();
-        // Clear popup state
-        setSelectedText(null);
-        setSelectionPosition(null);
-        setSelectionRects([]);
-        setSelectionBounds(null);
-        setSelectionRange(null);
-        // Also clear persistent highlight
-        setPersistentHighlightRects([]);
-        setPersistentHighlightPage(null);
+        dispatchSel({ type: 'CLEAR_CHAT' });
     }, []);
 
-    // ... (existing code until return)
-
-
+    // Load document with AbortController
     useEffect(() => {
+        const controller = new AbortController();
+
         const loadDocument = async () => {
             setIsLoading(true);
             setError(null);
@@ -194,6 +202,7 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                     .eq('id', documentId)
                     .single();
 
+                if (controller.signal.aborted) return;
                 if (docError) throw docError;
                 if (!docData) throw new Error('Dosya bulunamadı');
 
@@ -203,7 +212,7 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                     size: docData.size,
                     uploadedAt: new Date(docData.created_at),
                     storagePath: docData.storage_path,
-                    thumbnailData: undefined, // Not stored in files table
+                    thumbnailData: undefined,
                     summary: docData.summary,
                     folderId: docData.folder_id,
                     aiCategory: docData.ai_category,
@@ -216,10 +225,9 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                     .from('user_files')
                     .createSignedUrl(docData.storage_path, 3600);
 
+                if (controller.signal.aborted) return;
                 if (urlError) throw urlError;
                 setPdfUrl(signedUrl.signedUrl);
-
-                // Annotations are now loaded by AnnotationProvider via context
 
                 // Fetch document context for AI
                 const { data: chunks } = await supabase
@@ -228,6 +236,7 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                     .eq('file_id', documentId)
                     .limit(10);
 
+                if (controller.signal.aborted) return;
                 if (chunks) {
                     setDocumentContext(chunks.map((c: { content: string }) => c.content).join('\n\n'));
                 }
@@ -240,6 +249,7 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                     .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
                     .maybeSingle();
 
+                if (controller.signal.aborted) return;
                 if (progressData) {
                     setInitialProgress({
                         page: progressData.page,
@@ -248,18 +258,21 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                         scale: progressData.zoom_scale
                     });
                     setPdfScale(progressData.zoom_scale);
-                    setSelectedPageNumber(progressData.page); // Set initial page
                 }
 
             } catch (err) {
+                if (controller.signal.aborted) return;
                 console.error('Load error:', err);
                 setError(err instanceof Error ? err.message : 'Dosya yüklenemedi');
             } finally {
-                setIsLoading(false);
+                if (!controller.signal.aborted) {
+                    setIsLoading(false);
+                }
             }
         };
 
         loadDocument();
+        return () => controller.abort();
     }, [documentId, supabase]);
 
     useEffect(() => {
@@ -280,32 +293,21 @@ function ReaderContent({ documentId }: ReaderContentProps) {
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
-        const domDocument = window.document; // Use window.document to get DOM document
+        const domDocument = window.document;
 
         const handleSelectionChange = () => {
             const selection = window.getSelection();
-            // If selection is collapsed (empty) and we have chat text selected, clear it
-            if (selection?.isCollapsed && chatSelectedText) {
-                // Check if the active element is inside the chat panel - if so, don't clear
+            if (selection?.isCollapsed && sel.chatText) {
                 const activeElement = domDocument.activeElement;
                 if (activeElement?.closest('[data-chat-panel="true"]')) {
-                    return; // Don't clear selection when interacting with chat
+                    return;
                 }
 
-                // Small delay to avoid clearing during text selection process
                 setTimeout(() => {
                     const currentSelection = window.getSelection();
-                    // Re-check if still collapsed and not in chat panel
                     const currentActiveElement = domDocument.activeElement;
                     if (currentSelection?.isCollapsed && !currentActiveElement?.closest('[data-chat-panel="true"]')) {
-                        setChatSelectedText(null);
-                        setSelectedText(null);
-                        setSelectionPosition(null);
-                        setSelectionRects([]);
-                        setSelectionBounds(null);
-                        setSelectionRange(null);
-                        setPersistentHighlightRects([]);
-                        setPersistentHighlightPage(null);
+                        dispatchSel({ type: 'CLEAR_TEXT_POPUP' });
                     }
                 }, 100);
             }
@@ -313,35 +315,30 @@ function ReaderContent({ documentId }: ReaderContentProps) {
 
         domDocument.addEventListener('selectionchange', handleSelectionChange);
         return () => domDocument.removeEventListener('selectionchange', handleSelectionChange);
-    }, [chatSelectedText]);
+    }, [sel.chatText]);
 
     // Handle highlight - save via annotation context
     const handleHighlight = useCallback(async (color: string) => {
-        if (!selectedText || !documentId || !selectionRects || selectionRects.length === 0) {
-            // Silently return if no selection - this is expected for toolbar color changes
+        if (!sel.text || !documentId || !sel.rects || sel.rects.length === 0) {
             return;
         }
 
         try {
-            // Save percentage rects for web display
-            // iOS PDFAnnotationHandler will ignore these (values ≤100 appear invalid)
-            // and fall back to text search using the text field
             await addAnnotation({
                 fileId: documentId,
-                pageNumber: selectedPageNumber,
+                pageNumber: sel.pageNumber,
                 type: 'highlight',
-                color: color || selectedColor,  // Popup color takes priority
-                rects: selectionRects,  // Percentage coords for web, iOS ignores and uses text search
-                text: selectedText,  // Required for iOS text search fallback
+                color: color || selectedColor,
+                rects: sel.rects,
+                text: sel.text,
             });
 
-            // Clear selection after successful highlight
             window.getSelection()?.removeAllRanges();
             clearSelection();
         } catch (err) {
             console.error('Highlight error:', err);
         }
-    }, [addAnnotation, clearSelection, documentId, selectedPageNumber, selectedText, selectionRects, selectedColor]);
+    }, [addAnnotation, clearSelection, documentId, sel.pageNumber, sel.text, sel.rects, selectedColor]);
 
     const toggleQuickTranslationMode = useCallback(() => {
         setIsQuickTranslationMode(prev => !prev);
@@ -356,8 +353,6 @@ function ReaderContent({ documentId }: ReaderContentProps) {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // Updated debounce logic or just upsert
-            // Since onProgressChange is already debounced in PDFViewer, we can just save
             await supabase
                 .from('reading_progress')
                 .upsert({
@@ -392,7 +387,6 @@ function ReaderContent({ documentId }: ReaderContentProps) {
     useEffect(() => {
         const handleFullscreenChange = () => {
             setIsFullscreen(!!globalThis.document.fullscreenElement);
-            // Reset nav visibility when exiting fullscreen
             if (!globalThis.document.fullscreenElement) {
                 setIsNavHidden(false);
             }
@@ -406,15 +400,12 @@ function ReaderContent({ documentId }: ReaderContentProps) {
     const handleMouseMove = useCallback(() => {
         if (!isFullscreen) return;
 
-        // Show navbar on mouse move
         setIsNavHidden(false);
 
-        // Clear existing timeout
         if (mouseIdleTimeoutRef.current) {
             clearTimeout(mouseIdleTimeoutRef.current);
         }
 
-        // Hide after 3 seconds of inactivity
         mouseIdleTimeoutRef.current = setTimeout(() => {
             if (isFullscreen) {
                 setIsNavHidden(true);
@@ -431,25 +422,23 @@ function ReaderContent({ documentId }: ReaderContentProps) {
         };
     }, []);
 
-    // Keyboard shortcuts (F11 for fullscreen, ESC handled by browser, 1-4 for colors)
+    // Keyboard shortcuts (F11 for fullscreen, 1-4 for colors)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // F11 - Toggle fullscreen
             if (e.key === 'F11') {
                 e.preventDefault();
                 toggleFullscreen();
                 return;
             }
 
-            // Color shortcuts (1-4) when not typing in input
             const target = e.target as HTMLElement;
             if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
             const colorMap: Record<string, string> = {
-                '1': '#fef08a', // Yellow
-                '2': '#bbf7d0', // Green
-                '3': '#bae6fd', // Blue
-                '4': '#fbcfe8', // Pink
+                '1': '#fef08a',
+                '2': '#bbf7d0',
+                '3': '#bae6fd',
+                '4': '#fbcfe8',
             };
 
             if (colorMap[e.key]) {
@@ -514,8 +503,8 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                             y: initialProgress.y,
                             scale: initialProgress.scale
                         } : undefined}
-                        persistentHighlightRects={persistentHighlightRects}
-                        persistentHighlightPageNumber={persistentHighlightPage}
+                        persistentHighlightRects={sel.persistentRects}
+                        persistentHighlightPageNumber={sel.persistentPage}
                         selectedColor={selectedColor}
                         onColorChange={setSelectedColor}
                         onQuickHighlight={handleHighlight}
@@ -529,35 +518,35 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                     />
 
                     {/* Text Selection Popup */}
-                    {selectedText && selectionPosition && !isQuickTranslationMode && (
+                    {sel.text && sel.position && !isQuickTranslationMode && (
                         <SelectionPopup
-                            text={selectedText}
-                            position={selectionPosition}
+                            text={sel.text}
+                            position={sel.position}
                             onClose={clearSelection}
                             onAskAI={handleAskAI}
                             onHighlight={handleHighlight}
-                            selectionRange={selectionRange ?? undefined}
+                            selectionRange={sel.range ?? undefined}
                         />
                     )}
 
                     {/* Image Selection Popup */}
-                    {selectedImage && imageSelectionPos && (
+                    {sel.image && sel.imagePosition && (
                         <ImageSelectionPopup
-                            imageBase64={selectedImage}
-                            position={imageSelectionPos}
+                            imageBase64={sel.image}
+                            position={sel.imagePosition}
                             onClose={clearSelection}
                             onAskAI={handleAskAIWithImage}
                         />
                     )}
 
-                    {selectedText && selectionBounds && isQuickTranslationMode && (
+                    {sel.text && sel.bounds && isQuickTranslationMode && (
                         <QuickTranslationPopup
-                            text={selectedText}
-                            anchorBounds={selectionBounds}
+                            text={sel.text}
+                            anchorBounds={sel.bounds}
                             zoomScale={pdfScale}
                             containerSize={viewerSize ?? undefined}
                             onClose={clearSelection}
-                            selectionRange={selectionRange ?? undefined}
+                            selectionRange={sel.range ?? undefined}
                         />
                     )}
                 </div>
@@ -570,7 +559,7 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                     documentContext={documentContext}
                     initialMessage={chatInitialMessage}
                     initialImage={chatInitialImage}
-                    activeSelection={chatSelectedText}
+                    activeSelection={sel.chatText}
                     onClearInitialMessage={() => {
                         setChatInitialMessage(undefined);
                         setChatInitialImage(undefined);

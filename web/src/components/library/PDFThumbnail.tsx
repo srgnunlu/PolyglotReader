@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { Document, Page } from 'react-pdf';
 import { getSupabase } from '@/lib/supabase';
 import { thumbnailCache } from '@/lib/thumbnailCache';
@@ -16,10 +16,13 @@ interface PDFThumbnailProps {
 
 type LoadingState = 'idle' | 'loading' | 'loaded' | 'error';
 
-export function PDFThumbnail({ storagePath, alt, base64Data }: PDFThumbnailProps) {
+export const PDFThumbnail = memo(function PDFThumbnail({ storagePath, alt, base64Data }: PDFThumbnailProps) {
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [loadingState, setLoadingState] = useState<LoadingState>('idle');
+    const [isVisible, setIsVisible] = useState(false);
+    const [containerWidth, setContainerWidth] = useState(200);
     const objectUrlRef = useRef<string | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     // Cleanup function for object URLs
     const cleanupObjectUrl = useCallback(() => {
@@ -29,7 +32,43 @@ export function PDFThumbnail({ storagePath, alt, base64Data }: PDFThumbnailProps
         }
     }, []);
 
+    // Intersection Observer for lazy loading
     useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    setIsVisible(true);
+                    observer.disconnect();
+                }
+            },
+            { rootMargin: '200px' }
+        );
+
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
+    // Measure container width for dynamic Page width
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        const ro = new ResizeObserver(([entry]) => {
+            const width = entry.contentRect.width;
+            if (width > 0) setContainerWidth(Math.round(width));
+        });
+
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
+    useEffect(() => {
+        // Don't load until visible
+        if (!isVisible) return;
+
         // If we have base64 data, use it directly (fastest path)
         if (base64Data) {
             setLoadingState('loaded');
@@ -88,12 +127,12 @@ export function PDFThumbnail({ storagePath, alt, base64Data }: PDFThumbnailProps
 
         // Cleanup on unmount
         return cleanupObjectUrl;
-    }, [storagePath, base64Data, cleanupObjectUrl]);
+    }, [storagePath, base64Data, cleanupObjectUrl, isVisible]);
 
-    // Loading state - Skeleton loader
-    if (loadingState === 'loading' || loadingState === 'idle') {
+    // Skeleton state (not visible yet, or loading)
+    if (!isVisible || loadingState === 'loading' || loadingState === 'idle') {
         return (
-            <div className={styles.skeleton}>
+            <div ref={containerRef} className={styles.skeleton}>
                 <span className={styles.skeletonIcon}>📄</span>
             </div>
         );
@@ -102,7 +141,7 @@ export function PDFThumbnail({ storagePath, alt, base64Data }: PDFThumbnailProps
     // Error state
     if (loadingState === 'error') {
         return (
-            <div className={styles.cardPlaceholder}>
+            <div ref={containerRef} className={styles.cardPlaceholder}>
                 <span>📄</span>
             </div>
         );
@@ -111,7 +150,7 @@ export function PDFThumbnail({ storagePath, alt, base64Data }: PDFThumbnailProps
     // If base64 data exists, render as image (fastest)
     if (base64Data) {
         return (
-            <div className={styles.cardThumbnailWrapper}>
+            <div ref={containerRef} className={styles.cardThumbnailWrapper}>
                 <img
                     src={`data:image/png;base64,${base64Data}`}
                     alt={alt}
@@ -124,7 +163,7 @@ export function PDFThumbnail({ storagePath, alt, base64Data }: PDFThumbnailProps
     // Render PDF first page
     if (pdfUrl) {
         return (
-            <div className={styles.cardThumbnailWrapper}>
+            <div ref={containerRef} className={styles.cardThumbnailWrapper}>
                 <Document
                     file={pdfUrl}
                     loading={
@@ -137,7 +176,7 @@ export function PDFThumbnail({ storagePath, alt, base64Data }: PDFThumbnailProps
                 >
                     <Page
                         pageNumber={1}
-                        width={200}
+                        width={containerWidth}
                         renderTextLayer={false}
                         renderAnnotationLayer={false}
                         className={styles.thumbnailLoaded}
@@ -150,8 +189,8 @@ export function PDFThumbnail({ storagePath, alt, base64Data }: PDFThumbnailProps
     }
 
     return (
-        <div className={styles.cardPlaceholder}>
+        <div ref={containerRef} className={styles.cardPlaceholder}>
             <span>📄</span>
         </div>
     );
-}
+});
