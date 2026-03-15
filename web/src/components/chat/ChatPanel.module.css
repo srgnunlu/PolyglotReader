@@ -783,3 +783,94 @@
         transform: rotate(360deg);
     }
 }
+
+/* Message Actions (copy, retry) */
+.messageActions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.messageBubble:hover .messageActions {
+    opacity: 1;
+}
+
+.messageActionBtn {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.messageActionBtn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.retryBtn {
+    color: var(--color-primary-500);
+    border-color: var(--color-primary-200);
+}
+
+.retryBtn:hover {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+/* Error message styling */
+.messageError .messageBubble {
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Active history item */
+.historyItemActive {
+    background: rgba(99, 102, 241, 0.08);
+    border-left: 3px solid var(--color-primary-500);
+}
+
+/* Mobile Chat - Full screen overlay */
+@media (max-width: 768px) {
+    .panel {
+        position: fixed;
+        inset: 0;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        z-index: 200;
+        border-left: none;
+        border-radius: 0;
+    }
+
+    .resizeHandle {
+        display: none;
+    }
+
+    .header {
+        padding: 12px 16px;
+        padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    }
+
+    .messages {
+        padding: 12px;
+    }
+
+    .inputArea {
+        padding: 12px 16px;
+        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* Always show action buttons on mobile (no hover) */
+    .messageActions {
+        opacity: 1;
+    }
+
+    .iconBtn {
+        width: 32px;
+        height: 32px;
+    }
+}

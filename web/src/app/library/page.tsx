@@ -30,6 +30,8 @@ function LibraryContent() {
         error,
         selectedFolder,
         searchQuery,
+        hasMore,
+        loadMore,
         setSelectedFolder,
         setSearchQuery,
     } = useDocuments();
@@ -215,6 +217,7 @@ function LibraryContent() {
                             <p>iOS uygulamasından PDF yükleyerek başlayın</p>
                         </div>
                     ) : (
+                        <>
                         <div className={viewMode === 'grid' ? styles.grid : styles.list}>
                             {documentCards.map(doc => (
                                 <div
@@ -243,6 +246,18 @@ function LibraryContent() {
                                 </div>
                             ))}
                         </div>
+                        {hasMore && (
+                            <div className={styles.loadMoreContainer}>
+                                <button
+                                    className={styles.loadMoreBtn}
+                                    onClick={loadMore}
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? 'Yükleniyor...' : 'Daha Fazla Yükle'}
+                                </button>
+                            </div>
+                        )}
+                        </>
                     )}
                 </div>
             </main>

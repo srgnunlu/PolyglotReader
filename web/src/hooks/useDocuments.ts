@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { PDFDocumentMetadata, Folder, Tag, DatabaseFileRecord, DatabaseFolder, DatabaseTag } from '@/types/models';
 
+const PAGE_SIZE = 30;
+
 interface UseDocumentsReturn {
     documents: PDFDocumentMetadata[];
     folders: Folder[];
@@ -13,6 +15,8 @@ interface UseDocumentsReturn {
     selectedFolder: string | null;
     selectedTag: string | null;
     searchQuery: string;
+    hasMore: boolean;
+    loadMore: () => void;
     setSelectedFolder: (id: string | null) => void;
     setSelectedTag: (id: string | null) => void;
     setSearchQuery: (query: string) => void;
@@ -29,6 +33,8 @@ export function useDocuments(): UseDocumentsReturn {
     const [selectedTag, setSelectedTag] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [hasMore, setHasMore] = useState(true);
+    const [page, setPage] = useState(0);
     const foldersLoadedRef = useRef(false);
 
     const supabase = getSupabase();
@@ -98,16 +104,27 @@ export function useDocuments(): UseDocumentsReturn {
         fetchFoldersAndTags();
     }, [supabase]);
 
-    // Fetch documents when folder or debounced search changes
-    const fetchDocuments = useCallback(async () => {
+    // Reset pagination when filter changes
+    useEffect(() => {
+        setPage(0);
+        setDocuments([]);
+        setHasMore(true);
+    }, [selectedFolder, debouncedSearch]);
+
+    // Fetch documents with pagination
+    const fetchDocuments = useCallback(async (pageNum: number = 0) => {
         setIsLoading(true);
         setError(null);
 
         try {
+            const from = pageNum * PAGE_SIZE;
+            const to = from + PAGE_SIZE - 1;
+
             let documentsQuery = supabase
                 .from('files')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .range(from, to);
 
             if (selectedFolder) {
                 documentsQuery = documentsQuery.eq('folder_id', selectedFolder);
@@ -121,7 +138,14 @@ export function useDocuments(): UseDocumentsReturn {
 
             if (docsResult.error) throw docsResult.error;
 
-            setDocuments((docsResult.data || []).map(mapDocument));
+            const newDocs = (docsResult.data || []).map(mapDocument);
+            setHasMore(newDocs.length === PAGE_SIZE);
+
+            if (pageNum === 0) {
+                setDocuments(newDocs);
+            } else {
+                setDocuments(prev => [...prev, ...newDocs]);
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Dosyalar yüklenemedi');
         } finally {
@@ -130,8 +154,14 @@ export function useDocuments(): UseDocumentsReturn {
     }, [supabase, selectedFolder, debouncedSearch]);
 
     useEffect(() => {
-        fetchDocuments();
-    }, [fetchDocuments]);
+        fetchDocuments(page);
+    }, [fetchDocuments, page]);
+
+    const loadMore = useCallback(() => {
+        if (!isLoading && hasMore) {
+            setPage(prev => prev + 1);
+        }
+    }, [isLoading, hasMore]);
 
     const refresh = useCallback(async () => {
         // On manual refresh, also reload folders/tags
@@ -149,7 +179,9 @@ export function useDocuments(): UseDocumentsReturn {
         } catch {
             // Non-critical
         }
-        await fetchDocuments();
+        setPage(0);
+        setHasMore(true);
+        await fetchDocuments(0);
     }, [supabase, fetchDocuments]);
 
     return {
@@ -161,6 +193,8 @@ export function useDocuments(): UseDocumentsReturn {
         selectedFolder,
         selectedTag,
         searchQuery,
+        hasMore,
+        loadMore,
         setSelectedFolder,
         setSelectedTag,
         setSearchQuery,
