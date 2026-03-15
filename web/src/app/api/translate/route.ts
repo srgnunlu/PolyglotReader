@@ -23,14 +23,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) {
-        return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+        return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 });
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+        model: process.env.GEMINI_MODEL || process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-2.0-flash'
     });
 
     const prompt = `Translate the following text to ${targetLang}. Only return the translation, nothing else:\n\n${text}`;

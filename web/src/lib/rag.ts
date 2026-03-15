@@ -283,7 +283,7 @@ export async function getInitialDocumentContext(fileId: string, db?: SupabaseCli
  * Gemini API ile embedding oluşturur
  */
 async function createEmbedding(text: string): Promise<number[]> {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) throw new Error('Gemini API key not found');
 
     const response = await fetch(

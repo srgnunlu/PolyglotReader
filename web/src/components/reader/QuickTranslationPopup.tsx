@@ -124,14 +124,17 @@ export function QuickTranslationPopup({
             setError(null);
 
             getAccessToken()
-                .then(token => fetch('/api/translate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                    },
-                    body: JSON.stringify({ text, targetLang })
-                }))
+                .then(token => {
+                    if (!token) throw new Error('Oturum bulunamadı, lütfen tekrar giriş yapın');
+                    return fetch('/api/translate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ text, targetLang })
+                    });
+                })
                 .then(res => res.json())
                 .then(data => {
                     if (!isActive || requestIdRef.current !== requestId) return;
@@ -142,7 +145,7 @@ export function QuickTranslationPopup({
                 .catch(err => {
                     if (!isActive || requestIdRef.current !== requestId) return;
                     console.error('Quick translation error:', err);
-                    setError('Çeviri yapılamadı');
+                    setError(err instanceof Error ? err.message : 'Çeviri yapılamadı');
                     setIsLoading(false);
                 });
 
