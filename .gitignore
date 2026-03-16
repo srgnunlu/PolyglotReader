@@ -63,6 +63,9 @@ xcuserdata/
 *.lock
 *.err
 
+## Superpowers brainstorm sessions
+.superpowers/
+
 ## Supabase
 # If you have any local credentials or config you don't want to share
 .supabase/
