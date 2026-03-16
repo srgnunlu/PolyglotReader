@@ -2,24 +2,25 @@
     position: absolute;
     transform: translateX(-50%);
     z-index: 1000;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
     min-width: 180px;
     max-width: 300px;
-    animation: popupFadeIn 0.15s ease-out;
+    animation: popupFadeIn 0.18s ease;
+    overflow: hidden;
 }
 
 @keyframes popupFadeIn {
     from {
         opacity: 0;
-        transform: translateX(-50%) translateY(8px);
+        transform: translateX(-50%) translateY(8px) scale(0.97);
     }
-
     to {
         opacity: 1;
-        transform: translateX(-50%) translateY(0);
+        transform: translateX(-50%) translateY(0) scale(1);
     }
 }
 
@@ -29,8 +30,13 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    background: var(--bg-tertiary);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: rgba(0, 0, 0, 0.03);
+}
+
+@media (prefers-color-scheme: dark) {
+    .preview {
+        background: rgba(255, 255, 255, 0.03);
+    }
 }
 
 .previewImage {
@@ -42,8 +48,8 @@
 
 .actions {
     display: flex;
-    padding: 8px;
-    gap: 4px;
+    padding: 6px 8px;
+    gap: 2px;
 }
 
 .actionBtn {
@@ -51,12 +57,13 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 10px 8px;
+    gap: 3px;
+    padding: 8px 8px;
     border: none;
     background: transparent;
-    color: var(--text-primary);
-    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-weight: 500;
     cursor: pointer;
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
@@ -64,14 +71,22 @@
 
 .actionBtn:hover:not(:disabled) {
     background: var(--bg-tertiary);
-    color: var(--color-primary-500);
+    color: var(--text-primary);
+}
+
+.actionBtn:active:not(:disabled) {
+    transform: scale(0.95);
 }
 
 .actionBtn:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
 .icon {
-    font-size: 1.25rem;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }

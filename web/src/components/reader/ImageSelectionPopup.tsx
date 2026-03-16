@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { SparklesIcon, CopyIcon, CheckIcon } from './ReaderIcons';
 import styles from './ImageSelectionPopup.module.css';
 
 interface ImageSelectionPopupProps {
@@ -133,7 +134,7 @@ export function ImageSelectionPopup({
                     className={styles.actionBtn}
                     onClick={handleAskAI}
                 >
-                    <span className={styles.icon}>✨</span>
+                    <span className={styles.icon}><SparklesIcon size={18} /></span>
                     <span>AI&apos;a Sor</span>
                 </button>
 
@@ -143,9 +144,9 @@ export function ImageSelectionPopup({
                     disabled={copySuccess}
                 >
                     <span className={styles.icon}>
-                        {copySuccess ? '✓' : '📋'}
+                        {copySuccess ? <CheckIcon size={18} /> : <CopyIcon size={18} />}
                     </span>
-                    <span>{copySuccess ? 'Kopyalandı!' : 'Kopyala'}</span>
+                    <span>{copySuccess ? 'Kopyalandi!' : 'Kopyala'}</span>
                 </button>
             </div>
         </div>

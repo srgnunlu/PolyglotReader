@@ -5,13 +5,11 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
-// Dynamically import PDFViewer with SSR disabled to avoid DOMMatrix errors
 const PDFViewer = dynamic(() => import('@/components/reader/PDFViewer').then(mod => mod.PDFViewer), {
     ssr: false,
-    loading: () => <div className="pdf-loading-placeholder">PDF görüntüleyici yükleniyor...</div>
+    loading: () => <div className="pdf-loading-placeholder">PDF goruntüleyici yukleniyor...</div>
 });
-import { QuickTranslationPopup } from '@/components/reader/QuickTranslationPopup';
-import { SelectionPopup } from '@/components/reader/SelectionPopup';
+import { SmartSelectionPopup } from '@/components/reader/SmartSelectionPopup';
 import { ImageSelectionPopup } from '@/components/reader/ImageSelectionPopup';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { AnnotationDetailPopup } from '@/components/reader/AnnotationDetailPopup';
@@ -20,6 +18,7 @@ import { AnnotationProvider, useAnnotations } from '@/contexts/AnnotationContext
 import { Annotation } from '@/types/models';
 import { getSupabase } from '@/lib/supabase';
 import { PDFDocumentMetadata } from '@/types/models';
+import { ArrowLeftIcon, FileTextIcon } from '@/components/reader/ReaderIcons';
 import styles from './reader.module.css';
 
 interface PageParams {
@@ -121,12 +120,10 @@ function ReaderContent({ documentId }: ReaderContentProps) {
     const [error, setError] = useState<string | null>(null);
     const [initialProgress, setInitialProgress] = useState<{ page: number; x: number; y: number; scale: number } | null>(null);
 
-    // Consolidated selection state
     const [sel, dispatchSel] = useReducer(selectionReducer, initialSelection);
 
     const [isQuickTranslationMode, setIsQuickTranslationMode] = useState(false);
     const [pdfScale, setPdfScale] = useState(1.2);
-    const [viewerSize, setViewerSize] = useState<{ width: number; height: number } | null>(null);
 
     // Chat panel state
     const [isChatOpen, setIsChatOpen] = useState(false);
@@ -148,7 +145,6 @@ function ReaderContent({ documentId }: ReaderContentProps) {
         setSelectedAnnotation({ annotation, position });
     }, []);
 
-    // Handle text selection from PDF
     const handleTextSelect = useCallback((
         text: string,
         pageNumber: number,
@@ -165,7 +161,6 @@ function ReaderContent({ documentId }: ReaderContentProps) {
         });
     }, []);
 
-    // Handle image selection
     const handleImageSelect = useCallback((
         imageBase64: string,
         pageNumber: number,
@@ -175,14 +170,12 @@ function ReaderContent({ documentId }: ReaderContentProps) {
         window.getSelection()?.removeAllRanges();
     }, []);
 
-    // Handle AI question from selection
     const handleAskAI = useCallback((text: string) => {
         setChatInitialMessage(text);
         dispatchSel({ type: 'CLEAR_TEXT_POPUP' });
         setIsChatOpen(true);
     }, []);
 
-    // Handle AI question from image
     const handleAskAIWithImage = useCallback((imageBase64: string) => {
         setChatInitialImage(imageBase64);
         dispatchSel({ type: 'CLEAR_ALL' });
@@ -193,13 +186,12 @@ function ReaderContent({ documentId }: ReaderContentProps) {
         dispatchSel({ type: 'CLEAR_ALL' });
     }, []);
 
-    // Handle clearing chat selection (from chat X button)
     const handleClearChatSelection = useCallback(() => {
         window.getSelection()?.removeAllRanges();
         dispatchSel({ type: 'CLEAR_CHAT' });
     }, []);
 
-    // Load document with AbortController
+    // Load document
     useEffect(() => {
         const controller = new AbortController();
 
@@ -208,7 +200,6 @@ function ReaderContent({ documentId }: ReaderContentProps) {
             setError(null);
 
             try {
-                // Fetch document metadata
                 const { data: docData, error: docError } = await supabase
                     .from('files')
                     .select('*')
@@ -217,7 +208,7 @@ function ReaderContent({ documentId }: ReaderContentProps) {
 
                 if (controller.signal.aborted) return;
                 if (docError) throw docError;
-                if (!docData) throw new Error('Dosya bulunamadı');
+                if (!docData) throw new Error('Dosya bulunamadi');
 
                 setDocument({
                     id: docData.id,
@@ -232,7 +223,6 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                     tags: [],
                 });
 
-                // Get signed URL for PDF
                 const { data: signedUrl, error: urlError } = await supabase
                     .storage
                     .from('user_files')
@@ -242,7 +232,6 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                 if (urlError) throw urlError;
                 setPdfUrl(signedUrl.signedUrl);
 
-                // Fetch document context for AI
                 const { data: chunks } = await supabase
                     .from('document_chunks')
                     .select('content')
@@ -254,7 +243,6 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                     setDocumentContext(chunks.map((c: { content: string }) => c.content).join('\n\n'));
                 }
 
-                // Fetch reading progress
                 const { data: progressData } = await supabase
                     .from('reading_progress')
                     .select('*')
@@ -272,15 +260,12 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                     });
                     setPdfScale(progressData.zoom_scale);
                 }
-
             } catch (err) {
                 if (controller.signal.aborted) return;
                 console.error('Load error:', err);
-                setError(err instanceof Error ? err.message : 'Dosya yüklenemedi');
+                setError(err instanceof Error ? err.message : 'Dosya yuklenemedi');
             } finally {
-                if (!controller.signal.aborted) {
-                    setIsLoading(false);
-                }
+                if (!controller.signal.aborted) setIsLoading(false);
             }
         };
 
@@ -288,33 +273,16 @@ function ReaderContent({ documentId }: ReaderContentProps) {
         return () => controller.abort();
     }, [documentId, supabase]);
 
-    useEffect(() => {
-        if (!viewerRef.current) return;
-        const observer = new ResizeObserver(entries => {
-            const entry = entries[0];
-            if (!entry) return;
-            setViewerSize({
-                width: entry.contentRect.width,
-                height: entry.contentRect.height,
-            });
-        });
-        observer.observe(viewerRef.current);
-        return () => observer.disconnect();
-    }, []);
-
-    // Listen for selection changes to sync chat selection with PDF selection
+    // Selection change listener
     useEffect(() => {
         if (typeof window === 'undefined') return;
-
         const domDocument = window.document;
 
         const handleSelectionChange = () => {
             const selection = window.getSelection();
             if (selection?.isCollapsed && sel.chatText) {
                 const activeElement = domDocument.activeElement;
-                if (activeElement?.closest('[data-chat-panel="true"]')) {
-                    return;
-                }
+                if (activeElement?.closest('[data-chat-panel="true"]')) return;
 
                 setTimeout(() => {
                     const currentSelection = window.getSelection();
@@ -330,11 +298,8 @@ function ReaderContent({ documentId }: ReaderContentProps) {
         return () => domDocument.removeEventListener('selectionchange', handleSelectionChange);
     }, [sel.chatText]);
 
-    // Handle highlight - save via annotation context
     const handleHighlight = useCallback(async (color: string) => {
-        if (!sel.text || !documentId || !sel.rects || sel.rects.length === 0) {
-            return;
-        }
+        if (!sel.text || !documentId || !sel.rects || sel.rects.length === 0) return;
 
         try {
             await addAnnotation({
@@ -345,7 +310,6 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                 rects: sel.rects,
                 text: sel.text,
             });
-
             window.getSelection()?.removeAllRanges();
             clearSelection();
         } catch (err) {
@@ -358,10 +322,8 @@ function ReaderContent({ documentId }: ReaderContentProps) {
         clearSelection();
     }, [clearSelection]);
 
-    // Handle progress save
     const handleProgressChange = useCallback(async (page: number, x: number, y: number, scale: number) => {
         if (!documentId) return;
-
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
@@ -377,65 +339,45 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                     zoom_scale: scale,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'user_id,file_id' });
-
         } catch (err) {
             console.error('Error saving progress:', err);
         }
     }, [documentId, supabase]);
 
-    // Fullscreen toggle handler
     const toggleFullscreen = useCallback(() => {
         if (!viewerRef.current) return;
-
         if (!globalThis.document.fullscreenElement) {
-            viewerRef.current.requestFullscreen().catch(err => {
-                console.error('Fullscreen error:', err);
-            });
+            viewerRef.current.requestFullscreen().catch(err => console.error('Fullscreen error:', err));
         } else {
             globalThis.document.exitFullscreen();
         }
     }, []);
 
-    // Listen for fullscreen changes
     useEffect(() => {
         const handleFullscreenChange = () => {
             setIsFullscreen(!!globalThis.document.fullscreenElement);
-            if (!globalThis.document.fullscreenElement) {
-                setIsNavHidden(false);
-            }
+            if (!globalThis.document.fullscreenElement) setIsNavHidden(false);
         };
-
         globalThis.document.addEventListener('fullscreenchange', handleFullscreenChange);
         return () => globalThis.document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }, []);
 
-    // Auto-hide navigation on mouse idle (only in fullscreen)
     const handleMouseMove = useCallback(() => {
         if (!isFullscreen) return;
-
         setIsNavHidden(false);
-
-        if (mouseIdleTimeoutRef.current) {
-            clearTimeout(mouseIdleTimeoutRef.current);
-        }
-
+        if (mouseIdleTimeoutRef.current) clearTimeout(mouseIdleTimeoutRef.current);
         mouseIdleTimeoutRef.current = setTimeout(() => {
-            if (isFullscreen) {
-                setIsNavHidden(true);
-            }
+            if (isFullscreen) setIsNavHidden(true);
         }, 3000);
     }, [isFullscreen]);
 
-    // Cleanup mouse idle timeout
     useEffect(() => {
         return () => {
-            if (mouseIdleTimeoutRef.current) {
-                clearTimeout(mouseIdleTimeoutRef.current);
-            }
+            if (mouseIdleTimeoutRef.current) clearTimeout(mouseIdleTimeoutRef.current);
         };
     }, []);
 
-    // Keyboard shortcuts (F11 for fullscreen, 1-4 for colors)
+    // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'F11') {
@@ -443,20 +385,13 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                 toggleFullscreen();
                 return;
             }
-
             const target = e.target as HTMLElement;
             if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
             const colorMap: Record<string, string> = {
-                '1': '#fef08a',
-                '2': '#bbf7d0',
-                '3': '#bae6fd',
-                '4': '#fbcfe8',
+                '1': '#fef08a', '2': '#bbf7d0', '3': '#bae6fd', '4': '#fbcfe8',
             };
-
-            if (colorMap[e.key]) {
-                setSelectedColor(colorMap[e.key]);
-            }
+            if (colorMap[e.key]) setSelectedColor(colorMap[e.key]);
         };
 
         window.addEventListener('keydown', handleKeyDown);
@@ -466,8 +401,8 @@ function ReaderContent({ documentId }: ReaderContentProps) {
     if (isLoading) {
         return (
             <div className={styles.loading}>
-                <div className="spinner" style={{ width: 40, height: 40 }} />
-                <p>Dosya yükleniyor...</p>
+                <div className={styles.loadingSpinner} />
+                <p>Dosya yukleniyor...</p>
             </div>
         );
     }
@@ -475,10 +410,9 @@ function ReaderContent({ documentId }: ReaderContentProps) {
     if (error || !document || !pdfUrl) {
         return (
             <div className={styles.error}>
-                <span>⚠️</span>
-                <p>{error || 'Dosya bulunamadı'}</p>
+                <p>{error || 'Dosya bulunamadi'}</p>
                 <button className="btn btn-primary" onClick={() => router.push('/library')}>
-                    Kütüphaneye Dön
+                    Kutüphaneye Don
                 </button>
             </div>
         );
@@ -491,30 +425,26 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                 <button
                     className={styles.backBtn}
                     onClick={() => router.push('/library')}
-                    title="Kütüphane"
+                    title="Kutuphane"
                 >
-                    ←
+                    <ArrowLeftIcon size={18} />
                 </button>
 
                 <h1 className={styles.title}>{document.name}</h1>
 
-                <button
-                    onClick={() => setShowSummary(true)}
-                    style={{
-                        padding: '5px 12px', borderRadius: 8,
-                        background: 'rgba(99,102,241,0.1)', color: 'var(--color-primary-500)',
-                        border: '1px solid rgba(99,102,241,0.2)', cursor: 'pointer',
-                        fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap',
-                        transition: 'all 0.15s', flexShrink: 0,
-                    }}
-                >
-                    Özetle
-                </button>
+                <div className={styles.headerActions}>
+                    <button
+                        className={styles.summaryBtn}
+                        onClick={() => setShowSummary(true)}
+                    >
+                        <FileTextIcon size={14} />
+                        Ozetle
+                    </button>
+                </div>
             </header>
 
             {/* Main content */}
             <div className={styles.content} onMouseMove={handleMouseMove}>
-                {/* PDF Viewer */}
                 <div ref={viewerRef} className={styles.viewer}>
                     <PDFViewer
                         pdfUrl={pdfUrl}
@@ -544,15 +474,17 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                         onToggleChat={() => setIsChatOpen(!isChatOpen)}
                     />
 
-                    {/* Text Selection Popup */}
-                    {sel.text && sel.position && !isQuickTranslationMode && (
-                        <SelectionPopup
+                    {/* Unified Smart Selection Popup */}
+                    {sel.text && sel.position && (
+                        <SmartSelectionPopup
                             text={sel.text}
                             position={sel.position}
+                            anchorBounds={sel.bounds ?? undefined}
+                            selectionRange={sel.range ?? undefined}
+                            isQuickTranslationMode={isQuickTranslationMode}
                             onClose={clearSelection}
                             onAskAI={handleAskAI}
                             onHighlight={handleHighlight}
-                            selectionRange={sel.range ?? undefined}
                         />
                     )}
 
@@ -563,17 +495,6 @@ function ReaderContent({ documentId }: ReaderContentProps) {
                             position={sel.imagePosition}
                             onClose={clearSelection}
                             onAskAI={handleAskAIWithImage}
-                        />
-                    )}
-
-                    {sel.text && sel.bounds && isQuickTranslationMode && (
-                        <QuickTranslationPopup
-                            text={sel.text}
-                            anchorBounds={sel.bounds}
-                            zoomScale={pdfScale}
-                            containerSize={viewerSize ?? undefined}
-                            onClose={clearSelection}
-                            selectionRange={sel.range ?? undefined}
                         />
                     )}
                 </div>

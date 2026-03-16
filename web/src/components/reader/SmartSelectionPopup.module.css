@@ -1,0 +1,417 @@
+.popup {
+    position: absolute;
+    z-index: 100;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+    min-width: 260px;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    animation: popupIn 0.18s ease;
+    touch-action: none;
+    overflow: hidden;
+}
+
+.popupPinned {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-color: var(--color-primary-300);
+}
+
+/* Drag Handle */
+.dragHandle {
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    width: 100%;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.dragHandle:active {
+    cursor: grabbing;
+}
+
+.dragIndicator {
+    width: 28px;
+    height: 3px;
+    background: var(--text-tertiary);
+    border-radius: 2px;
+    opacity: 0.4;
+    transition: opacity 0.2s;
+}
+
+.dragHandle:hover .dragIndicator {
+    opacity: 0.7;
+}
+
+/* Pin button in drag handle */
+.pinBtn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.pinBtn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.pinBtnActive {
+    color: var(--color-primary-500);
+}
+
+/* Actions bar */
+.actions {
+    display: flex;
+    gap: 1px;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.actionBtn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    flex: 1;
+    min-width: 0;
+}
+
+.actionBtn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.actionBtn:active {
+    transform: scale(0.95);
+}
+
+.actionBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.actionBtnActive {
+    color: var(--color-primary-500);
+    background: var(--color-primary-50);
+}
+
+.actionIcon {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Color picker row */
+.colorPicker {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+    justify-content: center;
+    animation: slideDown 0.15s ease;
+}
+
+.colorBtn {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-full);
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.colorBtn:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.colorBtnActive {
+    border-color: var(--text-primary);
+    box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--color-primary-400);
+}
+
+/* Translation result */
+.translationSection {
+    border-bottom: 1px solid var(--border-color);
+    animation: slideDown 0.2s ease;
+    overflow: hidden;
+}
+
+.translationHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px 4px;
+}
+
+.translationLabel {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-primary-500);
+}
+
+.translationClose {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.translationClose:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.translationContent {
+    padding: 4px 12px 10px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.translationText {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Loading dots */
+.loadingDots {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 0;
+}
+
+.dot {
+    width: 5px;
+    height: 5px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary-400);
+    animation: dotPulse 0.8s ease-in-out infinite;
+}
+
+.dot:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.dot:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+/* Spinner */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--color-primary-500);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* Selected text preview */
+.preview {
+    padding: 8px 12px;
+}
+
+.previewText {
+    font-size: 0.78rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+    line-height: 1.4;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* Quick translation mode variant */
+.quickMode .actions {
+    border-top: 1px solid var(--border-color);
+    border-bottom: none;
+    padding: 4px 8px;
+}
+
+.quickMode .translationSection {
+    border-bottom: none;
+}
+
+.quickModeHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px 4px;
+}
+
+.quickModeTitle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-primary-500);
+}
+
+.quickModeClose {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.quickModeClose:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Animations */
+@keyframes popupIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 300px;
+    }
+}
+
+@keyframes dotPulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.4;
+    }
+    50% {
+        transform: scale(1.5);
+        opacity: 0.9;
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Mobile: bottom sheet */
+@media (max-width: 768px) {
+    .popup {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        top: auto !important;
+        transform: none !important;
+        min-width: 100%;
+        max-width: 100%;
+        border-radius: 20px 20px 0 0;
+        box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.18);
+        z-index: 150;
+        max-height: 50vh;
+        animation: mobileSlideUp 0.25s ease;
+        padding-bottom: env(safe-area-inset-bottom, 8px);
+    }
+
+    .dragHandle {
+        height: 28px;
+    }
+
+    .dragIndicator {
+        width: 40px;
+        height: 4px;
+    }
+
+    .actions {
+        gap: 2px;
+        padding: 6px 12px;
+        justify-content: space-around;
+    }
+
+    .actionBtn {
+        padding: 10px 10px;
+        font-size: 0.72rem;
+    }
+
+    .colorBtn {
+        width: 28px;
+        height: 28px;
+    }
+
+    .preview {
+        padding: 6px 12px;
+    }
+
+    .translationContent {
+        max-height: 150px;
+    }
+}
+
+@keyframes mobileSlideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
