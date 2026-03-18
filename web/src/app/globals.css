@@ -158,37 +158,12 @@
   }
 }
 
-/* Reset & Base */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  font-size: 16px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  line-height: 1.5;
-  min-height: 100vh;
-}
+/* Reset & Base — Tailwind v4 provides its own preflight/reset.
+   Old custom reset removed to prevent specificity conflicts with Tailwind utilities.
+   Only keep styles needed by legacy pages not yet migrated. */
 
 a {
-  color: var(--color-primary-500);
   text-decoration: none;
-  transition: color var(--transition-fast);
-}
-
-a:hover {
-  color: var(--color-primary-600);
 }
 
 /* Buttons */
