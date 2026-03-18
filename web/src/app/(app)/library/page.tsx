@@ -1,218 +1,198 @@
+// Library page — main document browser, wrapped by AppShell which handles sidebar/nav
 'use client';
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { useAuth } from '@/hooks/useAuth';
 import { useDocuments } from '@/hooks/useDocuments';
-import dynamic from 'next/dynamic';
-const PDFThumbnail = dynamic(() => import('@/components/library/PDFThumbnail').then(mod => mod.PDFThumbnail), {
-    ssr: false,
-    loading: () => <div className="card-placeholder">📄</div>
-});
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import styles from './library.module.css';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PDFGrid } from '@/components/library/PDFGrid';
+import { PDFList } from '@/components/library/PDFList';
+import { EmptyLibrary } from '@/components/library/EmptyLibrary';
+import { UploadArea } from '@/components/library/UploadArea';
+import { LayoutGrid, List, Search, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 export default function LibraryPage() {
-    return (
-        <ProtectedRoute>
-            <LibraryContent />
-        </ProtectedRoute>
-    );
+  return (
+    <ProtectedRoute>
+      <LibraryContent />
+    </ProtectedRoute>
+  );
 }
 
 function LibraryContent() {
-    const router = useRouter();
-    const { user, signOut } = useAuth();
-    const {
-        documents,
-        folders,
-        isLoading,
-        error,
-        selectedFolder,
-        searchQuery,
-        setSelectedFolder,
-        setSearchQuery,
-    } = useDocuments();
+  const {
+    documents,
+    isLoading,
+    error,
+    searchQuery,
+    setSearchQuery,
+  } = useDocuments();
 
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showUpload, setShowUpload] = useState(false);
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const handleDocumentClick = (id: string) => {
-        router.push(`/reader/${id}`);
+  // 300ms debounce before updating the hook's search query (triggers API call)
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setLocalSearch(value);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        setSearchQuery(value);
+      }, 300);
+    },
+    [setSearchQuery]
+  );
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
+  }, []);
 
-    const handleLogout = async () => {
-        await signOut();
-        router.push('/login');
-    };
+  return (
+    <div
+      className="min-h-screen"
+      style={{ background: '#FDFAF6' }}
+    >
+      {/* Page header */}
+      <div
+        className="sticky top-0 z-10 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3"
+        style={{
+          background: 'rgba(253, 250, 246, 0.9)',
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(42, 37, 32, 0.06)',
+        }}
+      >
+        {/* Title */}
+        <h1
+          className="text-xl font-semibold shrink-0"
+          style={{ color: '#2A2520' }}
+        >
+          Kütüphane
+        </h1>
 
-    const formatFileSize = (bytes: number) => {
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    };
-
-    const formatDate = (date: Date) => {
-        return date.toLocaleDateString('tr-TR', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-        });
-    };
-
-    return (
-        <div className={styles.layout}>
-            {/* Animated Background */}
-            <div className={styles.backgroundOrbs}>
-                <div className={`${styles.orb} ${styles.orb1}`} />
-                <div className={`${styles.orb} ${styles.orb2}`} />
-            </div>
-
-            {/* Sidebar */}
-            <aside className={styles.sidebar}>
-                <div className={styles.sidebarHeader}>
-                    <div className={styles.logo}>
-                        <span className={styles.logoIcon}>📄</span>
-                        <span className={styles.logoText}>Corio Docs</span>
-                    </div>
-                </div>
-
-                <nav className={styles.sidebarNav}>
-                    <button
-                        className={`${styles.navItem} ${!selectedFolder ? styles.navItemActive : ''}`}
-                        onClick={() => setSelectedFolder(null)}
-                    >
-                        <span className={styles.navIcon}>📁</span>
-                        <span>Tüm Dosyalar</span>
-                        <span className={styles.navBadge}>{documents.length}</span>
-                    </button>
-
-                    <button
-                        className={styles.navItem}
-                        onClick={() => router.push('/notes')}
-                    >
-                        <span className={styles.navIcon}>📝</span>
-                        <span>Notlarım</span>
-                    </button>
-
-                    <div className={styles.navSection}>
-                        <h3 className={styles.navSectionTitle}>Klasörler</h3>
-                        {folders.map(folder => (
-                            <button
-                                key={folder.id}
-                                className={`${styles.navItem} ${selectedFolder === folder.id ? styles.navItemActive : ''}`}
-                                onClick={() => setSelectedFolder(folder.id)}
-                            >
-                                <span
-                                    className={styles.navIcon}
-                                    style={{ color: folder.color }}
-                                >
-                                    📁
-                                </span>
-                                <span>{folder.name}</span>
-                            </button>
-                        ))}
-                    </div>
-                </nav>
-
-                <div className={styles.sidebarFooter}>
-                    <div className={styles.userInfo}>
-                        <div className={styles.userAvatar}>
-                            {user?.name?.charAt(0).toUpperCase() || '?'}
-                        </div>
-                        <div className={styles.userDetails}>
-                            <span className={styles.userName}>{user?.name}</span>
-                            <span className={styles.userEmail}>{user?.email}</span>
-                        </div>
-                    </div>
-                    <button className={styles.logoutBtn} onClick={handleLogout}>
-                        Çıkış
-                    </button>
-                </div>
-            </aside>
-
-            {/* Main Content */}
-            <main className={styles.main}>
-                {/* Header */}
-                <header className={styles.header}>
-                    <div className={styles.searchContainer}>
-                        <input
-                            type="text"
-                            className={styles.searchInput}
-                            placeholder="Dosya ara..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                        <span className={styles.searchIcon}>🔍</span>
-                    </div>
-
-                    <div className={styles.headerActions}>
-                        <button
-                            className={`${styles.viewToggle} ${viewMode === 'grid' ? styles.viewToggleActive : ''}`}
-                            onClick={() => setViewMode('grid')}
-                            title="Grid görünümü"
-                        >
-                            ▦
-                        </button>
-                        <button
-                            className={`${styles.viewToggle} ${viewMode === 'list' ? styles.viewToggleActive : ''}`}
-                            onClick={() => setViewMode('list')}
-                            title="Liste görünümü"
-                        >
-                            ☰
-                        </button>
-                    </div>
-                </header>
-
-                {/* Content */}
-                <div className={styles.content}>
-                    {isLoading ? (
-                        <div className={styles.loading}>
-                            <div className="spinner" style={{ width: 40, height: 40 }} />
-                            <p>Dosyalar yükleniyor...</p>
-                        </div>
-                    ) : error ? (
-                        <div className={styles.error}>
-                            <span>⚠️</span>
-                            <p>{error}</p>
-                        </div>
-                    ) : documents.length === 0 ? (
-                        <div className={styles.empty}>
-                            <span className={styles.emptyIcon}>📭</span>
-                            <h3>Henüz dosya yok</h3>
-                            <p>iOS uygulamasından PDF yükleyerek başlayın</p>
-                        </div>
-                    ) : (
-                        <div className={viewMode === 'grid' ? styles.grid : styles.list}>
-                            {documents.map(doc => (
-                                <div
-                                    key={doc.id}
-                                    className={viewMode === 'grid' ? styles.cardGrid : styles.cardList}
-                                    onClick={() => handleDocumentClick(doc.id)}
-                                >
-                                    <div className={styles.cardThumbnail}>
-                                        <PDFThumbnail
-                                            storagePath={doc.storagePath}
-                                            alt={doc.name}
-                                            base64Data={doc.thumbnailData}
-                                        />
-                                    </div>
-                                    <div className={styles.cardInfo}>
-                                        <h4 className={styles.cardTitle}>{doc.name}</h4>
-                                        <div className={styles.cardMeta}>
-                                            <span>{formatFileSize(doc.size)}</span>
-                                            <span>•</span>
-                                            <span>{formatDate(doc.uploadedAt)}</span>
-                                        </div>
-                                        {doc.summary && viewMode === 'list' && (
-                                            <p className={styles.cardSummary}>{doc.summary}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </main>
+        {/* Search */}
+        <div className="relative flex-1 sm:max-w-md">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+            style={{ color: 'rgba(42, 37, 32, 0.4)' }}
+          />
+          <input
+            type="text"
+            placeholder="Belge ara..."
+            value={localSearch}
+            onChange={e => handleSearchChange(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none transition-all"
+            style={{
+              background: 'rgba(255, 255, 255, 0.7)',
+              border: '1px solid rgba(42, 37, 32, 0.1)',
+              color: '#2A2520',
+            }}
+          />
         </div>
-    );
+
+        {/* Controls */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* View toggle */}
+          <div
+            className="flex items-center rounded-xl p-1 gap-0.5"
+            style={{
+              background: 'rgba(42, 37, 32, 0.06)',
+            }}
+          >
+            <button
+              onClick={() => setViewMode('grid')}
+              className="flex items-center justify-center w-8 h-7 rounded-lg transition-all"
+              title="Grid görünümü"
+              style={{
+                background: viewMode === 'grid' ? 'rgba(255,255,255,0.9)' : 'transparent',
+                color: viewMode === 'grid' ? '#D4713C' : 'rgba(42, 37, 32, 0.5)',
+                boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(42,37,32,0.1)' : 'none',
+              }}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className="flex items-center justify-center w-8 h-7 rounded-lg transition-all"
+              title="Liste görünümü"
+              style={{
+                background: viewMode === 'list' ? 'rgba(255,255,255,0.9)' : 'transparent',
+                color: viewMode === 'list' ? '#D4713C' : 'rgba(42, 37, 32, 0.5)',
+                boxShadow: viewMode === 'list' ? '0 1px 3px rgba(42,37,32,0.1)' : 'none',
+              }}
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="px-4 sm:px-6 py-6">
+        {/* Loading skeleton */}
+        {isLoading && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="rounded-xl overflow-hidden">
+                <Skeleton className="w-full" style={{ aspectRatio: '3 / 4' }} />
+                <div className="p-3 space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-3 w-2/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Error state */}
+        {!isLoading && error && (
+          <div
+            className="flex flex-col items-center gap-3 py-16 text-center"
+          >
+            <div
+              className="flex items-center justify-center w-14 h-14 rounded-2xl"
+              style={{ background: 'rgba(220, 38, 38, 0.08)' }}
+            >
+              <AlertCircle className="w-7 h-7" style={{ color: '#DC2626' }} />
+            </div>
+            <p className="text-sm font-medium" style={{ color: '#2A2520' }}>
+              Belgeler yüklenirken hata oluştu
+            </p>
+            <p className="text-xs max-w-xs" style={{ color: 'rgba(42, 37, 32, 0.5)' }}>
+              {error}
+            </p>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && !error && documents.length === 0 && !showUpload && (
+          <EmptyLibrary onUploadClick={() => setShowUpload(true)} />
+        )}
+
+        {/* Upload area — shown after clicking "PDF Yükle" in empty state */}
+        {showUpload && (
+          <div className="mb-6">
+            <UploadArea
+              onFilesSelected={files => {
+                // TODO: wire to Supabase upload logic
+                console.info('Selected files for upload:', files.map(f => f.name));
+                setShowUpload(false);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Document list */}
+        {!isLoading && !error && documents.length > 0 && (
+          viewMode === 'grid'
+            ? <PDFGrid documents={documents} />
+            : <PDFList documents={documents} />
+        )}
+      </div>
+    </div>
+  );
 }
