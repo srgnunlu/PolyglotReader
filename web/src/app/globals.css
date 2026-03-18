@@ -636,7 +636,9 @@ a {
 }
 
 /* Corio Design Language — Sepia Theme */
+/* Must override BOTH Corio AND shadcn variables to prevent visual conflicts */
 .sepia {
+  /* Corio tokens */
   --corio-background: #EDE4D3;
   --corio-foreground: hsl(30 15% 18%);
   --corio-surface-1: hsl(38 40% 88%);
@@ -648,6 +650,30 @@ a {
   --corio-border: hsl(36 25% 75%);
   --corio-border-subtle: hsl(36 20% 80%);
   --corio-reader-bg: hsl(38 50% 90%);
+
+  /* shadcn token overrides — keeps shadcn components in sync with sepia */
+  --background: #EDE4D3;
+  --foreground: hsl(30 15% 18%);
+  --card: #F5EDE0;
+  --card-foreground: hsl(30 15% 18%);
+  --popover: #F5EDE0;
+  --popover-foreground: hsl(30 15% 18%);
+  --primary: #D4713C;
+  --primary-foreground: #ffffff;
+  --secondary: hsl(38 35% 84%);
+  --secondary-foreground: hsl(30 15% 18%);
+  --muted: hsl(38 30% 85%);
+  --muted-foreground: hsl(30 12% 40%);
+  --accent: hsl(38 50% 88%);
+  --accent-foreground: hsl(30 15% 18%);
+  --border: hsl(36 25% 75%);
+  --input: hsl(36 25% 75%);
+  --ring: #D4713C;
+  --sidebar-background: hsl(38 35% 86%);
+  --sidebar-foreground: hsl(30 15% 18%);
+  --sidebar-border: hsl(36 25% 75%);
+  --sidebar-accent: hsl(38 50% 88%);
+  --sidebar-accent-foreground: hsl(30 15% 18%);
 }
 
 @theme inline {
