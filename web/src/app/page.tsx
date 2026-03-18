@@ -116,32 +116,37 @@ export default function LandingPage() {
         <FeaturesGrid />
 
         {/* CTA section */}
-        <section className="relative overflow-hidden bg-gradient-to-b from-[#FDFAF6] to-[#FAF0E8] px-6 py-28">
-          <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-            <div className="absolute bottom-0 left-1/2 h-[300px] w-[600px] -translate-x-1/2 rounded-full bg-[#D4713C]/[0.06] blur-[100px]" />
-          </div>
+        <section
+          className="relative overflow-hidden px-6 py-20 sm:py-24"
+          style={{ background: 'linear-gradient(to bottom, #FDFAF6, #FAF0E8)' }}
+        >
           <div className="relative mx-auto max-w-lg text-center">
-            <h2 className="mb-4 text-[clamp(1.5rem,3.5vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.025em] text-[#2A2520]">
+            <h2 className="mb-4 text-2xl font-bold leading-tight tracking-tight sm:text-3xl" style={{ color: '#2A2520' }}>
               Hemen ücretsiz başlayın
             </h2>
-            <p className="mb-10 text-[15px] leading-[1.7] text-[#2A2520]/50">
+            <p className="mb-8 text-sm leading-relaxed sm:text-base" style={{ color: 'rgba(42,37,32,0.5)' }}>
               Belgelerinizi yapay zeka ile keşfetmeye bugün başlayın. Kredi kartı gerektirmez.
             </p>
             <button
               onClick={handleGoogleSignIn}
               disabled={isLoading}
-              className="inline-flex h-[52px] items-center gap-3 rounded-2xl bg-white px-8 text-[15px] font-semibold text-[#2A2520] shadow-[0_2px_16px_rgba(42,37,32,0.08),0_0_0_1px_rgba(42,37,32,0.06)] transition-all duration-200 hover:shadow-[0_4px_24px_rgba(42,37,32,0.12)] hover:-translate-y-0.5 disabled:opacity-50"
+              className="inline-flex h-12 items-center gap-3 rounded-2xl px-8 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50 sm:h-13 sm:text-base"
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#2A2520',
+                boxShadow: '0 2px 16px rgba(42,37,32,0.08), 0 0 0 1px rgba(42,37,32,0.06)',
+              }}
             >
               {authLoading === 'google' ? (
-                <span className="size-5 animate-spin rounded-full border-2 border-[#2A2520]/15 border-t-[#2A2520]/60" />
+                <span className="size-5 animate-spin rounded-full" style={{ border: '2px solid rgba(42,37,32,0.15)', borderTopColor: 'rgba(42,37,32,0.6)' }} />
               ) : (
                 <GoogleLogoSmall />
               )}
               Google ile Ücretsiz Başlayın
             </button>
-            <p className="mt-5 text-[12px] text-[#2A2520]/30">
+            <p className="mt-5 text-xs" style={{ color: 'rgba(42,37,32,0.3)' }}>
               Giriş yaparak{' '}
-              <Link href="/legal/terms-of-service" className="underline decoration-[#2A2520]/20 underline-offset-2 transition-colors hover:text-[#D4713C]">
+              <Link href="/legal/terms-of-service" className="underline underline-offset-2 transition-colors" style={{ textDecorationColor: 'rgba(42,37,32,0.2)' }}>
                 Kullanım Şartlarını
               </Link>{' '}
               kabul ediyorsunuz

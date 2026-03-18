@@ -1,4 +1,4 @@
-// Hero section — warm luxury editorial, CSS animations (SSR-safe, no Framer Motion dependency)
+// Hero section — static, no animation dependencies, always visible
 'use client';
 
 import { Sparkles } from 'lucide-react';
@@ -38,49 +38,77 @@ export function HeroSection({
   isDisabled,
 }: HeroSectionProps) {
   return (
-    <section className="relative flex min-h-[92vh] items-center justify-center overflow-hidden">
-      {/* Layered gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#FDF9F3] via-[#FAF0E8] to-[#F5E6D8]" />
-
+    <section
+      className="relative overflow-hidden px-6 pb-20 pt-28 sm:pb-28 sm:pt-36"
+      style={{ background: 'linear-gradient(to bottom, #FDF9F3, #FAF0E8, #F5E6D8)' }}
+    >
       {/* Decorative warm orbs */}
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <div className="absolute right-[15%] top-[10%] h-[500px] w-[500px] rounded-full bg-[#D4713C]/[0.07] blur-[120px]" />
-        <div className="absolute bottom-[5%] left-[10%] h-[400px] w-[400px] rounded-full bg-[#D4713C]/[0.05] blur-[100px]" />
-        <div className="absolute left-1/2 top-[40%] h-[300px] w-[300px] -translate-x-1/2 rounded-full bg-[#E8A87C]/[0.08] blur-[80px]" />
+        <div
+          className="absolute right-[15%] top-[10%] h-[500px] w-[500px] rounded-full blur-[120px]"
+          style={{ backgroundColor: 'rgba(212, 113, 60, 0.07)' }}
+        />
+        <div
+          className="absolute bottom-[5%] left-[10%] h-[400px] w-[400px] rounded-full blur-[100px]"
+          style={{ backgroundColor: 'rgba(212, 113, 60, 0.05)' }}
+        />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-4xl px-6 py-32 text-center">
-        {/* Badge — CSS animation */}
-        <div className="mb-8 inline-flex animate-[fadeUp_0.6s_ease-out_0.1s_both] items-center gap-2.5 rounded-full border border-[#D4713C]/20 bg-white/60 px-5 py-2 shadow-[0_1px_8px_rgba(212,113,60,0.08)] backdrop-blur-sm">
-          <Sparkles className="size-4 text-[#D4713C]" />
-          <span className="text-[13px] font-semibold tracking-wide text-[#D4713C]">AI Destekli PDF Okuyucu</span>
+      <div className="relative z-10 mx-auto max-w-3xl text-center">
+        {/* Badge */}
+        <div
+          className="mb-8 inline-flex items-center gap-2.5 rounded-full px-5 py-2 backdrop-blur-sm"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.6)',
+            border: '1px solid rgba(212, 113, 60, 0.2)',
+            boxShadow: '0 1px 8px rgba(212, 113, 60, 0.08)',
+          }}
+        >
+          <Sparkles className="size-4" style={{ color: '#D4713C' }} />
+          <span className="text-sm font-semibold tracking-wide" style={{ color: '#D4713C' }}>
+            AI Destekli PDF Okuyucu
+          </span>
         </div>
 
-        {/* Main heading */}
-        <h1 className="mb-6 animate-[fadeUp_0.7s_ease-out_0.2s_both] text-[clamp(2.5rem,6vw,4.5rem)] font-bold leading-[1.08] tracking-[-0.03em] text-[#2A2520]">
+        {/* Heading */}
+        <h1
+          className="mb-6 text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl"
+          style={{ color: '#2A2520' }}
+        >
           Belgeleriniz için
           <br />
-          <span className="bg-gradient-to-r from-[#D4713C] to-[#E8946A] bg-clip-text text-transparent">
+          <span
+            style={{
+              background: 'linear-gradient(to right, #D4713C, #E8946A)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
             AI destekli
           </span>{' '}
           okuma asistanı
         </h1>
 
         {/* Subheading */}
-        <p className="mx-auto mb-12 max-w-[540px] animate-[fadeUp_0.6s_ease-out_0.35s_both] text-[17px] leading-[1.7] text-[#2A2520]/55">
+        <p className="mx-auto mb-12 max-w-lg text-base leading-relaxed sm:text-lg" style={{ color: 'rgba(42, 37, 32, 0.55)' }}>
           PDF belgelerinizi yapay zeka ile okuyun, anında çevirin ve notlar alın.
           Google Gemini teknolojisi ile belgelerinize sorular sorun.
         </p>
 
         {/* CTA buttons */}
-        <div className="flex animate-[fadeUp_0.6s_ease-out_0.5s_both] flex-col items-center gap-3.5 sm:flex-row sm:justify-center">
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
           <button
             onClick={onGoogleSignIn}
             disabled={isDisabled}
-            className="group inline-flex h-[52px] w-full max-w-[260px] items-center justify-center gap-3 rounded-2xl bg-white px-7 text-[15px] font-semibold text-[#2A2520] shadow-[0_2px_16px_rgba(42,37,32,0.08),0_0_0_1px_rgba(42,37,32,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_24px_rgba(42,37,32,0.12),0_0_0_1px_rgba(42,37,32,0.08)] active:translate-y-0 disabled:pointer-events-none disabled:opacity-50 sm:w-auto"
+            className="inline-flex h-12 w-full items-center justify-center gap-3 rounded-2xl px-7 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50 sm:h-13 sm:w-auto sm:text-base"
+            style={{
+              backgroundColor: '#ffffff',
+              color: '#2A2520',
+              boxShadow: '0 2px 16px rgba(42,37,32,0.08), 0 0 0 1px rgba(42,37,32,0.06)',
+            }}
           >
             {isGoogleLoading ? (
-              <span className="size-5 animate-spin rounded-full border-2 border-[#2A2520]/20 border-t-[#2A2520]/70" />
+              <span className="size-5 animate-spin rounded-full" style={{ border: '2px solid rgba(42,37,32,0.2)', borderTopColor: 'rgba(42,37,32,0.7)' }} />
             ) : (
               <GoogleLogo className="size-5 shrink-0" />
             )}
@@ -90,10 +118,15 @@ export function HeroSection({
           <button
             onClick={onAppleSignIn}
             disabled={isDisabled}
-            className="group inline-flex h-[52px] w-full max-w-[260px] items-center justify-center gap-3 rounded-2xl bg-[#2A2520] px-7 text-[15px] font-semibold text-[#FDFAF6] shadow-[0_2px_16px_rgba(42,37,32,0.2)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#3D3530] hover:shadow-[0_4px_24px_rgba(42,37,32,0.25)] active:translate-y-0 disabled:pointer-events-none disabled:opacity-50 sm:w-auto"
+            className="inline-flex h-12 w-full items-center justify-center gap-3 rounded-2xl px-7 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50 sm:h-13 sm:w-auto sm:text-base"
+            style={{
+              backgroundColor: '#2A2520',
+              color: '#FDFAF6',
+              boxShadow: '0 2px 16px rgba(42,37,32,0.2)',
+            }}
           >
             {isAppleLoading ? (
-              <span className="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white/80" />
+              <span className="size-5 animate-spin rounded-full" style={{ border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'rgba(255,255,255,0.8)' }} />
             ) : (
               <AppleLogo className="size-5 shrink-0" />
             )}
@@ -102,25 +135,22 @@ export function HeroSection({
         </div>
 
         {/* Stats */}
-        <div className="mt-16 flex animate-[fadeUp_0.8s_ease-out_0.7s_both] flex-wrap items-center justify-center gap-x-12 gap-y-4">
+        <div className="mt-14 flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
           {[
             { value: '10K+', label: 'Aktif Kullanıcı' },
             { value: '50K+', label: 'Analiz Edilen Belge' },
             { value: '4.8★', label: 'App Store' },
           ].map((stat, i) => (
             <div key={stat.label} className="flex items-center gap-3">
-              {i > 0 && <div className="hidden h-4 w-px bg-[#2A2520]/10 sm:block" />}
+              {i > 0 && <div className="hidden h-4 w-px sm:block" style={{ backgroundColor: 'rgba(42, 37, 32, 0.1)' }} />}
               <div className="text-center sm:text-left">
-                <span className="text-lg font-bold tracking-tight text-[#2A2520]">{stat.value}</span>
-                <span className="ml-1.5 text-[13px] text-[#2A2520]/40">{stat.label}</span>
+                <span className="text-lg font-bold tracking-tight" style={{ color: '#2A2520' }}>{stat.value}</span>
+                <span className="ml-1.5 text-xs" style={{ color: 'rgba(42, 37, 32, 0.4)' }}>{stat.label}</span>
               </div>
             </div>
           ))}
         </div>
       </div>
-
-      {/* Bottom fade */}
-      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#FDFAF6] to-transparent" />
     </section>
   );
 }
