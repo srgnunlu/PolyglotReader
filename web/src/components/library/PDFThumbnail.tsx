@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { Document, Page } from 'react-pdf';
 import { getSupabase } from '@/lib/supabase';
 import { thumbnailCache } from '@/lib/thumbnailCache';
-import styles from '@/app/library/library.module.css';
+import styles from '@/app/(app)/library/library.module.css';
 
 import '@/lib/pdfjs-config'; // Initialize PDF.js worker configuration
 
