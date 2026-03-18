@@ -636,44 +636,44 @@ a {
 }
 
 /* Corio Design Language — Sepia Theme */
-/* Must override BOTH Corio AND shadcn variables to prevent visual conflicts */
+/* Subtle warm tint, NOT heavy parchment. Card content stays neutral/white. */
 .sepia {
-  /* Corio tokens */
-  --corio-background: #EDE4D3;
-  --corio-foreground: hsl(30 15% 18%);
-  --corio-surface-1: hsl(38 40% 88%);
-  --corio-surface-2: hsl(38 35% 84%);
-  --corio-surface-3: hsl(38 30% 78%);
+  /* Corio tokens — subtle warm, not heavy brown */
+  --corio-background: #F8F4EE;
+  --corio-foreground: #1a1a1a;
+  --corio-surface-1: #F3EEE7;
+  --corio-surface-2: #EDE7DF;
+  --corio-surface-3: #E5DED5;
   --corio-accent: #D4713C;
   --corio-accent-hover: #C0632F;
-  --corio-accent-subtle: hsl(38 50% 88%);
-  --corio-border: hsl(36 25% 75%);
-  --corio-border-subtle: hsl(36 20% 80%);
-  --corio-reader-bg: hsl(38 50% 90%);
+  --corio-accent-subtle: #FAF0E8;
+  --corio-border: #E0D8CF;
+  --corio-border-subtle: #E8E2DA;
+  --corio-reader-bg: #F5F0EA;
 
-  /* shadcn token overrides — keeps shadcn components in sync with sepia */
-  --background: #EDE4D3;
-  --foreground: hsl(30 15% 18%);
-  --card: #F5EDE0;
-  --card-foreground: hsl(30 15% 18%);
-  --popover: #F5EDE0;
-  --popover-foreground: hsl(30 15% 18%);
+  /* shadcn overrides — sync with sepia, keep text neutral/dark */
+  --background: #F8F4EE;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
   --primary: #D4713C;
   --primary-foreground: #ffffff;
-  --secondary: hsl(38 35% 84%);
-  --secondary-foreground: hsl(30 15% 18%);
-  --muted: hsl(38 30% 85%);
-  --muted-foreground: hsl(30 12% 40%);
-  --accent: hsl(38 50% 88%);
-  --accent-foreground: hsl(30 15% 18%);
-  --border: hsl(36 25% 75%);
-  --input: hsl(36 25% 75%);
+  --secondary: #EDE7DF;
+  --secondary-foreground: #1a1a1a;
+  --muted: #EDE7DF;
+  --muted-foreground: #666666;
+  --accent: #FAF0E8;
+  --accent-foreground: #1a1a1a;
+  --border: #E0D8CF;
+  --input: #E0D8CF;
   --ring: #D4713C;
-  --sidebar-background: hsl(38 35% 86%);
-  --sidebar-foreground: hsl(30 15% 18%);
-  --sidebar-border: hsl(36 25% 75%);
-  --sidebar-accent: hsl(38 50% 88%);
-  --sidebar-accent-foreground: hsl(30 15% 18%);
+  --sidebar-background: #F3EEE7;
+  --sidebar-foreground: #1a1a1a;
+  --sidebar-border: #E0D8CF;
+  --sidebar-accent: #FAF0E8;
+  --sidebar-accent-foreground: #1a1a1a;
 }
 
 @theme inline {
