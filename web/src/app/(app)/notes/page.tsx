@@ -1,3 +1,4 @@
+// Notes page — displays all annotations grouped by PDF file, with search and color filtering
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -5,49 +6,52 @@ import { useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { getSupabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import styles from './notes.module.css';
+import { AnnotationCard } from '@/components/notebook/AnnotationCard';
+import { NotebookFilters } from '@/components/notebook/NotebookFilters';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Notebook, AlertCircle, Library } from 'lucide-react';
 
 interface Note {
-    id: string;
-    fileId: string;
-    fileName: string;
-    pageNumber: number;
-    text: string;
-    note: string;
-    color: string;
-    createdAt: Date;
+  id: string;
+  fileId: string;
+  fileName: string;
+  pageNumber: number;
+  text: string;
+  note: string;
+  color: string;
+  createdAt: Date;
 }
 
 export default function NotesPage() {
-    return (
-        <ProtectedRoute>
-            <NotesContent />
-        </ProtectedRoute>
-    );
+  return (
+    <ProtectedRoute>
+      <NotesContent />
+    </ProtectedRoute>
+  );
 }
 
 function NotesContent() {
-    const router = useRouter();
-    const supabase = getSupabase();
-    const { user, signOut } = useAuth();
+  const router = useRouter();
+  const supabase = getSupabase();
+  const { user } = useAuth();
 
-    const [notes, setNotes] = useState<Note[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [error, setError] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeColor, setActiveColor] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-    // Fetch notes from Supabase
-    useEffect(() => {
-        const fetchNotes = async () => {
-            setIsLoading(true);
-            setError(null);
+  // Fetch annotations from Supabase
+  useEffect(() => {
+    const fetchNotes = async () => {
+      setIsLoading(true);
+      setError(null);
 
-            try {
-                // Fetch annotations with their file names
-                // data column is JSONB containing: text, note, color, rects, isAiGenerated
-                const { data, error: fetchError } = await supabase
-                    .from('annotations')
-                    .select(`
+      try {
+        // data column is JSONB containing: text, note, color, rects, isAiGenerated
+        const { data, error: fetchError } = await supabase
+          .from('annotations')
+          .select(`
             id,
             file_id,
             page,
@@ -56,189 +60,167 @@ function NotesContent() {
             created_at,
             files!inner(name)
           `)
-                    .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false });
 
-                if (fetchError) throw fetchError;
+        if (fetchError) throw fetchError;
 
-                // Filter notes that have a note in the data
-                const mappedNotes: Note[] = (data || [])
-                    .filter((item: Record<string, unknown>) => {
-                        const itemData = item.data as { note?: string } | undefined;
-                        return itemData?.note;
-                    })
-                    .map((item: Record<string, unknown>) => {
-                        const itemData = item.data as { text?: string; note?: string; color?: string };
-                        return {
-                            id: item.id as string,
-                            fileId: item.file_id as string,
-                            fileName: (item.files as { name: string })?.name || 'Bilinmeyen Dosya',
-                            pageNumber: item.page as number,
-                            text: itemData?.text || '',
-                            note: itemData?.note || '',
-                            color: itemData?.color || '#fef08a',
-                            createdAt: new Date(item.created_at as string),
-                        };
-                    });
-
-                setNotes(mappedNotes);
-            } catch (err) {
-                console.error('Fetch notes error:', err);
-                setError('Notlar yüklenemedi');
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchNotes();
-    }, [supabase]);
-
-    // Filter notes by search
-    const filteredNotes = notes.filter(note =>
-        note.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.note.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.fileName.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    // Group notes by file
-    const groupedNotes = filteredNotes.reduce((acc, note) => {
-        if (!acc[note.fileId]) {
-            acc[note.fileId] = {
-                fileName: note.fileName,
-                notes: [],
+        // Show ALL annotations (not just ones with notes)
+        const mappedNotes: Note[] = (data || [])
+          .filter((item: Record<string, unknown>) => {
+            const itemData = item.data as { text?: string; note?: string } | undefined;
+            // Include annotation if it has highlighted text OR a user note
+            return itemData?.text || itemData?.note;
+          })
+          .map((item: Record<string, unknown>) => {
+            const itemData = item.data as { text?: string; note?: string; color?: string };
+            return {
+              id: item.id as string,
+              fileId: item.file_id as string,
+              fileName: (item.files as { name: string })?.name || 'Bilinmeyen Dosya',
+              pageNumber: item.page as number,
+              text: itemData?.text || '',
+              note: itemData?.note || '',
+              color: itemData?.color || '#fef08a',
+              createdAt: new Date(item.created_at as string),
             };
-        }
-        acc[note.fileId].notes.push(note);
-        return acc;
-    }, {} as Record<string, { fileName: string; notes: Note[] }>);
+          });
 
-    const handleNoteClick = (note: Note) => {
-        router.push(`/reader/${note.fileId}?page=${note.pageNumber}`);
+        setNotes(mappedNotes);
+      } catch (err) {
+        console.error('Fetch notes error:', err);
+        setError('Notlar yüklenemedi. Lütfen tekrar deneyin.');
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    return (
-        <div className={styles.layout}>
-            {/* Animated Background */}
-            <div className={styles.backgroundOrbs}>
-                <div className={`${styles.orb} ${styles.orb1}`} />
-                <div className={`${styles.orb} ${styles.orb2}`} />
-            </div>
+    fetchNotes();
+  }, [supabase]);
 
-            {/* Sidebar */}
-            <aside className={styles.sidebar}>
-                <div className={styles.sidebarHeader}>
-                    <div className={styles.logoSection}>
-                        <span className={styles.logoIcon}>📄</span>
-                        <h1 className={styles.logoText}>Corio Docs</h1>
-                    </div>
-                </div>
+  // Filter notes by search query and color
+  const filteredNotes = notes.filter((note) => {
+    const matchesSearch =
+      note.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      note.note.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      note.fileName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesColor = activeColor === null || note.color === activeColor;
+    return matchesSearch && matchesColor;
+  });
 
-                <nav className={styles.nav}>
-                    <button
-                        className={styles.navItem}
-                        onClick={() => router.push('/library')}
-                    >
-                        <span className={styles.navIcon}>📁</span>
-                        <span>Kütüphane</span>
-                    </button>
-                    <button className={`${styles.navItem} ${styles.navItemActive}`}>
-                        <span className={styles.navIcon}>📝</span>
-                        <span>Notlarım</span>
-                    </button>
-                </nav>
+  // Group notes by file
+  const groupedNotes = filteredNotes.reduce(
+    (acc, note) => {
+      if (!acc[note.fileId]) {
+        acc[note.fileId] = { fileName: note.fileName, notes: [] };
+      }
+      acc[note.fileId].notes.push(note);
+      return acc;
+    },
+    {} as Record<string, { fileName: string; notes: Note[] }>
+  );
 
-                <div className={styles.sidebarFooter}>
-                    <div className={styles.userInfo}>
-                        <div className={styles.userAvatar}>
-                            {user?.name?.charAt(0).toUpperCase() || '?'}
-                        </div>
-                        <div className={styles.userDetails}>
-                            <span className={styles.userName}>{user?.name}</span>
-                            <span className={styles.userEmail}>{user?.email}</span>
-                        </div>
-                    </div>
-                    <button className={styles.logoutBtn} onClick={signOut}>
-                        Çıkış Yap
-                    </button>
-                </div>
-            </aside>
+  const handleNoteClick = (note: Note) => {
+    router.push(`/reader/${note.fileId}?page=${note.pageNumber}`);
+  };
 
-            {/* Main Content */}
-            <main className={styles.main}>
-                <header className={styles.header}>
-                    <h2 className={styles.title}>📝 Notlarım</h2>
-                    <div className={styles.searchBox}>
-                        <span className={styles.searchIcon}>🔍</span>
-                        <input
-                            type="text"
-                            placeholder="Notlarda ara..."
-                            className={styles.searchInput}
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                </header>
-
-                <div className={styles.content}>
-                    {isLoading ? (
-                        <div className={styles.loading}>
-                            <div className="spinner" style={{ width: 40, height: 40 }} />
-                            <p>Notlar yükleniyor...</p>
-                        </div>
-                    ) : error ? (
-                        <div className={styles.error}>
-                            <span>⚠️</span>
-                            <p>{error}</p>
-                        </div>
-                    ) : filteredNotes.length === 0 ? (
-                        <div className={styles.empty}>
-                            <span className={styles.emptyIcon}>📝</span>
-                            <h3>Henüz not yok</h3>
-                            <p>PDF dosyalarınızda metin seçip not ekleyebilirsiniz.</p>
-                            <button
-                                className="btn btn-primary"
-                                onClick={() => router.push('/library')}
-                            >
-                                Kütüphaneye Git
-                            </button>
-                        </div>
-                    ) : (
-                        <div className={styles.notesList}>
-                            {Object.entries(groupedNotes).map(([fileId, { fileName, notes: fileNotes }]) => (
-                                <div key={fileId} className={styles.fileGroup}>
-                                    <h3 className={styles.fileGroupTitle}>
-                                        <span>📄</span>
-                                        {fileName}
-                                        <span className={styles.noteCount}>({fileNotes.length} not)</span>
-                                    </h3>
-                                    <div className={styles.fileNotes}>
-                                        {fileNotes.map(note => (
-                                            <div
-                                                key={note.id}
-                                                className={styles.noteCard}
-                                                onClick={() => handleNoteClick(note)}
-                                                style={{ borderLeftColor: note.color }}
-                                            >
-                                                <div className={styles.noteHeader}>
-                                                    <span className={styles.notePage}>Sayfa {note.pageNumber}</span>
-                                                    <span className={styles.noteDate}>
-                                                        {note.createdAt.toLocaleDateString('tr-TR')}
-                                                    </span>
-                                                </div>
-                                                {note.text && (
-                                                    <p className={styles.noteHighlight}>
-                                                        &ldquo;{note.text.slice(0, 150)}{note.text.length > 150 ? '...' : ''}&rdquo;
-                                                    </p>
-                                                )}
-                                                <p className={styles.noteText}>{note.note}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </main>
+  return (
+    <div className="min-h-screen bg-corio-bg">
+      {/* Page header */}
+      <div className="sticky top-0 z-10 px-4 sm:px-6 py-4 bg-corio-bg/90 backdrop-blur-xl border-b border-corio-border-subtle">
+        <div className="flex flex-col gap-3">
+          <h1 className="text-xl font-semibold text-corio-fg">Notlarim</h1>
+          <NotebookFilters
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            activeColor={activeColor}
+            onColorFilter={setActiveColor}
+          />
         </div>
-    );
+      </div>
+
+      {/* Content */}
+      <div className="px-4 sm:px-6 py-6 max-w-3xl mx-auto">
+        {/* Loading state */}
+        {isLoading && (
+          <div className="space-y-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-24 w-full rounded-xl" />
+                <Skeleton className="h-24 w-full rounded-xl" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Error state */}
+        {!isLoading && error && (
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <div className="flex items-center justify-center size-14 rounded-2xl bg-red-500/10">
+              <AlertCircle className="size-7 text-red-500" />
+            </div>
+            <p className="text-sm font-medium text-corio-fg">{error}</p>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && !error && filteredNotes.length === 0 && (
+          <div className="flex flex-col items-center gap-4 py-20 text-center">
+            <div className="flex items-center justify-center size-16 rounded-2xl bg-corio-surface-2">
+              <Notebook className="size-8 text-corio-fg/30" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-medium text-corio-fg">
+                Henuz not yok
+              </h3>
+              <p className="text-sm text-corio-fg/50 max-w-xs">
+                PDF dosyalarinizda metin secip isaretleme yapabilir ve not ekleyebilirsiniz.
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/library')}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-corio-accent text-white hover:bg-corio-accent-hover transition-colors"
+            >
+              <Library className="size-4" />
+              Kutuphaneye Git
+            </button>
+          </div>
+        )}
+
+        {/* Grouped annotations */}
+        {!isLoading && !error && filteredNotes.length > 0 && (
+          <div className="space-y-6">
+            {Object.entries(groupedNotes).map(([fileId, { fileName, notes: fileNotes }]) => (
+              <div key={fileId} className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-corio-fg truncate">
+                    {fileName}
+                  </h3>
+                  <span className="text-xs text-corio-fg/40 shrink-0">
+                    ({fileNotes.length} not)
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {fileNotes.map((note) => (
+                    <AnnotationCard
+                      key={note.id}
+                      id={note.id}
+                      fileName={note.fileName}
+                      fileId={note.fileId}
+                      pageNumber={note.pageNumber}
+                      text={note.text}
+                      note={note.note}
+                      color={note.color}
+                      createdAt={note.createdAt}
+                      onClick={() => handleNoteClick(note)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
