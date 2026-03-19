@@ -153,6 +153,7 @@ export function PDFThumbnail({ storagePath, alt, base64Data }: PDFThumbnailProps
                     file={pdfUrl}
                     loading={<ThumbnailSkeleton />}
                     error={<ThumbnailSkeleton />}
+                    onLoadError={() => {}}
                     className="pdf-thumbnail-document"
                 >
                     <Page

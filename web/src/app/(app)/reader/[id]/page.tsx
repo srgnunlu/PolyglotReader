@@ -205,32 +205,35 @@ function ReaderContent({ documentId }: { documentId: string }) {
     return () => observer.disconnect();
   }, []);
 
-  // Selection change listener
+  // Selection change listener — clears selection state when user clicks away
+  const chatSelectedTextRef = useRef(chatSelectedText);
+  chatSelectedTextRef.current = chatSelectedText;
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const domDoc = window.document;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
     const handleSelectionChange = () => {
       const sel = window.getSelection();
-      if (sel?.isCollapsed && chatSelectedText) {
-        if (domDoc.activeElement?.closest('[data-chat-panel="true"]')) return;
-        setTimeout(() => {
-          const current = window.getSelection();
-          if (current?.isCollapsed && !domDoc.activeElement?.closest('[data-chat-panel="true"]')) {
-            setChatSelectedText(null);
-            setSelectedText(null);
-            setSelectionPosition(null);
-            setSelectionRects([]);
-            setSelectionBounds(null);
-            setSelectionRange(null);
-            setPersistentHighlightRects([]);
-            setPersistentHighlightPage(null);
-          }
-        }, 100);
-      }
+      if (!sel?.isCollapsed || !chatSelectedTextRef.current) return;
+      if (domDoc.activeElement?.closest('[data-chat-panel="true"]')) return;
+
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const current = window.getSelection();
+        if (current?.isCollapsed && !domDoc.activeElement?.closest('[data-chat-panel="true"]')) {
+          clearSelection();
+        }
+      }, 150);
     };
+
     domDoc.addEventListener('selectionchange', handleSelectionChange);
-    return () => domDoc.removeEventListener('selectionchange', handleSelectionChange);
-  }, [chatSelectedText]);
+    return () => {
+      domDoc.removeEventListener('selectionchange', handleSelectionChange);
+      clearTimeout(timeoutId);
+    };
+  }, [clearSelection]);
 
   // Highlight handler
   const handleHighlight = useCallback(async (color: string) => {
