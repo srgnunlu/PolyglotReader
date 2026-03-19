@@ -12,7 +12,7 @@ const defaultScale = 1.2;
 const minScale = 0.5;
 const maxScale = 3;
 const pdfjsVersion = pdfjs.version || '5.4.296';
-const overscanPages = 2;
+const overscanPages = 10;
 const fallbackPageSize = { width: 595, height: 842 };
 
 // Highlight colors
@@ -190,41 +190,47 @@ export function PDFViewer({
         pageElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, [initialPage, totalPages]);
 
-    // Track current page based on scroll position
+    // Track current page based on scroll position (scroll-based, more reliable than IntersectionObserver)
     useEffect(() => {
-        if (!containerRef.current || totalPages === 0) return;
+        const container = containerRef.current;
+        if (!container || totalPages === 0) return;
 
-        const observerOptions = {
-            root: containerRef.current,
-            threshold: [0, 0.25, 0.5, 0.75, 1],
-            rootMargin: '-10% 0px -10% 0px',
-        };
+        let rafId: number;
+        const updateCurrentPage = () => {
+            const containerRect = container.getBoundingClientRect();
+            const containerMid = containerRect.top + containerRect.height / 2;
+            let closestPage = currentPage;
+            let closestDist = Infinity;
 
-        const observer = new IntersectionObserver((entries) => {
-            let maxRatio = 0;
-            let mostVisiblePage = currentPage;
-
-            entries.forEach((entry) => {
-                if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
-                    const pageNum = Number(entry.target.getAttribute('data-page-number'));
-                    if (pageNum && pageNum >= 1) {
-                        maxRatio = entry.intersectionRatio;
-                        mostVisiblePage = pageNum;
-                    }
+            pageRefs.current.forEach((el, pageNum) => {
+                const rect = el.getBoundingClientRect();
+                const pageMid = rect.top + rect.height / 2;
+                const dist = Math.abs(pageMid - containerMid);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closestPage = pageNum;
                 }
             });
 
-            if (mostVisiblePage !== currentPage && maxRatio > 0) {
-                setCurrentPage(mostVisiblePage);
-                onPageChange?.(mostVisiblePage);
+            if (closestPage !== currentPage) {
+                setCurrentPage(closestPage);
+                onPageChange?.(closestPage);
             }
-        }, observerOptions);
+        };
 
-        pageRefs.current.forEach((el) => {
-            observer.observe(el);
-        });
+        const handleScroll = () => {
+            cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(updateCurrentPage);
+        };
 
-        return () => observer.disconnect();
+        container.addEventListener('scroll', handleScroll, { passive: true });
+        // Run once on mount to set initial page
+        updateCurrentPage();
+
+        return () => {
+            container.removeEventListener('scroll', handleScroll);
+            cancelAnimationFrame(rafId);
+        };
     }, [totalPages, onPageChange, currentPage]);
 
     // Handle initial scroll restoration
