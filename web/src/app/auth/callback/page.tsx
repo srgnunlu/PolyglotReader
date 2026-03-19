@@ -1,73 +1,46 @@
+// OAuth callback handler — exchanges code for session and redirects
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
+import { Button } from '@/components/ui/button';
 
 export default function AuthCallbackPage() {
-    const router = useRouter();
-    const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        const handleCallback = async () => {
-            const supabase = getSupabase();
+  useEffect(() => {
+    const handleCallback = async () => {
+      const supabase = getSupabase();
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        router.push(data.session ? '/library' : '/login');
+      } catch (err) {
+        console.error('Auth callback error:', err);
+        setError(err instanceof Error ? err.message : 'Authentication failed');
+      }
+    };
+    handleCallback();
+  }, [router]);
 
-            try {
-                // Handle the OAuth callback
-                const { data, error } = await supabase.auth.getSession();
-
-                if (error) throw error;
-
-                if (data.session) {
-                    // Successfully logged in, redirect to library
-                    router.push('/library');
-                } else {
-                    // No session, redirect to login
-                    router.push('/login');
-                }
-            } catch (err) {
-                console.error('Auth callback error:', err);
-                setError(err instanceof Error ? err.message : 'Authentication failed');
-            }
-        };
-
-        handleCallback();
-    }, [router]);
-
-    if (error) {
-        return (
-            <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100vh',
-                gap: '16px',
-                color: 'var(--text-secondary)',
-            }}>
-                <span style={{ fontSize: '3rem' }}>⚠️</span>
-                <p>{error}</p>
-                <button
-                    className="btn btn-primary"
-                    onClick={() => router.push('/login')}
-                >
-                    Giriş Sayfasına Dön
-                </button>
-            </div>
-        );
-    }
-
+  if (error) {
     return (
-        <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100vh',
-            gap: '16px',
-        }}>
-            <div className="spinner" style={{ width: 40, height: 40 }} />
-            <p style={{ color: 'var(--text-secondary)' }}>Giriş yapılıyor...</p>
-        </div>
+      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-corio-bg text-corio-fg/60">
+        <span className="text-5xl">⚠️</span>
+        <p>{error}</p>
+        <Button onClick={() => router.push('/login')} className="bg-corio-accent text-white hover:bg-corio-accent-hover">
+          Giriş Sayfasına Dön
+        </Button>
+      </div>
     );
+  }
+
+  return (
+    <div className="flex h-screen flex-col items-center justify-center gap-4 bg-corio-bg text-corio-fg/60">
+      <div className="h-10 w-10 animate-spin rounded-full border-2 border-corio-border border-t-corio-accent" />
+      <p>Giriş yapılıyor...</p>
+    </div>
+  );
 }
