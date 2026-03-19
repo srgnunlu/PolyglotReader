@@ -22,8 +22,6 @@ import { SelectionPopup } from '@/components/reader/SelectionPopup';
 import { ImageSelectionPopup } from '@/components/reader/ImageSelectionPopup';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { ReadingProgress } from '@/components/reader/ReadingProgress';
-import { ReaderToolbar } from '@/components/reader/ReaderToolbar';
-import { PageNavigation } from '@/components/reader/PageNavigation';
 import { AnnotationProvider, useAnnotations } from '@/contexts/AnnotationContext';
 import { getSupabase } from '@/lib/supabase';
 import { PDFDocumentMetadata } from '@/types/models';
@@ -72,7 +70,7 @@ function ReaderContent({ documentId }: { documentId: string }) {
   const [isQuickTranslationMode, setIsQuickTranslationMode] = useState(false);
   const [pdfScale, setPdfScale] = useState(1.2);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [viewerSize, setViewerSize] = useState<{ width: number; height: number } | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>();
@@ -360,6 +358,7 @@ function ReaderContent({ documentId }: { documentId: string }) {
             onTextSelect={handleTextSelect}
             onImageSelect={handleImageSelect}
             onPageChange={(page: number) => setCurrentPage(page)}
+            onTotalPagesChange={setTotalPages}
             onScaleChange={setPdfScale}
             onProgressChange={handleProgressChange}
             initialPage={initialProgress?.page || 1}
@@ -407,19 +406,10 @@ function ReaderContent({ documentId }: { documentId: string }) {
           onClearSelection={handleClearChatSelection} />
       </div>
 
-      {/* Bottom bars */}
-      <div className={`transition-all ${isNavHidden ? 'opacity-0 pointer-events-none translate-y-full' : ''}`}>
-        <ReaderToolbar
-          selectedColor={selectedColor} onColorChange={setSelectedColor} onQuickHighlight={handleHighlight}
-          isQuickTranslationMode={isQuickTranslationMode} onToggleTranslation={toggleQuickTranslationMode}
-          isChatOpen={isChatOpen} onToggleChat={() => setIsChatOpen(!isChatOpen)}
-          isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />
-        <PageNavigation
-          currentPage={currentPage} totalPages={totalPages} displayScale={pdfScale}
-          onGoToPage={(page) => setCurrentPage(page)}
-          onZoomIn={() => setPdfScale(prev => Math.min(prev + 0.2, 3))}
-          onZoomOut={() => setPdfScale(prev => Math.max(prev - 0.2, 0.5))}
-          onResetZoom={() => setPdfScale(1.2)} />
+      {/* Bottom bar — reading progress summary */}
+      <div className={`flex items-center justify-between border-t border-corio-border bg-corio-surface-1 px-4 py-1.5 text-xs text-corio-fg/50 transition-all ${isNavHidden ? 'opacity-0 pointer-events-none translate-y-full' : ''}`}>
+        <span>Sayfa {currentPage} / {totalPages}</span>
+        <span>{totalPages > 0 ? Math.round(readingProgress) : 0}% okundu</span>
       </div>
     </div>
   );

@@ -42,6 +42,7 @@ interface PDFViewerProps {
         position: { x: number; y: number }
     ) => void;
     onPageChange?: (page: number) => void;
+    onTotalPagesChange?: (total: number) => void;
     onScaleChange?: (scale: number) => void;
     onProgressChange?: (page: number, x: number, y: number, scale: number) => void;
     initialPage?: number;
@@ -71,6 +72,7 @@ export function PDFViewer({
     onTextSelect,
     onImageSelect,
     onPageChange,
+    onTotalPagesChange,
     onScaleChange,
     onProgressChange,
     initialPage = 1,
@@ -287,7 +289,8 @@ export function PDFViewer({
         pdfDocumentRef.current = pdf;
         setTotalPages(pdf.numPages);
         setCurrentPage(prev => Math.min(Math.max(prev, 1), pdf.numPages));
-    }, []);
+        onTotalPagesChange?.(pdf.numPages);
+    }, [onTotalPagesChange]);
 
     const handleDocumentLoadError = useCallback((err: Error) => {
         if (err.message && err.message.includes('Worker was terminated')) {
