@@ -190,7 +190,12 @@ export function PDFViewer({
         pageElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, [initialPage, totalPages]);
 
-    // Track current page based on scroll position (scroll-based, more reliable than IntersectionObserver)
+    // Track current page based on scroll position
+    const currentPageRef = useRef(currentPage);
+    currentPageRef.current = currentPage;
+    const onPageChangeRef = useRef(onPageChange);
+    onPageChangeRef.current = onPageChange;
+
     useEffect(() => {
         const container = containerRef.current;
         if (!container || totalPages === 0) return;
@@ -199,7 +204,7 @@ export function PDFViewer({
         const updateCurrentPage = () => {
             const containerRect = container.getBoundingClientRect();
             const containerMid = containerRect.top + containerRect.height / 2;
-            let closestPage = currentPage;
+            let closestPage = currentPageRef.current;
             let closestDist = Infinity;
 
             pageRefs.current.forEach((el, pageNum) => {
@@ -212,9 +217,9 @@ export function PDFViewer({
                 }
             });
 
-            if (closestPage !== currentPage) {
+            if (closestPage !== currentPageRef.current) {
                 setCurrentPage(closestPage);
-                onPageChange?.(closestPage);
+                onPageChangeRef.current?.(closestPage);
             }
         };
 
@@ -224,14 +229,12 @@ export function PDFViewer({
         };
 
         container.addEventListener('scroll', handleScroll, { passive: true });
-        // Run once on mount to set initial page
-        updateCurrentPage();
 
         return () => {
             container.removeEventListener('scroll', handleScroll);
             cancelAnimationFrame(rafId);
         };
-    }, [totalPages, onPageChange, currentPage]);
+    }, [totalPages]);
 
     // Handle initial scroll restoration
     useEffect(() => {
