@@ -267,32 +267,24 @@ export async function getInitialDocumentContext(fileId: string): Promise<string>
 // Mobil uygulamadaki RAGSearchService ile aynı mantık
 
 /**
- * Gemini API ile embedding oluşturur
+ * Sunucu taraflı /api/gemini/embed route'u üzerinden embedding oluşturur
+ * (API anahtarı istemciye inmez)
  */
 async function createEmbedding(text: string): Promise<number[]> {
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (!apiKey) throw new Error('Gemini API key not found');
-
-    const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: 'models/text-embedding-004',
-                content: { parts: [{ text }] }
-            })
-        }
-    );
+    const response = await fetch('/api/gemini/embed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+    });
 
     if (!response.ok) {
         const errorText = await response.text();
         console.error('Embedding API error:', errorText);
-        throw new Error(`Embedding failed: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(`Embedding failed: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    return data.embedding.values;
+    return data.embedding;
 }
 
 /**
