@@ -80,8 +80,8 @@ export function SelectionPopup({
                         const viewerRect = viewerElement.getBoundingClientRect();
 
                         // Center horizontally, position above by default
-                        let x = params.left - viewerRect.left + params.width / 2;
-                        let y = params.top - viewerRect.top - 12; // 12px padding above
+                        const x = params.left - viewerRect.left + params.width / 2;
+                        const y = params.top - viewerRect.top - 12; // 12px padding above
 
                         // Check limits if we can get popup dimensions
                         // For now just basic tracking

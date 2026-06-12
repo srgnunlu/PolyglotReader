@@ -22,7 +22,8 @@ import { SelectionPopup } from '@/components/reader/SelectionPopup';
 import { ImageSelectionPopup } from '@/components/reader/ImageSelectionPopup';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { ReadingProgress } from '@/components/reader/ReadingProgress';
-import { AnnotationProvider, useAnnotations } from '@/contexts/AnnotationContext';
+import { useAnnotationStore } from '@/stores/useAnnotationStore';
+import { useReaderStore } from '@/stores/useReaderStore';
 import { getSupabase } from '@/lib/supabase';
 import { PDFDocumentMetadata } from '@/types/models';
 
@@ -32,9 +33,7 @@ export default function ReaderPage({ params }: { params: Promise<PageParams> }) 
   const resolvedParams = use(params);
   return (
     <ProtectedRoute>
-      <AnnotationProvider fileId={resolvedParams.id}>
-        <ReaderContent documentId={resolvedParams.id} />
-      </AnnotationProvider>
+      <ReaderContent documentId={resolvedParams.id} />
     </ProtectedRoute>
   );
 }
@@ -44,7 +43,23 @@ function ReaderContent({ documentId }: { documentId: string }) {
   const supabase = getSupabase();
   const viewerRef = useRef<HTMLDivElement>(null);
   const mouseIdleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { annotations, selectedColor, setSelectedColor, addAnnotation } = useAnnotations();
+  const {
+    annotations, selectedColor, setSelectedColor, addAnnotation,
+    loadFileAnnotations, reset: resetAnnotations,
+  } = useAnnotationStore();
+  const {
+    isChatOpen, isTranslationMode, toggleChat, toggleTranslationMode,
+    setChatOpen, reset: resetReaderUI,
+  } = useReaderStore();
+
+  // Load annotations for this document; clear store state when leaving.
+  useEffect(() => {
+    loadFileAnnotations(documentId);
+    return () => {
+      resetAnnotations();
+      resetReaderUI();
+    };
+  }, [documentId, loadFileAnnotations, resetAnnotations, resetReaderUI]);
 
   const [document, setDocument] = useState<PDFDocumentMetadata | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -67,12 +82,10 @@ function ReaderContent({ documentId }: { documentId: string }) {
   const [persistentHighlightRects, setPersistentHighlightRects] = useState<{ x: number; y: number; width: number; height: number }[]>([]);
   const [persistentHighlightPage, setPersistentHighlightPage] = useState<number | null>(null);
   // UI state
-  const [isQuickTranslationMode, setIsQuickTranslationMode] = useState(false);
   const [pdfScale, setPdfScale] = useState(1.2);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [viewerSize, setViewerSize] = useState<{ width: number; height: number } | null>(null);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInitialMessage, setChatInitialMessage] = useState<string | undefined>();
   const [chatInitialImage, setChatInitialImage] = useState<string | undefined>();
   const [documentContext, setDocumentContext] = useState<string>('');
@@ -114,15 +127,15 @@ function ReaderContent({ documentId }: { documentId: string }) {
     setChatInitialMessage(text);
     setSelectedText(null);
     setSelectionPosition(null);
-    setIsChatOpen(true);
-  }, []);
+    setChatOpen(true);
+  }, [setChatOpen]);
 
   const handleAskAIWithImage = useCallback((imageBase64: string) => {
     setChatInitialImage(imageBase64);
     setSelectedImage(null);
     setImageSelectionPos(null);
-    setIsChatOpen(true);
-  }, []);
+    setChatOpen(true);
+  }, [setChatOpen]);
 
   const clearSelection = useCallback(() => {
     setSelectedText(null);
@@ -251,9 +264,9 @@ function ReaderContent({ documentId }: { documentId: string }) {
   }, [addAnnotation, clearSelection, documentId, selectedPageNumber, selectedText, selectionRects, selectedColor]);
 
   const toggleQuickTranslationMode = useCallback(() => {
-    setIsQuickTranslationMode(prev => !prev);
+    toggleTranslationMode();
     clearSelection();
-  }, [clearSelection]);
+  }, [toggleTranslationMode, clearSelection]);
 
   // Progress save
   const handleProgressChange = useCallback(async (page: number, x: number, y: number, scale: number) => {
@@ -309,11 +322,11 @@ function ReaderContent({ documentId }: { documentId: string }) {
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
       const colorMap: Record<string, string> = { '1': '#fef08a', '2': '#bbf7d0', '3': '#bae6fd', '4': '#fbcfe8' };
       if (colorMap[e.key]) setSelectedColor(colorMap[e.key]);
-      if ((e.metaKey || e.ctrlKey) && e.key === 'j') { e.preventDefault(); setIsChatOpen(prev => !prev); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'j') { e.preventDefault(); toggleChat(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleFullscreen, setSelectedColor]);
+  }, [toggleFullscreen, setSelectedColor, toggleChat]);
 
   if (isLoading) {
     return (
@@ -374,14 +387,14 @@ function ReaderContent({ documentId }: { documentId: string }) {
             isFullscreen={isFullscreen}
             onToggleFullscreen={toggleFullscreen}
             isNavHidden={isNavHidden}
-            isQuickTranslationMode={isQuickTranslationMode}
+            isQuickTranslationMode={isTranslationMode}
             onToggleTranslation={toggleQuickTranslationMode}
             isChatOpen={isChatOpen}
-            onToggleChat={() => setIsChatOpen(!isChatOpen)}
+            onToggleChat={toggleChat}
           />
 
           {/* Text selection popup */}
-          {selectedText && selectionPosition && !isQuickTranslationMode && (
+          {selectedText && selectionPosition && !isTranslationMode && (
             <SelectionPopup text={selectedText} position={selectionPosition} onClose={clearSelection}
               onAskAI={handleAskAI} onHighlight={handleHighlight} selectionRange={selectionRange ?? undefined} />
           )}
@@ -393,7 +406,7 @@ function ReaderContent({ documentId }: { documentId: string }) {
           )}
 
           {/* Quick translation popup */}
-          {selectedText && selectionBounds && isQuickTranslationMode && (
+          {selectedText && selectionBounds && isTranslationMode && (
             <QuickTranslationPopup text={selectedText} anchorBounds={selectionBounds}
               zoomScale={pdfScale} containerSize={viewerSize ?? undefined}
               onClose={clearSelection} selectionRange={selectionRange ?? undefined} />
@@ -401,7 +414,7 @@ function ReaderContent({ documentId }: { documentId: string }) {
         </div>
 
         {/* Chat Panel */}
-        <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)}
+        <ChatPanel isOpen={isChatOpen} onClose={() => setChatOpen(false)}
           documentId={documentId} documentContext={documentContext}
           initialMessage={chatInitialMessage} initialImage={chatInitialImage}
           activeSelection={chatSelectedText}

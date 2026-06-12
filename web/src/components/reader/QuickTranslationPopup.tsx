@@ -1,9 +1,11 @@
 'use client';
 
+// Quick translation popup — "Frosted Light" design from the Corio redesign
+// spec: frosted-glass card with a drag header, copy action and Literata body.
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { Languages, Copy, Check, X, GripHorizontal } from 'lucide-react';
 import { translateText } from '@/lib/gemini';
-import styles from './QuickTranslationPopup.module.css';
 
 interface QuickTranslationPopupProps {
     text: string;
@@ -28,15 +30,13 @@ export function QuickTranslationPopup({
     const [translation, setTranslation] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isCopied, setIsCopied] = useState(false);
     const requestIdRef = useRef(0);
 
-    // Initial position based on anchorBounds (used as fallback or initial)
-    const initialPosition = useRef({
+    const [currentPosition, setCurrentPosition] = useState(() => ({
         x: anchorBounds.x + anchorBounds.width / 2,
         y: anchorBounds.y + anchorBounds.height + 12,
-    });
-
-    const [currentPosition, setCurrentPosition] = useState(initialPosition.current);
+    }));
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const isDragging = useRef(false);
     const dragStart = useRef({ x: 0, y: 0 });
@@ -49,11 +49,8 @@ export function QuickTranslationPopup({
     const availableHeight = resolvedContainerHeight - currentPosition.y - 16;
     const maxHeight = Math.max(120, Math.min(resolvedContainerHeight * 0.45, availableHeight));
     const fontSize = Math.min(20, Math.max(14, 12 + zoomScale * 3.2));
-    const lineHeight = Math.round(fontSize * 1.45);
-    const paddingX = Math.round(fontSize * 0.9);
-    const paddingY = Math.round(fontSize * 0.55);
 
-    // Sticky positioning effect
+    // Sticky positioning — follows the selected text while the PDF scrolls.
     useEffect(() => {
         if (!selectionRange) return;
 
@@ -61,41 +58,21 @@ export function QuickTranslationPopup({
 
         const updatePosition = () => {
             try {
-                // Check if range is still valid and in document
                 if (selectionRange.commonAncestorContainer.isConnected) {
-                    const params = selectionRange.getBoundingClientRect();
-                    // Just check if optimization needed: only update if changed significantly?
-                    // For smooth sticky behavior, we usually need to update every frame on scroll
-
-                    // We need to convert viewport coordinates (getBoundingClientRect) 
-                    // to the coordinate system used by the popup.
-                    // Assuming the popup is fixed or absolute relative to viewport/body:
-
-                    // However, our anchorBounds were likely relative to the PDF container or wrapper.
-                    // If the popup is in the same container, we need relative coordinates.
-                    // But usually these popups are in a specialized layer or body.
-                    // Let's check where QuickTranslationPopup is mounted.
-                    // It's in ReaderContent, alongside PDFViewer.
-
-                    // If ReaderContent has `position: relative` (which `.viewer` class might have),
-                    // then we need coords relative to that.
-                    // But `Range.getBoundingClientRect()` returns viewport coords.
-
-                    // Let's assume we need to convert to the container's coordinate space if it's relative.
-                    // The viewer div has `ref={viewerRef}`. 
-                    // QuickTranslationPopup is rendered inside `.viewer`.
-
-                    const viewerElement = popupRef.current?.offsetParent as HTMLElement;
+                    const rangeRect = selectionRange.getBoundingClientRect();
+                    // Range gives viewport coords; the popup is positioned
+                    // relative to its offsetParent (the reader viewer).
+                    const viewerElement = popupRef.current?.offsetParent as HTMLElement | null;
                     if (viewerElement) {
                         const viewerRect = viewerElement.getBoundingClientRect();
-                        const x = params.left - viewerRect.left + params.width / 2;
-                        const y = params.top - viewerRect.top + params.height + 12; // 12px gap
-
-                        setCurrentPosition({ x, y });
+                        setCurrentPosition({
+                            x: rangeRect.left - viewerRect.left + rangeRect.width / 2,
+                            y: rangeRect.top - viewerRect.top + rangeRect.height + 12,
+                        });
                     }
                 }
-            } catch (e) {
-                // Range might be detached
+            } catch {
+                // Range might be detached — keep the last known position.
             }
             animationFrameId = requestAnimationFrame(updatePosition);
         };
@@ -104,17 +81,16 @@ export function QuickTranslationPopup({
         return () => cancelAnimationFrame(animationFrameId);
     }, [selectionRange]);
 
+    // Debounced translation request
     useEffect(() => {
-        if (!text.trim()) {
-            setTranslation('');
-            setIsLoading(false);
-            setError(null);
-            return;
-        }
-
-        // Debounce translation
         const timer = setTimeout(() => {
-            let isActive = true;
+            if (!text.trim()) {
+                setTranslation('');
+                setIsLoading(false);
+                setError(null);
+                return;
+            }
+
             const requestId = requestIdRef.current + 1;
             requestIdRef.current = requestId;
             setIsLoading(true);
@@ -122,43 +98,30 @@ export function QuickTranslationPopup({
 
             translateText(text, targetLang)
                 .then(result => {
-                    if (!isActive || requestIdRef.current !== requestId) return;
+                    if (requestIdRef.current !== requestId) return;
                     setTranslation(result.trim());
                     setIsLoading(false);
                 })
                 .catch(err => {
-                    if (!isActive || requestIdRef.current !== requestId) return;
+                    if (requestIdRef.current !== requestId) return;
                     console.error('Quick translation error:', err);
                     setError('Çeviri yapılamadı');
                     setIsLoading(false);
                 });
+        }, 500);
 
-            // Cleanup for the active request scope
-            return () => {
-                isActive = false;
-            };
-        }, 500); // 500ms delay
-
-        return () => {
-            clearTimeout(timer);
-        };
+        return () => clearTimeout(timer);
     }, [text, targetLang]);
 
-    // Cleanup click outside
+    // Close on outside click / Escape
     useEffect(() => {
         const handleOutsideClick = (event: MouseEvent | TouchEvent) => {
-            if (isDragging.current) return; // Don't close while dragging
+            if (isDragging.current) return;
 
             const target = event.target as HTMLElement | null;
             if (!target || !popupRef.current) return;
-
-            // Don't close if clicking inside the popup itself
             if (popupRef.current.contains(target)) return;
-
-            // Don't close if clicking inside the chat panel
             if (target.closest('[data-chat-panel="true"]')) return;
-
-            // Don't close if clicking on PDF toolbar (for quick highlighting)
             if (target.closest('[data-pdf-toolbar="true"]')) return;
 
             onClose();
@@ -181,7 +144,7 @@ export function QuickTranslationPopup({
 
     // Drag handlers
     const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
-        e.preventDefault(); // Prevent text selection
+        e.preventDefault();
         isDragging.current = true;
 
         const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -189,7 +152,7 @@ export function QuickTranslationPopup({
 
         dragStart.current = {
             x: clientX - dragOffset.x,
-            y: clientY - dragOffset.y
+            y: clientY - dragOffset.y,
         };
 
         document.addEventListener('mousemove', handleDragMove);
@@ -206,7 +169,7 @@ export function QuickTranslationPopup({
 
         setDragOffset({
             x: clientX - dragStart.current.x,
-            y: clientY - dragStart.current.y
+            y: clientY - dragStart.current.y,
         });
     };
 
@@ -218,50 +181,82 @@ export function QuickTranslationPopup({
         document.removeEventListener('touchend', handleDragEnd);
     };
 
-    const styleVars = {
-        '--qt-font-size': `${fontSize}px`,
-        '--qt-line-height': `${lineHeight}px`,
-        '--qt-padding-x': `${paddingX}px`,
-        '--qt-padding-y': `${paddingY}px`,
-        '--qt-width': `${preferredWidth}px`,
-        '--qt-max-width': `${maxWidth}px`,
-        '--qt-min-width': `${minWidth}px`,
-        '--qt-max-height': `${Math.max(120, maxHeight)}px`,
-    } as CSSProperties;
+    const handleCopy = async () => {
+        if (!translation) return;
+        try {
+            await navigator.clipboard.writeText(translation);
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 1500);
+        } catch {
+            // Clipboard unavailable (permissions) — nothing to do.
+        }
+    };
 
-    // Calculate final position
-    // We center the popup horizontally on the calculate point, then apply drag offset
-    const finalLeft = currentPosition.x + dragOffset.x;
-    const finalTop = currentPosition.y + dragOffset.y;
+    const sizeStyle: CSSProperties = {
+        left: currentPosition.x + dragOffset.x,
+        top: currentPosition.y + dragOffset.y,
+        transform: 'translateX(-50%)',
+        width: preferredWidth,
+        maxWidth,
+        minWidth,
+    };
 
     return (
         <div
             ref={popupRef}
-            className={styles.popup}
-            style={{
-                left: finalLeft,
-                top: finalTop,
-                transform: 'translateX(-50%)', // Center horizontally
-                ...styleVars,
-            }}
+            className="absolute z-50 overflow-hidden rounded-2xl border border-corio-border bg-corio-surface-1/90 shadow-xl shadow-black/10 backdrop-blur-xl"
+            style={sizeStyle}
         >
+            {/* Header — drag handle + actions */}
             <div
-                className={styles.dragHandle}
+                className="flex cursor-grab select-none items-center gap-2 border-b border-corio-border-subtle bg-corio-surface-2/60 px-3 py-1.5 active:cursor-grabbing"
                 onMouseDown={handleDragStart}
                 onTouchStart={handleDragStart}
             >
-                <div className={styles.dragIndicator} />
+                <Languages className="size-3.5 shrink-0 text-corio-accent" />
+                <span className="text-xs font-medium text-corio-fg/70">Çeviri</span>
+                <GripHorizontal className="mx-auto size-4 text-corio-fg/25" />
+                <button
+                    onClick={handleCopy}
+                    onMouseDown={e => e.stopPropagation()}
+                    onTouchStart={e => e.stopPropagation()}
+                    disabled={!translation || isLoading}
+                    className="rounded-md p-1 text-corio-fg/50 transition-colors hover:bg-corio-surface-3 hover:text-corio-fg disabled:opacity-40"
+                    title="Çeviriyi kopyala"
+                >
+                    {isCopied ? <Check className="size-3.5 text-green-600" /> : <Copy className="size-3.5" />}
+                </button>
+                <button
+                    onClick={onClose}
+                    onMouseDown={e => e.stopPropagation()}
+                    onTouchStart={e => e.stopPropagation()}
+                    className="rounded-md p-1 text-corio-fg/50 transition-colors hover:bg-corio-surface-3 hover:text-corio-fg"
+                    title="Kapat"
+                >
+                    <X className="size-3.5" />
+                </button>
             </div>
 
-            <div className={styles.content}>
+            {/* Content */}
+            <div
+                className="overflow-y-auto px-4 py-3"
+                style={{ maxHeight: Math.max(120, maxHeight) }}
+            >
                 {isLoading ? (
-                    <span className={styles.loading}>
-                        <span className={styles.dot} />
-                        <span className={styles.dot} />
-                        <span className={styles.dot} />
-                    </span>
+                    <div className="flex items-center gap-1.5 py-1">
+                        <span className="size-1.5 animate-bounce rounded-full bg-corio-accent [animation-delay:0ms]" />
+                        <span className="size-1.5 animate-bounce rounded-full bg-corio-accent [animation-delay:150ms]" />
+                        <span className="size-1.5 animate-bounce rounded-full bg-corio-accent [animation-delay:300ms]" />
+                    </div>
+                ) : error ? (
+                    <p className="text-sm text-red-600">{error}</p>
                 ) : (
-                    <span className={styles.text}>{error || translation}</span>
+                    <p
+                        className="font-reading leading-relaxed text-corio-fg"
+                        style={{ fontSize }}
+                    >
+                        {translation}
+                    </p>
                 )}
             </div>
         </div>

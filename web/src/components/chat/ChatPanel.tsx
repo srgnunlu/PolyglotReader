@@ -433,7 +433,7 @@ export function ChatPanel({
                             <div className={styles.selectedQuote}>
                                 <QuoteIcon size={16} className={styles.quoteIcon} />
                                 <div className={styles.quoteContent}>
-                                    <div className={styles.quoteText}>"{activeSelection}"</div>
+                                    <div className={styles.quoteText}>&ldquo;{activeSelection}&rdquo;</div>
                                 </div>
                                 <button
                                     className={styles.quoteClose}

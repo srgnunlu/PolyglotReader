@@ -9,7 +9,6 @@ import { getSupabase } from "@/lib/supabase";
 const DEFAULT_SCALE = 1.2;
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
-const PDFJS_VERSION = pdfjs.version || "5.4.296";
 const FALLBACK_PAGE_SIZE = { width: 595, height: 842 };
 
 interface UsePDFRendererOptions {
@@ -33,9 +32,10 @@ export function usePDFRenderer({ pdfUrl, storagePath, initialScale }: UsePDFRend
   const [defaultPageSize, setDefaultPageSize] = useState<{ width: number; height: number } | null>(null);
 
   const documentOptions = useMemo(() => ({
-    cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/cmaps/`,
+    // Self-hosted assets (scripts/copy-pdf-assets.mjs) — no CDN dependency.
+    cMapUrl: "/pdfjs/cmaps/",
     cMapPacked: true,
-    standardFontDataUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/standard_fonts/`,
+    standardFontDataUrl: "/pdfjs/standard_fonts/",
     verbosity: 0,
   }), []);
 
