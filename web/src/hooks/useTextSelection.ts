@@ -1,88 +1,102 @@
-// Detects text selection within a container element
+// Extracts text-selection geometry from the PDF page DOM and reports it
+// upward (percentage-based rects for annotations + viewport coords for popups).
 "use client";
 
-import { useCallback, useEffect, useState, type RefObject } from "react";
+import { useCallback, type RefObject } from "react";
 
-interface SelectionInfo {
-  selectedText: string;
-  selectionRect: { x: number; y: number; width: number; height: number };
-  pageNumber: number;
-  selectionRects: { x: number; y: number; width: number; height: number }[];
-  selectionRange: Range;
-  pageDimensions: { width: number; height: number } | null;
+export type SelectionRect = { x: number; y: number; width: number; height: number };
+
+interface UseTextSelectionOptions {
+  wrapperRef: RefObject<HTMLDivElement | null>;
+  containerRef: RefObject<HTMLDivElement | null>;
+  pageDimensions: Map<number, { width: number; height: number }>;
+  onTextSelect?: (
+    text: string,
+    pageNumber: number,
+    rect: { x: number; y: number },
+    selectionRects?: SelectionRect[],
+    selectionBounds?: SelectionRect,
+    selectionRange?: Range,
+    pageDimensions?: { width: number; height: number }
+  ) => void;
+  // Selecting text also moves the current page to the selection's page
+  onSelectPage?: (pageNumber: number) => void;
 }
 
-export function useTextSelection(containerRef: RefObject<HTMLElement | null>) {
-  const [selection, setSelection] = useState<SelectionInfo | null>(null);
-
-  const clearSelection = useCallback(() => {
-    setSelection(null);
-    window.getSelection()?.removeAllRanges();
-  }, []);
-
+export function useTextSelection({
+  wrapperRef,
+  containerRef,
+  pageDimensions,
+  onTextSelect,
+  onSelectPage,
+}: UseTextSelectionOptions) {
   const handleSelectionEnd = useCallback(() => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return;
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) return;
 
-    const text = sel.toString().trim();
-    if (!text || !containerRef.current) return;
+    const text = selection.toString().trim();
+    if (!text) return;
 
-    const range = sel.getRangeAt(0);
-    if (!containerRef.current.contains(range.commonAncestorContainer)) return;
+    const range = selection.getRangeAt(0);
+    if (!containerRef.current?.contains(range.commonAncestorContainer)) {
+      return;
+    }
 
     const rect = range.getBoundingClientRect();
-    const containerRect = containerRef.current.getBoundingClientRect();
+    const wrapperRect = wrapperRef.current?.getBoundingClientRect();
 
-    // Find the page element
+    if (!wrapperRect) return;
+
     let element: HTMLElement | null = range.commonAncestorContainer as HTMLElement;
-    if (element.nodeType === Node.TEXT_NODE) element = element.parentElement;
-    const pageElement = element?.closest("[data-page-number]") as HTMLElement | null;
+    if (element.nodeType === Node.TEXT_NODE) {
+      element = element.parentElement;
+    }
+
+    const pageElement = element?.closest('[data-page-number]') as HTMLElement | null;
     if (!pageElement) return;
 
     const pageNumber = Number(pageElement.dataset.pageNumber);
     if (!Number.isFinite(pageNumber) || pageNumber < 1) return;
 
-    const canvas = pageElement.querySelector(".react-pdf__Page__canvas") as HTMLCanvasElement | null;
+    const canvas = pageElement.querySelector('.react-pdf__Page__canvas') as HTMLCanvasElement | null;
     const pageRect = (canvas ?? pageElement).getBoundingClientRect();
+
     if (!pageRect.width || !pageRect.height) return;
 
     const selectionRects = Array.from(range.getClientRects())
-      .filter((r) => r.width > 0 && r.height > 0)
-      .map((r) => ({
+      .filter(r => r.width > 0 && r.height > 0)
+      .map(r => ({
         x: ((r.left - pageRect.left) / pageRect.width) * 100,
         y: ((r.top - pageRect.top) / pageRect.height) * 100,
         width: (r.width / pageRect.width) * 100,
         height: (r.height / pageRect.height) * 100,
       }));
 
-    setSelection({
-      selectedText: text,
-      selectionRect: {
-        x: rect.left - containerRect.left + rect.width / 2,
-        y: rect.top - containerRect.top - 40,
-        width: rect.width,
-        height: rect.height,
-      },
-      pageNumber,
-      selectionRects,
-      selectionRange: range,
-      pageDimensions: canvas
-        ? { width: canvas.width, height: canvas.height }
-        : null,
-    });
-  }, [containerRef]);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    el.addEventListener("mouseup", handleSelectionEnd);
-    el.addEventListener("touchend", handleSelectionEnd);
-    return () => {
-      el.removeEventListener("mouseup", handleSelectionEnd);
-      el.removeEventListener("touchend", handleSelectionEnd);
+    const selectionBounds = {
+      x: rect.left - wrapperRect.left,
+      y: rect.top - wrapperRect.top,
+      width: rect.width,
+      height: rect.height,
     };
-  }, [containerRef, handleSelectionEnd]);
 
-  return { selection, clearSelection };
+    if (onTextSelect) {
+      const dims = pageDimensions.get(pageNumber);
+      onTextSelect(
+        text,
+        pageNumber,
+        {
+          x: rect.left - wrapperRect.left + rect.width / 2,
+          y: rect.top - wrapperRect.top - 40,
+        },
+        selectionRects,
+        selectionBounds,
+        range,
+        dims
+      );
+    }
+
+    onSelectPage?.(pageNumber);
+  }, [wrapperRef, containerRef, pageDimensions, onTextSelect, onSelectPage]);
+
+  return { handleSelectionEnd };
 }

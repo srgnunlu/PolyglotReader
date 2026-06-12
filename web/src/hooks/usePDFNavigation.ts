@@ -1,17 +1,22 @@
-// PDF page navigation, scroll tracking, progress reporting
+// PDF page navigation, scroll tracking, scroll restoration, progress reporting.
+// Page tracking is scroll-based with rAF throttling; currentPage/onPageChange
+// live in refs so the effect only depends on totalPages — keeping the
+// "effect → setState → effect" freeze loop fixed (see commits f3e469a, 03b0c8a).
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 interface UsePDFNavigationOptions {
   totalPages: number;
   initialPage?: number;
   initialScroll?: { x: number; y: number; scale: number };
-  containerRef: React.RefObject<HTMLElement | null>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
   pageRefs: React.RefObject<Map<number, HTMLDivElement>>;
   displayScale: number;
   onPageChange?: (page: number) => void;
   onProgressChange?: (page: number, x: number, y: number, scale: number) => void;
+  // Called once during scroll restoration when the saved zoom differs
+  restoreScale?: (scale: number) => void;
 }
 
 export function usePDFNavigation({
@@ -23,118 +28,128 @@ export function usePDFNavigation({
   displayScale,
   onPageChange,
   onProgressChange,
+  restoreScale,
 }: UsePDFNavigationOptions) {
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [isRestored, setIsRestored] = useState(false);
+
+  // Scroll to initial page once the document is ready
+  useEffect(() => {
+    if (!totalPages) return;
+    const targetPage = Math.min(Math.max(initialPage, 1), totalPages);
+    pageRefs.current?.get(targetPage)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [initialPage, totalPages, pageRefs]);
+
+  // Track current page based on scroll position
+  const currentPageRef = useRef(currentPage);
+  const onPageChangeRef = useRef(onPageChange);
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+    onPageChangeRef.current = onPageChange;
+  });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || totalPages === 0) return;
+
+    let rafId: number;
+    const updateCurrentPage = () => {
+      const containerRect = container.getBoundingClientRect();
+      const containerMid = containerRect.top + containerRect.height / 2;
+      let closestPage = currentPageRef.current;
+      let closestDist = Infinity;
+
+      pageRefs.current?.forEach((el, pageNum) => {
+        const rect = el.getBoundingClientRect();
+        const pageMid = rect.top + rect.height / 2;
+        const dist = Math.abs(pageMid - containerMid);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestPage = pageNum;
+        }
+      });
+
+      if (closestPage !== currentPageRef.current) {
+        setCurrentPage(closestPage);
+        onPageChangeRef.current?.(closestPage);
+      }
+    };
+
+    const handleScroll = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(updateCurrentPage);
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      cancelAnimationFrame(rafId);
+    };
+  }, [totalPages, containerRef, pageRefs]);
+
+  // Handle initial scroll restoration
+  useEffect(() => {
+    if (!containerRef.current || totalPages === 0 || isRestored || !initialScroll) return;
+
+    const timer = setTimeout(() => {
+      if (initialScroll && containerRef.current) {
+        if (initialScroll.scale !== displayScale) {
+          restoreScale?.(initialScroll.scale);
+        }
+
+        pageRefs.current?.get(initialPage)?.scrollIntoView({ behavior: "auto", block: "start" });
+      }
+      setIsRestored(true);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [totalPages, initialScroll, isRestored, initialPage, displayScale, restoreScale, containerRef, pageRefs]);
+
+  // Monitor scroll for progress updates (debounced)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !onProgressChange) return;
+
+    const handleScroll = () => {
+      const pageElement = pageRefs.current?.get(currentPage);
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (pageElement) {
+        const containerRect = container.getBoundingClientRect();
+        const pageRect = pageElement.getBoundingClientRect();
+
+        offsetY = Math.max(0, containerRect.top - pageRect.top) / displayScale;
+        offsetX = Math.max(0, containerRect.left - pageRect.left) / displayScale;
+      }
+
+      onProgressChange(currentPage, offsetX, offsetY, displayScale);
+    };
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const debouncedScroll = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(handleScroll, 500);
+    };
+
+    container.addEventListener("scroll", debouncedScroll);
+    return () => {
+      container.removeEventListener("scroll", debouncedScroll);
+      clearTimeout(timeoutId);
+    };
+  }, [currentPage, displayScale, onProgressChange, containerRef, pageRefs]);
 
   const goToPage = useCallback(
     (page: number) => {
       if (!totalPages) return;
       const newPage = Math.max(1, Math.min(page, totalPages));
       setCurrentPage(newPage);
-      onPageChange?.(newPage);
-      pageRefs.current.get(newPage)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      onPageChangeRef.current?.(newPage);
+      pageRefs.current?.get(newPage)?.scrollIntoView({ behavior: "smooth", block: "start" });
     },
-    [totalPages, onPageChange, pageRefs]
+    [totalPages, pageRefs]
   );
 
-  const nextPage = useCallback(() => goToPage(currentPage + 1), [currentPage, goToPage]);
-  const prevPage = useCallback(() => goToPage(currentPage - 1), [currentPage, goToPage]);
-
-  const progress = totalPages > 0 ? (currentPage / totalPages) * 100 : 0;
-
-  // Scroll to initial page
-  useEffect(() => {
-    if (!totalPages) return;
-    const targetPage = Math.min(Math.max(initialPage, 1), totalPages);
-    pageRefs.current.get(targetPage)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [initialPage, totalPages, pageRefs]);
-
-  // Track current page via IntersectionObserver
-  useEffect(() => {
-    if (!containerRef.current || totalPages === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        let maxRatio = 0;
-        let mostVisiblePage = currentPage;
-
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
-            const pageNum = Number(entry.target.getAttribute("data-page-number"));
-            if (pageNum >= 1) {
-              maxRatio = entry.intersectionRatio;
-              mostVisiblePage = pageNum;
-            }
-          }
-        });
-
-        if (mostVisiblePage !== currentPage && maxRatio > 0) {
-          setCurrentPage(mostVisiblePage);
-          onPageChange?.(mostVisiblePage);
-        }
-      },
-      {
-        root: containerRef.current,
-        threshold: [0, 0.25, 0.5, 0.75, 1],
-        rootMargin: "-10% 0px -10% 0px",
-      }
-    );
-
-    pageRefs.current.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [totalPages, onPageChange, currentPage, containerRef, pageRefs]);
-
-  // Restore initial scroll position
-  useEffect(() => {
-    if (!containerRef.current || totalPages === 0 || isRestored || !initialScroll) return;
-
-    const timer = setTimeout(() => {
-      pageRefs.current.get(initialPage)?.scrollIntoView({ behavior: "auto", block: "start" });
-      setIsRestored(true);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [totalPages, initialScroll, isRestored, initialPage, containerRef, pageRefs]);
-
-  // Progress reporting (debounced scroll handler)
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container || !onProgressChange) return;
-
-    let timeoutId: ReturnType<typeof setTimeout>;
-    const handleScroll = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        const pageElement = pageRefs.current.get(currentPage);
-        let offsetX = 0;
-        let offsetY = 0;
-
-        if (pageElement) {
-          const containerRect = container.getBoundingClientRect();
-          const pageRect = pageElement.getBoundingClientRect();
-          offsetY = Math.max(0, containerRect.top - pageRect.top) / displayScale;
-          offsetX = Math.max(0, containerRect.left - pageRect.left) / displayScale;
-        }
-
-        onProgressChange(currentPage, offsetX, offsetY, displayScale);
-      }, 500);
-    };
-
-    container.addEventListener("scroll", handleScroll);
-    return () => {
-      container.removeEventListener("scroll", handleScroll);
-      clearTimeout(timeoutId);
-    };
-  }, [currentPage, displayScale, onProgressChange, containerRef, pageRefs]);
-
-  return {
-    currentPage,
-    totalPages,
-    goToPage,
-    nextPage,
-    prevPage,
-    progress,
-    setCurrentPage,
-  };
+  return { currentPage, setCurrentPage, goToPage };
 }

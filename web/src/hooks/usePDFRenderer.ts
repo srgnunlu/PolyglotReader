@@ -141,6 +141,13 @@ export function usePDFRenderer({ pdfUrl, storagePath, initialScale }: UsePDFRend
     handleZoom(DEFAULT_SCALE, containerEl);
   }, [handleZoom]);
 
+  // Set both scales at once without the zoom debounce — used when restoring
+  // a saved reading position
+  const setScaleImmediate = useCallback((scale: number) => {
+    setDisplayScale(scale);
+    setRenderScale(scale);
+  }, []);
+
   // Cleanup
   useEffect(() => {
     return () => {
@@ -167,6 +174,6 @@ export function usePDFRenderer({ pdfUrl, storagePath, initialScale }: UsePDFRend
     zoomIn,
     zoomOut,
     resetZoom,
-    setDisplayScale,
+    setScaleImmediate,
   };
 }
