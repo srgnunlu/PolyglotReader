@@ -8,8 +8,10 @@ import { PDFGrid } from '@/components/library/PDFGrid';
 import { PDFList } from '@/components/library/PDFList';
 import { EmptyLibrary } from '@/components/library/EmptyLibrary';
 import { UploadArea } from '@/components/library/UploadArea';
-import { LayoutGrid, List, Search, AlertCircle } from 'lucide-react';
+import { useFileUpload } from '@/hooks/useFileUpload';
+import { LayoutGrid, List, Search, AlertCircle, Upload, Loader2 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
 
 export default function LibraryPage() {
   return (
@@ -26,12 +28,41 @@ function LibraryContent() {
     error,
     searchQuery,
     setSearchQuery,
+    refresh,
   } = useDocuments();
 
+  const { uploadFiles, isUploading } = useFileUpload();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showUpload, setShowUpload] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleFilesSelected = useCallback(
+    async (files: File[]) => {
+      setShowUpload(false);
+      const uploadToast = toast.loading(
+        files.length === 1
+          ? `"${files[0].name}" yükleniyor...`
+          : `${files.length} dosya yükleniyor...`
+      );
+
+      const result = await uploadFiles(files);
+      toast.dismiss(uploadToast);
+
+      if (result.succeeded.length > 0) {
+        toast.success(
+          result.succeeded.length === 1
+            ? `"${result.succeeded[0]}" yüklendi`
+            : `${result.succeeded.length} dosya yüklendi`
+        );
+        await refresh();
+      }
+      for (const failure of result.failed) {
+        toast.error(`"${failure.name}" yüklenemedi: ${failure.error}`);
+      }
+    },
+    [uploadFiles, refresh]
+  );
 
   // 300ms debounce before updating the hook's search query (triggers API call)
   const handleSearchChange = useCallback(
@@ -96,6 +127,22 @@ function LibraryContent() {
 
         {/* Controls */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Upload button */}
+          <button
+            onClick={() => setShowUpload(prev => !prev)}
+            disabled={isUploading}
+            className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-medium transition-all disabled:opacity-60"
+            style={{
+              background: '#D4713C',
+              color: '#FFFFFF',
+            }}
+          >
+            {isUploading
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <Upload className="w-4 h-4" />}
+            PDF Yükle
+          </button>
+
           {/* View toggle */}
           <div
             className="flex items-center rounded-xl p-1 gap-0.5"
@@ -173,16 +220,10 @@ function LibraryContent() {
           <EmptyLibrary onUploadClick={() => setShowUpload(true)} />
         )}
 
-        {/* Upload area — shown after clicking "PDF Yükle" in empty state */}
+        {/* Upload area — toggled from the header button or the empty state */}
         {showUpload && (
           <div className="mb-6">
-            <UploadArea
-              onFilesSelected={files => {
-                // TODO: wire to Supabase upload logic
-                console.info('Selected files for upload:', files.map(f => f.name));
-                setShowUpload(false);
-              }}
-            />
+            <UploadArea onFilesSelected={handleFilesSelected} />
           </div>
         )}
 
