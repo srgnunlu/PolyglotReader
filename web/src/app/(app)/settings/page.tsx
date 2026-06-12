@@ -5,8 +5,6 @@ import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/hooks/useAuth';
-import { pdfCache } from '@/lib/pdfCache';
-import { thumbnailCache } from '@/lib/thumbnailCache';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -66,6 +64,12 @@ function SettingsContent() {
   const handleClearCache = async () => {
     setIsClearingCache(true);
     try {
+      // Dynamic import: both caches open IndexedDB / CacheStorage at module
+      // load, which doesn't exist during prerendering.
+      const [{ pdfCache }, { thumbnailCache }] = await Promise.all([
+        import('@/lib/pdfCache'),
+        import('@/lib/thumbnailCache'),
+      ]);
       await Promise.all([pdfCache.clearCache(), thumbnailCache.clearCache()]);
       toast.success('Önbellek başarıyla temizlendi');
     } catch {
