@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabase } from './supabase';
 
 // MARK: - RAG Configuration (matches mobile RAGConfig.swift v3.0)
@@ -12,17 +11,6 @@ const RAG_CONFIG = {
 };
 
 type DocumentLanguage = 'turkish' | 'english' | 'simple';
-
-type DocumentChunkPreview = {
-    content: string;
-};
-
-type BM25AttemptParams = {
-    search_query: string;
-    target_file_id: string;
-    match_count: number;
-    search_language?: DocumentLanguage;
-};
 
 const documentLanguageCache = new Map<string, DocumentLanguage>();
 const turkishCharRegex = /[çğıöşüÇĞİÖŞÜ]/g;
@@ -69,11 +57,11 @@ function estimateLanguage(text: string): DocumentLanguage {
     return turkishCharCount > 0 ? 'turkish' : 'english';
 }
 
-async function getDocumentLanguage(fileId: string, db?: SupabaseClient): Promise<DocumentLanguage> {
+async function getDocumentLanguage(fileId: string): Promise<DocumentLanguage> {
     const cached = documentLanguageCache.get(fileId);
     if (cached) return cached;
 
-    const supabase = db ?? getSupabase();
+    const supabase = getSupabase();
     const { data, error } = await supabase
         .from('document_chunks')
         .select('content')
@@ -85,8 +73,8 @@ async function getDocumentLanguage(fileId: string, db?: SupabaseClient): Promise
         return 'simple';
     }
 
-    const sampleText = ((data || []) as DocumentChunkPreview[])
-        .map((chunk) => chunk.content)
+    const sampleText = (data || [])
+        .map((chunk: any) => chunk.content)
         .join(' ');
 
     const detected = estimateLanguage(sampleText);
@@ -140,18 +128,17 @@ interface ChunkResult {
 export async function searchRelevantChunks(
     fileId: string,
     query: string,
-    limit: number = 20,
-    db?: SupabaseClient
+    limit: number = 20
 ): Promise<string> {
     try {
         console.log(`BM25 search: query="${query}", fileId="${fileId}"`);
 
-        const results = await bm25Search(fileId, query, limit, db);
+        const results = await bm25Search(fileId, query, limit);
         console.log(`BM25 search returned ${results?.length || 0} results`);
 
         if (!results || results.length === 0) {
             console.log('No BM25 results, fetching broad context');
-            return await getBroadContext(fileId, limit, db);
+            return await getBroadContext(fileId, limit);
         }
 
         // Chunk'ları chunk_index'e göre sırala
@@ -166,7 +153,7 @@ export async function searchRelevantChunks(
 
     } catch (err) {
         console.error('RAG search error:', err);
-        return await getBroadContext(fileId, limit, db);
+        return await getBroadContext(fileId, limit);
     }
 }
 
@@ -187,8 +174,8 @@ function removeDuplicates(chunks: ChunkResult[]): ChunkResult[] {
 /**
  * Dökümanın farklı bölümlerinden geniş bir context getirir
  */
-async function getBroadContext(fileId: string, limit: number, db?: SupabaseClient): Promise<string> {
-    const supabase = db ?? getSupabase();
+async function getBroadContext(fileId: string, limit: number): Promise<string> {
+    const supabase = getSupabase();
 
     // Toplam chunk sayısını al
     const { count } = await supabase
@@ -258,8 +245,8 @@ async function getBroadContext(fileId: string, limit: number, db?: SupabaseClien
 /**
  * Döküman için temel context getirir (chat açıldığında ilk yükleme için).
  */
-export async function getInitialDocumentContext(fileId: string, db?: SupabaseClient): Promise<string> {
-    const supabase = db ?? getSupabase();
+export async function getInitialDocumentContext(fileId: string): Promise<string> {
+    const supabase = getSupabase();
 
     // Önce özet var mı kontrol et
     const { data: file } = await supabase
@@ -273,39 +260,31 @@ export async function getInitialDocumentContext(fileId: string, db?: SupabaseCli
     }
 
     // Özet yoksa geniş context getir
-    return await getBroadContext(fileId, 10, db);
+    return await getBroadContext(fileId, 10);
 }
 
 // MARK: - Hybrid Search (Vector + BM25 + RRF Fusion)
 // Mobil uygulamadaki RAGSearchService ile aynı mantık
 
 /**
- * Gemini API ile embedding oluşturur
+ * Sunucu taraflı /api/gemini/embed route'u üzerinden embedding oluşturur
+ * (API anahtarı istemciye inmez)
  */
 async function createEmbedding(text: string): Promise<number[]> {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (!apiKey) throw new Error('Gemini API key not found');
-
-    const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: 'models/text-embedding-004',
-                content: { parts: [{ text }] }
-            })
-        }
-    );
+    const response = await fetch('/api/gemini/embed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+    });
 
     if (!response.ok) {
         const errorText = await response.text();
         console.error('Embedding API error:', errorText);
-        throw new Error(`Embedding failed: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(`Embedding failed: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    return data.embedding.values;
+    return data.embedding;
 }
 
 /**
@@ -314,10 +293,9 @@ async function createEmbedding(text: string): Promise<number[]> {
 async function vectorSearch(
     fileId: string,
     queryEmbedding: number[],
-    limit: number,
-    db?: SupabaseClient
+    limit: number
 ): Promise<VectorSearchResult[]> {
-    const supabase = db ?? getSupabase();
+    const supabase = getSupabase();
     const embeddingText = embeddingToText(queryEmbedding);
 
     const attempts = [
@@ -466,16 +444,15 @@ function preprocessQueryForBM25(query: string, language: DocumentLanguage): stri
 async function bm25Search(
     fileId: string,
     query: string,
-    limit: number,
-    db?: SupabaseClient
+    limit: number
 ): Promise<BM25SearchResult[]> {
-    const supabase = db ?? getSupabase();
+    const supabase = getSupabase();
 
     // ÖNEMLI: Sorgu dilini tespit et (döküman dilinden bağımsız)
     const queryLanguage = detectQueryLanguage(query);
 
     // Döküman dilini de al (fallback için)
-    const documentLanguage = await getDocumentLanguage(fileId, db);
+    const documentLanguage = await getDocumentLanguage(fileId);
 
     // Sorguyu ön işleme tabi tut
     const processedQuery = preprocessQueryForBM25(query, queryLanguage);
@@ -486,7 +463,7 @@ async function bm25Search(
     console.log(`  Original query: "${query}"`);
     console.log(`  Processed query: "${processedQuery}"`);
 
-    const attempts: { name: string; params: BM25AttemptParams }[] = [];
+    const attempts: { name: string; params: Record<string, unknown> }[] = [];
 
     // Önce sorgu diliyle ara
     if (queryLanguage !== 'simple') {
@@ -526,7 +503,7 @@ async function bm25Search(
 
     let lastError: unknown = null;
     for (const attempt of attempts) {
-        const lang = attempt.params.search_language;
+        const lang = (attempt.params as any).search_language;
         const attemptDesc = lang ? `${attempt.name}(${lang})` : attempt.name;
         console.log(`  🔎 Attempting: ${attemptDesc}`);
 
@@ -609,8 +586,7 @@ function rrfFusion(
 export async function searchRelevantChunksHybrid(
     fileId: string,
     query: string,
-    limit: number = 10,
-    db?: SupabaseClient
+    limit: number = 10
 ): Promise<string> {
     console.log(`🔍 Hybrid search: query="${query.substring(0, 50)}...", fileId="${fileId}"`);
 
@@ -618,17 +594,17 @@ export async function searchRelevantChunksHybrid(
         // Parallel search: Vector + BM25
         const [queryEmbedding, bm25Results] = await Promise.all([
             createEmbedding(query),
-            bm25Search(fileId, query, limit, db)
+            bm25Search(fileId, query, limit)
         ]);
 
-        const vectorResults = await vectorSearch(fileId, queryEmbedding, limit, db);
+        const vectorResults = await vectorSearch(fileId, queryEmbedding, limit);
 
         console.log(`📊 Vector results: ${vectorResults.length}, BM25 results: ${bm25Results.length}`);
 
         // Check if we have any results
         if (vectorResults.length === 0 && bm25Results.length === 0) {
             console.log('⚠️ No results from hybrid search, using fallback');
-            return await getBroadContext(fileId, limit, db);
+            return await getBroadContext(fileId, limit);
         }
 
         // BM25'in 0 sonuç vermesi normaldir - sorgu kelimeleri içerikte olmayabilir
@@ -665,6 +641,6 @@ ${chunk.content}`;
     } catch (err) {
         console.error('❌ Hybrid search error:', err);
         // Fallback to BM25 only
-        return await searchRelevantChunks(fileId, query, limit, db);
+        return await searchRelevantChunks(fileId, query, limit);
     }
 }

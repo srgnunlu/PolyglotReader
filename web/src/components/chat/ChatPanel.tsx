@@ -1,16 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { ChatMessage } from '@/types/models';
-import { getAccessToken, getSupabase } from '@/lib/supabase';
-
-type ChatHistoryMessage = { role: 'user' | 'model'; text: string };
-type ChatSession = { file_id: string; file_name: string; first_message: string; created_at: string };
+import { streamChat, streamChatWithImage, streamChatWithRAGAndHistory, ChatHistoryMessage } from '@/lib/gemini';
+import { searchRelevantChunks } from '@/lib/rag';
 import { loadChatHistory, saveChatMessage, clearChatHistory } from '@/lib/chatSync';
 import styles from './ChatPanel.module.css';
-import ReactMarkdown, { Components } from 'react-markdown';
+import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CodeBlock } from './CodeBlock';
 import {
     CorioLogo,
     NewChatIcon,
@@ -61,26 +58,10 @@ export function ChatPanel({
     const [isLoading, setIsLoading] = useState(false);
     const [pendingAttachment, setPendingAttachment] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(false);
-    const [historySessions, setHistorySessions] = useState<ChatSession[]>([]);
-    const [historyLoading, setHistoryLoading] = useState(false);
-    const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [panelWidth, setPanelWidth] = useState(380);
     const resizeStartRef = useRef<{ x: number; width: number } | null>(null);
     const historyRef = useRef<HTMLDivElement>(null);
-
-    // Markdown components with syntax highlighting
-    const markdownComponents = useMemo<Components>(() => ({
-        code({ className, children, ...props }) {
-            const match = /language-(\w+)/.exec(className || '');
-            const codeString = String(children).replace(/\n$/, '');
-            if (match) {
-                return <CodeBlock language={match[1]}>{codeString}</CodeBlock>;
-            }
-            return <code className={className} {...props}>{children}</code>;
-        },
-    }), []);
 
     // Scroll to bottom when new message
     useEffect(() => {
@@ -167,7 +148,6 @@ export function ChatPanel({
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         setPendingAttachment(null);
-        resetTextareaHeight();
 
         if (activeSelection && onClearSelection) {
             onClearSelection();
@@ -192,41 +172,26 @@ export function ChatPanel({
                 text: m.text
             }));
 
-            const accessToken = await getAccessToken();
-            if (!accessToken) throw new Error('Not authenticated');
+            let stream: AsyncGenerator<string, void, unknown>;
 
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`
-                },
-                body: JSON.stringify({
-                    message: messageContent,
-                    fileId: documentId,
-                    history: chatHistory,
-                    image: img ?? undefined,
-                    context: !documentId ? documentContext : undefined
-                })
-            });
-
-            if (!response.ok || !response.body) {
-                let errorDetail = `HTTP ${response.status}`;
-                try {
-                    const errBody = await response.json();
-                    errorDetail = errBody.error || errorDetail;
-                } catch {
-                    errorDetail = await response.text().catch(() => errorDetail);
+            if (img) {
+                let context = documentContext;
+                if (documentId) {
+                    try {
+                        context = await searchRelevantChunks(documentId, messageContent, 15);
+                    } catch (ragError) {
+                        console.error('RAG search failed:', ragError);
+                    }
                 }
-                throw new Error(errorDetail);
+                stream = streamChatWithImage(messageContent, img, context);
+            } else if (documentId) {
+                stream = streamChatWithRAGAndHistory(messageContent, documentId, chatHistory);
+            } else {
+                stream = streamChat(messageContent, documentContext);
             }
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                fullResponse += decoder.decode(value, { stream: true });
+            for await (const chunk of stream) {
+                fullResponse += chunk;
                 setMessages(prev =>
                     prev.map(m =>
                         m.id === aiMessageId ? { ...m, text: fullResponse } : m
@@ -240,32 +205,16 @@ export function ChatPanel({
                     await saveChatMessage(documentId, 'model', fullResponse);
                 } catch (saveError) {
                     console.error('Failed to save chat messages:', saveError);
-                    setMessages(prev =>
-                        prev.map(m =>
-                            m.id === aiMessageId
-                                ? { ...m, saveError: true }
-                                : m
-                        )
-                    );
                 }
             }
         } catch (err) {
             console.error('Chat error:', err);
             setMessages(prev =>
-                prev.map(m => {
-                    if (m.id !== aiMessageId) return m;
-                    // Preserve any partial response that was streamed
-                    const partialText = m.text || '';
-                    const errorSuffix = partialText
-                        ? '\n\n---\n⚠️ Yanıt tamamlanamadı.'
-                        : '⚠️ Bir hata oluştu.';
-                    return {
-                        ...m,
-                        text: partialText + errorSuffix,
-                        error: true,
-                        originalUserMessage: messageContent,
-                    };
-                })
+                prev.map(m =>
+                    m.id === aiMessageId
+                        ? { ...m, text: 'Bir hata oluştu. Lütfen tekrar deneyin.' }
+                        : m
+                )
             );
         } finally {
             setIsLoading(false);
@@ -293,70 +242,6 @@ export function ChatPanel({
     const handleSuggestionClick = (suggestion: string) => {
         handleSendMessage(suggestion);
     };
-
-    const handleRetry = useCallback((message: ChatMessage) => {
-        if (!message.originalUserMessage) return;
-        // Remove the error message
-        setMessages(prev => prev.filter(m => m.id !== message.id));
-        handleSendMessage(message.originalUserMessage);
-    }, []);
-
-    const handleCopyMessage = useCallback(async (text: string, messageId: string) => {
-        await navigator.clipboard.writeText(text);
-        setCopiedMessageId(messageId);
-        setTimeout(() => setCopiedMessageId(null), 2000);
-    }, []);
-
-    // Auto-resize textarea
-    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setInput(e.target.value);
-        const el = e.target;
-        el.style.height = 'auto';
-        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-    }, []);
-
-    // Reset textarea height after sending
-    const resetTextareaHeight = useCallback(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-        }
-    }, []);
-
-    // Fetch real chat sessions for history dropdown
-    const fetchChatSessions = useCallback(async () => {
-        if (!documentId) return;
-        setHistoryLoading(true);
-        try {
-            const supabase = getSupabase();
-            // Get distinct file_ids with their first message from chats table
-            const { data, error } = await supabase
-                .from('chats')
-                .select('file_id, content, created_at')
-                .eq('role', 'user')
-                .order('created_at', { ascending: true })
-                .limit(20);
-
-            if (error) throw error;
-
-            // Group by file_id, take first message per file
-            const sessionMap = new Map<string, ChatSession>();
-            for (const row of data || []) {
-                if (!sessionMap.has(row.file_id)) {
-                    sessionMap.set(row.file_id, {
-                        file_id: row.file_id,
-                        file_name: '',
-                        first_message: row.content?.substring(0, 60) || 'Sohbet',
-                        created_at: row.created_at,
-                    });
-                }
-            }
-            setHistorySessions(Array.from(sessionMap.values()));
-        } catch {
-            // Non-critical
-        } finally {
-            setHistoryLoading(false);
-        }
-    }, [documentId]);
 
     if (!isOpen) return null;
 
@@ -430,11 +315,7 @@ export function ChatPanel({
                     <div className={styles.historyContainer} ref={historyRef}>
                         <button
                             className={styles.iconBtn}
-                            onClick={() => {
-                                const next = !showHistory;
-                                setShowHistory(next);
-                                if (next) fetchChatSessions();
-                            }}
+                            onClick={() => setShowHistory(!showHistory)}
                             title="Sohbet Geçmişi"
                         >
                             <HistoryIcon size={18} />
@@ -442,25 +323,18 @@ export function ChatPanel({
                         {showHistory && (
                             <div className={styles.historyDropdown}>
                                 <div className={styles.historyHeader}>Sohbet Geçmişi</div>
-                                {historyLoading ? (
-                                    <div className={styles.historyEmpty}>Yükleniyor...</div>
-                                ) : historySessions.length > 0 ? (
-                                    historySessions.map(session => (
-                                        <div
-                                            key={session.file_id}
-                                            className={`${styles.historyItem} ${session.file_id === documentId ? styles.historyItemActive : ''}`}
-                                        >
-                                            <MessageIcon size={20} className={styles.historyItemIcon} />
-                                            <div className={styles.historyItemText}>
-                                                <div className={styles.historyItemTitle}>
-                                                    {session.first_message}
-                                                </div>
-                                                <div className={styles.historyItemDate}>
-                                                    {new Date(session.created_at).toLocaleDateString('tr-TR')}
-                                                </div>
+                                {messages.length > 0 ? (
+                                    <div className={styles.historyItem}>
+                                        <MessageIcon size={20} className={styles.historyItemIcon} />
+                                        <div className={styles.historyItemText}>
+                                            <div className={styles.historyItemTitle}>
+                                                {messages[0]?.text?.substring(0, 40) || 'Mevcut Sohbet'}...
+                                            </div>
+                                            <div className={styles.historyItemDate}>
+                                                {new Date().toLocaleDateString('tr-TR')}
                                             </div>
                                         </div>
-                                    ))
+                                    </div>
                                 ) : (
                                     <div className={styles.historyEmpty}>
                                         Henüz sohbet geçmişi yok
@@ -512,7 +386,7 @@ export function ChatPanel({
                     messages.map(message => (
                         <div
                             key={message.id}
-                            className={`${styles.message} ${styles[message.role]} ${message.error ? styles.messageError : ''}`}
+                            className={`${styles.message} ${styles[message.role]}`}
                         >
                             <div className={styles.messageAvatar}>
                                 {message.role === 'user' ? (
@@ -533,10 +407,7 @@ export function ChatPanel({
                                 )}
                                 {message.text ? (
                                     <div className={styles.messageMarkdown}>
-                                        <ReactMarkdown
-                                            remarkPlugins={[remarkGfm]}
-                                            components={message.role === 'model' ? markdownComponents : undefined}
-                                        >
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                             {message.text}
                                         </ReactMarkdown>
                                     </div>
@@ -545,48 +416,6 @@ export function ChatPanel({
                                         <span className={styles.typingDot} />
                                         <span className={styles.typingDot} />
                                         <span className={styles.typingDot} />
-                                    </div>
-                                )}
-                                {/* Action buttons for AI messages */}
-                                {message.role === 'model' && message.text && (
-                                    <div className={styles.messageActions}>
-                                        <button
-                                            className={styles.messageActionBtn}
-                                            onClick={() => handleCopyMessage(message.text, message.id)}
-                                            title="Kopyala"
-                                        >
-                                            {copiedMessageId === message.id ? 'Kopyalandı!' : '📋 Kopyala'}
-                                        </button>
-                                        {message.error && message.originalUserMessage && (
-                                            <button
-                                                className={`${styles.messageActionBtn} ${styles.retryBtn}`}
-                                                onClick={() => handleRetry(message)}
-                                                disabled={isLoading}
-                                            >
-                                                🔄 Tekrar Dene
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                                {message.saveError && (
-                                    <div className={styles.saveErrorBanner}>
-                                        <span>Mesaj kaydedilemedi</span>
-                                        <button
-                                            className={styles.saveRetryBtn}
-                                            onClick={async () => {
-                                                if (!documentId) return;
-                                                try {
-                                                    const userMsg = messages.find(m => m.role === 'user' && m.timestamp <= message.timestamp);
-                                                    if (userMsg) await saveChatMessage(documentId, 'user', userMsg.text);
-                                                    await saveChatMessage(documentId, 'model', message.text);
-                                                    setMessages(prev => prev.map(m => m.id === message.id ? { ...m, saveError: false } : m));
-                                                } catch {
-                                                    // Still failed
-                                                }
-                                            }}
-                                        >
-                                            Tekrar dene
-                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -604,7 +433,7 @@ export function ChatPanel({
                             <div className={styles.selectedQuote}>
                                 <QuoteIcon size={16} className={styles.quoteIcon} />
                                 <div className={styles.quoteContent}>
-                                    <div className={styles.quoteText}>&quot;{activeSelection}&quot;</div>
+                                    <div className={styles.quoteText}>"{activeSelection}"</div>
                                 </div>
                                 <button
                                     className={styles.quoteClose}
@@ -634,10 +463,9 @@ export function ChatPanel({
                             </div>
                         )}
                         <textarea
-                            ref={textareaRef}
                             className={styles.input}
                             value={input}
-                            onChange={handleInputChange}
+                            onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
                             onMouseDown={(e) => e.stopPropagation()}
                             onFocus={(e) => e.stopPropagation()}

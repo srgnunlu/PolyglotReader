@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { getAccessToken } from '@/lib/supabase';
+import { translateText } from '@/lib/gemini';
 import styles from './SelectionPopup.module.css';
 
 interface SelectionPopupProps {
@@ -44,21 +44,11 @@ export function SelectionPopup({
 
         setIsTranslating(true);
         try {
-            const token = await getAccessToken();
-            const res = await fetch('/api/translate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({ text, targetLang: 'tr' }),
-            });
-            const data = await res.json();
-            if (data.error) throw new Error(data.error);
-            setTranslation(data.translation?.trim() || 'Çeviri sonucu boş');
+            const result = await translateText(text, 'tr');
+            setTranslation(result);
         } catch (err) {
             console.error('Translation error:', err);
-            setTranslation('Çeviri yapılamadı. Lütfen tekrar deneyin.');
+            setTranslation('Çeviri yapılamadı');
         } finally {
             setIsTranslating(false);
         }
@@ -90,13 +80,16 @@ export function SelectionPopup({
                         const viewerRect = viewerElement.getBoundingClientRect();
 
                         // Center horizontally, position above by default
-                        const x = params.left - viewerRect.left + params.width / 2;
-                        const y = params.top - viewerRect.top - 12; // 12px padding above
+                        let x = params.left - viewerRect.left + params.width / 2;
+                        let y = params.top - viewerRect.top - 12; // 12px padding above
+
+                        // Check limits if we can get popup dimensions
+                        // For now just basic tracking
 
                         setCurrentPosition({ x, y });
                     }
                 }
-            } catch {
+            } catch (e) {
                 // Range detached
             }
             animationFrameId = requestAnimationFrame(updatePosition);
@@ -180,25 +173,8 @@ export function SelectionPopup({
         document.removeEventListener('touchend', handleDragEnd);
     };
 
-    // Clamp position to viewport boundaries
-    const clampToViewport = (left: number, top: number) => {
-        const popup = popupRef.current;
-        if (!popup || !popup.offsetParent) return { left, top };
-        const parentRect = (popup.offsetParent as HTMLElement).getBoundingClientRect();
-        const popupWidth = popup.offsetWidth || 300;
-        const popupHeight = popup.offsetHeight || 200;
-        const maxLeft = parentRect.width - popupWidth / 2;
-        const minLeft = popupWidth / 2;
-        const minTop = popupHeight;
-        return {
-            left: Math.max(minLeft, Math.min(maxLeft, left)),
-            top: Math.max(minTop, Math.min(parentRect.height - 16, top)),
-        };
-    };
-
-    const rawLeft = currentPosition.x + dragOffset.x;
-    const rawTop = currentPosition.y + dragOffset.y;
-    const { left: finalLeft, top: finalTop } = clampToViewport(rawLeft, rawTop);
+    const finalLeft = currentPosition.x + dragOffset.x;
+    const finalTop = currentPosition.y + dragOffset.y;
 
     return (
         <div
@@ -207,8 +183,7 @@ export function SelectionPopup({
             style={{
                 left: finalLeft,
                 top: finalTop,
-                transform: 'translateX(-50%) translateY(-100%)',
-                touchAction: 'none',
+                transform: 'translateX(-50%) translateY(-100%)', // Centered and above
             }}
         >
             <div

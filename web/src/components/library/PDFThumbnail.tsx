@@ -1,10 +1,11 @@
+// PDFThumbnail - renders the first page of a PDF as a thumbnail image
+// Supports: base64 pre-cached data (fastest), IndexedDB blob cache, or live Supabase download
 'use client';
 
-import { useEffect, useState, useCallback, useRef, memo } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Document, Page } from 'react-pdf';
 import { getSupabase } from '@/lib/supabase';
 import { thumbnailCache } from '@/lib/thumbnailCache';
-import styles from '@/app/library/library.module.css';
 
 import '@/lib/pdfjs-config'; // Initialize PDF.js worker configuration
 
@@ -16,13 +17,30 @@ interface PDFThumbnailProps {
 
 type LoadingState = 'idle' | 'loading' | 'loaded' | 'error';
 
-export const PDFThumbnail = memo(function PDFThumbnail({ storagePath, alt, base64Data }: PDFThumbnailProps) {
+// Shared skeleton used during load and error states
+function ThumbnailSkeleton({ icon = '📄' }: { icon?: string }) {
+    return (
+        <div
+            style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(42, 37, 32, 0.04)',
+                fontSize: 28,
+                minHeight: 80,
+            }}
+        >
+            {icon}
+        </div>
+    );
+}
+
+export function PDFThumbnail({ storagePath, alt, base64Data }: PDFThumbnailProps) {
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [loadingState, setLoadingState] = useState<LoadingState>('idle');
-    const [isVisible, setIsVisible] = useState(false);
-    const [containerWidth, setContainerWidth] = useState(200);
     const objectUrlRef = useRef<string | null>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
 
     // Cleanup function for object URLs
     const cleanupObjectUrl = useCallback(() => {
@@ -32,43 +50,7 @@ export const PDFThumbnail = memo(function PDFThumbnail({ storagePath, alt, base6
         }
     }, []);
 
-    // Intersection Observer for lazy loading
     useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) {
-                    setIsVisible(true);
-                    observer.disconnect();
-                }
-            },
-            { rootMargin: '200px' }
-        );
-
-        observer.observe(el);
-        return () => observer.disconnect();
-    }, []);
-
-    // Measure container width for dynamic Page width
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-
-        const ro = new ResizeObserver(([entry]) => {
-            const width = entry.contentRect.width;
-            if (width > 0) setContainerWidth(Math.round(width));
-        });
-
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, []);
-
-    useEffect(() => {
-        // Don't load until visible
-        if (!isVisible) return;
-
         // If we have base64 data, use it directly (fastest path)
         if (base64Data) {
             setLoadingState('loaded');
@@ -81,7 +63,7 @@ export const PDFThumbnail = memo(function PDFThumbnail({ storagePath, alt, base6
             try {
                 const cacheKey = `thumbnail:${storagePath}`;
 
-                // 1. Check cache first - instant hit path
+                // 1. Check cache first — instant hit path
                 const cachedBlob = await thumbnailCache.getCachedThumbnail(cacheKey);
                 if (cachedBlob) {
                     cleanupObjectUrl();
@@ -92,7 +74,7 @@ export const PDFThumbnail = memo(function PDFThumbnail({ storagePath, alt, base6
                     return;
                 }
 
-                // 2. Cache miss - download from Supabase
+                // 2. Cache miss — download from Supabase
                 const supabase = getSupabase();
                 const { data, error } = await supabase.storage
                     .from('user_files')
@@ -100,7 +82,6 @@ export const PDFThumbnail = memo(function PDFThumbnail({ storagePath, alt, base6
 
                 if (error) throw error;
 
-                // Fetch the actual file
                 const response = await fetch(data.signedUrl);
                 if (!response.ok) throw new Error('Failed to fetch thumbnail');
 
@@ -108,10 +89,10 @@ export const PDFThumbnail = memo(function PDFThumbnail({ storagePath, alt, base6
 
                 // 3. Cache for next time (fire and forget)
                 thumbnailCache.cacheThumbnail(cacheKey, blob).catch(() => {
-                    // Silently ignore cache errors
+                    // Silently ignore cache errors — non-critical
                 });
 
-                // 4. Create object URL
+                // 4. Create object URL for rendering
                 cleanupObjectUrl();
                 const url = URL.createObjectURL(blob);
                 objectUrlRef.current = url;
@@ -125,72 +106,68 @@ export const PDFThumbnail = memo(function PDFThumbnail({ storagePath, alt, base6
 
         fetchUrl();
 
-        // Cleanup on unmount
         return cleanupObjectUrl;
-    }, [storagePath, base64Data, cleanupObjectUrl, isVisible]);
+    }, [storagePath, base64Data, cleanupObjectUrl]);
 
-    // Skeleton state (not visible yet, or loading)
-    if (!isVisible || loadingState === 'loading' || loadingState === 'idle') {
-        return (
-            <div ref={containerRef} className={styles.skeleton}>
-                <span className={styles.skeletonIcon}>📄</span>
-            </div>
-        );
+    if (loadingState === 'loading' || loadingState === 'idle') {
+        return <ThumbnailSkeleton />;
     }
 
-    // Error state
     if (loadingState === 'error') {
-        return (
-            <div ref={containerRef} className={styles.cardPlaceholder}>
-                <span>📄</span>
-            </div>
-        );
+        return <ThumbnailSkeleton />;
     }
 
-    // If base64 data exists, render as image (fastest)
+    // Render base64 pre-cached image (fastest path)
     if (base64Data) {
         return (
-            <div ref={containerRef} className={styles.cardThumbnailWrapper}>
+            <div style={{ width: '100%', height: '100%', position: 'relative', background: '#ffffff' }}>
                 <img
                     src={`data:image/png;base64,${base64Data}`}
                     alt={alt}
-                    className={styles.thumbnailLoaded}
+                    style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        objectPosition: 'top center',
+                        display: 'block',
+                    }}
                 />
             </div>
         );
     }
 
-    // Render PDF first page
+    // Render PDF first page via react-pdf — scale to fill container
     if (pdfUrl) {
         return (
-            <div ref={containerRef} className={styles.cardThumbnailWrapper}>
+            <div style={{
+                width: '100%',
+                height: '100%',
+                position: 'relative',
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'center',
+                background: '#ffffff',
+            }}>
                 <Document
                     file={pdfUrl}
-                    loading={
-                        <div className={styles.skeleton}>
-                            <span className={styles.skeletonIcon}>📄</span>
-                        </div>
-                    }
-                    error={<div className={styles.cardPlaceholder}>📄</div>}
+                    loading={<ThumbnailSkeleton />}
+                    error={<ThumbnailSkeleton />}
+                    onLoadError={() => {}}
                     className="pdf-thumbnail-document"
                 >
                     <Page
                         pageNumber={1}
-                        width={containerWidth}
+                        width={300}
                         renderTextLayer={false}
                         renderAnnotationLayer={false}
-                        className={styles.thumbnailLoaded}
                     />
                 </Document>
-                {/* Overlay to prevent interaction */}
+                {/* Transparent overlay prevents accidental PDF interaction clicks */}
                 <div style={{ position: 'absolute', inset: 0, zIndex: 10 }} />
             </div>
         );
     }
 
-    return (
-        <div ref={containerRef} className={styles.cardPlaceholder}>
-            <span>📄</span>
-        </div>
-    );
-});
+    return <ThumbnailSkeleton />;
+}

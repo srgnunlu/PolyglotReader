@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Annotation, AnnotationType } from '@/types/models';
 
 interface AnnotationLayerProps {
@@ -9,26 +9,17 @@ interface AnnotationLayerProps {
     scale: number;
     pageWidth: number;
     pageHeight: number;
-    onAnnotationClick?: (annotation: Annotation, position: { x: number; y: number }) => void;
 }
 
-const AnnotationLayerInner = ({
+export function AnnotationLayer({
     pageNumber,
     annotations,
     scale,
     pageWidth,
     pageHeight,
-    onAnnotationClick,
-}: AnnotationLayerProps) => {
+}: AnnotationLayerProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const offscreenRef = useRef<HTMLCanvasElement | null>(null);
     const [isVisible, setIsVisible] = useState(false);
-
-    // Pre-filter annotations for this page so the filter doesn't run on every render
-    const pageAnnotations = useMemo(
-        () => annotations.filter(a => a.pageNumber === pageNumber),
-        [annotations, pageNumber]
-    );
 
     // Fade in after a small delay to ensure canvas is painted
     useEffect(() => {
@@ -47,23 +38,17 @@ const AnnotationLayerInner = ({
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Lazily create the reusable offscreen canvas
-        if (!offscreenRef.current) {
-            offscreenRef.current = document.createElement('canvas');
-        }
-        const offscreen = offscreenRef.current;
+        // Filter annotations for this page
+        const pageAnnotations = annotations.filter(a => a.pageNumber === pageNumber);
 
-        // Resize the offscreen canvas to match the main canvas dimensions
-        offscreen.width = canvas.width;
-        offscreen.height = canvas.height;
-
-        // Draw each annotation using the reusable offscreen canvas to prevent overlapping opacity
+        // Draw each annotation using offscreen canvas to prevent overlapping opacity
         pageAnnotations.forEach(annotation => {
+            // Create offscreen canvas for this annotation
+            const offscreen = document.createElement('canvas');
+            offscreen.width = canvas.width;
+            offscreen.height = canvas.height;
             const offCtx = offscreen.getContext('2d');
             if (!offCtx) return;
-
-            // Clear the offscreen canvas for this annotation
-            offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
 
             // Use solid color for offscreen (we'll apply opacity when compositing)
             offCtx.fillStyle = annotation.color;
@@ -118,73 +103,25 @@ const AnnotationLayerInner = ({
             ctx.drawImage(offscreen, 0, 0);
             ctx.globalAlpha = 1.0; // Reset alpha
         });
-    }, [pageAnnotations, scale, pageWidth, pageHeight]);
-
-    const getAnnotationBounds = (annotation: Annotation) => {
-        if (annotation.rects.length === 0) return null;
-        let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
-        annotation.rects.forEach(rect => {
-            const isPct = rect.x <= 100 && rect.y <= 100 && rect.width <= 100 && rect.height <= 100;
-            const x = isPct ? (rect.x / 100) * pageWidth : rect.x;
-            const y = isPct ? (rect.y / 100) * pageHeight : (pageHeight - rect.y - rect.height);
-            const w = isPct ? (rect.width / 100) * pageWidth : rect.width;
-            const h = isPct ? (rect.height / 100) * pageHeight : rect.height;
-            minX = Math.min(minX, x); minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h);
-        });
-        return { x: minX * scale, y: minY * scale, w: (maxX - minX) * scale, h: (maxY - minY) * scale };
-    };
+    }, [annotations, pageNumber, scale, pageWidth, pageHeight]);
 
     return (
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}>
-            <canvas
-                ref={canvasRef}
-                width={pageWidth * scale}
-                height={pageHeight * scale}
-                style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    pointerEvents: 'none',
-                    opacity: isVisible ? 1 : 0,
-                    transition: 'opacity 0.15s ease-in',
-                }}
-            />
-            {onAnnotationClick && pageAnnotations.map(annotation => {
-                const bounds = getAnnotationBounds(annotation);
-                if (!bounds) return null;
-                return (
-                    <div
-                        key={annotation.id}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onAnnotationClick(annotation, { x: bounds.x + bounds.w / 2, y: bounds.y });
-                        }}
-                        style={{
-                            position: 'absolute',
-                            left: bounds.x,
-                            top: bounds.y,
-                            width: bounds.w,
-                            height: bounds.h,
-                            cursor: 'pointer',
-                            zIndex: 2,
-                        }}
-                    />
-                );
-            })}
-        </div>
+        <canvas
+            ref={canvasRef}
+            width={pageWidth * scale}
+            height={pageHeight * scale}
+            style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+                zIndex: 1,
+                opacity: isVisible ? 1 : 0,
+                transition: 'opacity 0.15s ease-in',
+            }}
+        />
     );
-};
+}
 
-export const AnnotationLayer = React.memo(AnnotationLayerInner, (prev, next) => {
-    return (
-        prev.annotations === next.annotations &&
-        prev.pageNumber === next.pageNumber &&
-        prev.scale === next.scale &&
-        prev.pageWidth === next.pageWidth &&
-        prev.pageHeight === next.pageHeight &&
-        prev.onAnnotationClick === next.onAnnotationClick
-    );
-});

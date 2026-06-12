@@ -1,17 +1,55 @@
-import { GoogleGenerativeAI, GenerativeModel, Content } from '@google/generative-ai';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
-function getModel(): GenerativeModel {
-    return genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL ?? 'gemini-2.0-flash'
-    });
-}
+// Client-side Gemini facade. All AI calls go through /api/gemini/* route
+// handlers so the API key stays on the server. Prompt building lives here.
 
 // MARK: - Chat Message Type for History
 export interface ChatHistoryMessage {
     role: 'user' | 'model';
     text: string;
+}
+
+// MARK: - API helpers
+
+async function generateViaApi(prompt: string, imageBase64?: string): Promise<string> {
+    const response = await fetch('/api/gemini/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, imageBase64 }),
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || `AI request failed (${response.status})`);
+    }
+
+    const data = await response.json();
+    return data.text;
+}
+
+async function* streamViaApi(
+    prompt: string,
+    history?: ChatHistoryMessage[],
+    imageBase64?: string
+): AsyncGenerator<string, void, unknown> {
+    const response = await fetch('/api/gemini/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, history, imageBase64 }),
+    });
+
+    if (!response.ok || !response.body) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || `AI request failed (${response.status})`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value, { stream: true });
+        if (text) yield text;
+    }
 }
 
 // MARK: - Enhanced Prompt Builder (NotebookLM-Style)
@@ -68,24 +106,13 @@ Aşağıda kullanıcının sorusuyla ilgili doküman bölümleri yer almaktadır
 `;
 }
 
-// MARK: - Convert history to Gemini format
-function historyToGeminiFormat(history: ChatHistoryMessage[]): Content[] {
-    return history.map(msg => ({
-        role: msg.role,
-        parts: [{ text: msg.text }]
-    }));
-}
-
 // Translation
 export async function translateText(
     text: string,
     targetLang: string = 'tr'
 ): Promise<string> {
-    const model = getModel();
     const prompt = `Translate the following text to ${targetLang}. Only return the translation, nothing else:\n\n${text}`;
-
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+    return generateViaApi(prompt);
 }
 
 /**
@@ -126,8 +153,6 @@ function shouldTranslateQuery(query: string): boolean {
  * RAG için daha iyi sonuçlar alınmasını sağlar
  */
 export async function translateAndExpandQuery(query: string): Promise<string> {
-    const model = getModel();
-
     const prompt = `Sen bir tıbbi terminoloji uzmanısın. Aşağıdaki Türkçe sorguyu İngilizce'ye çevir ve tıbbi terimlerle genişlet.
 
 Türkçe sorgu: "${query}"
@@ -146,8 +171,7 @@ Kurallar:
 Şimdi yukarıdaki sorguyu çevir ve genişlet (SADECE terimleri ver):`;
 
     try {
-        const result = await model.generateContent(prompt);
-        const expandedQuery = result.response.text().trim();
+        const expandedQuery = (await generateViaApi(prompt)).trim();
         console.log(`🔄 Query expansion: "${query}" → "${expandedQuery}"`);
         return expandedQuery;
     } catch (error) {
@@ -162,7 +186,6 @@ export async function chatWithContext(
     message: string,
     context: string
 ): Promise<string> {
-    const model = getModel();
     const prompt = `You are a helpful assistant analyzing a document. Use the following context to answer the question.
 
 Context from document:
@@ -172,26 +195,19 @@ User question: ${message}
 
 Please provide a helpful, accurate answer based on the context. If the answer cannot be found in the context, say so clearly.`;
 
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+    return generateViaApi(prompt);
 }
 
 // Document summary
 export async function generateSummary(text: string): Promise<string> {
-    const model = getModel();
     const prompt = `Summarize the following document text in Turkish. Keep it concise but comprehensive:\n\n${text}`;
-
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+    return generateViaApi(prompt);
 }
 
 // Smart note from selection
 export async function generateSmartNote(text: string): Promise<string> {
-    const model = getModel();
     const prompt = `Read this text and generate a smart note in Turkish. Include key points, important concepts, and any notable insights:\n\n${text}`;
-
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+    return generateViaApi(prompt);
 }
 
 // Stream chat (for real-time responses)
@@ -199,17 +215,11 @@ export async function* streamChat(
     message: string,
     context?: string
 ): AsyncGenerator<string, void, unknown> {
-    const model = getModel();
-
     const prompt = context
         ? `Context from document:\n${context}\n\nUser question: ${message}\n\nProvide a helpful answer based on the context.`
         : message;
 
-    const result = await model.generateContentStream(prompt);
-
-    for await (const chunk of result.stream) {
-        yield chunk.text();
-    }
+    yield* streamViaApi(prompt);
 }
 
 // Stream chat with dynamic RAG search (for document-aware responses)
@@ -252,8 +262,6 @@ export async function* streamChatWithRAGAndHistory(
     // Search for relevant chunks using hybrid search
     const context = await searchRelevantChunksHybrid(fileId, searchQuery, 10);
 
-    const model = getModel();
-
     // Build context with header
     const formattedContext = context
         ? buildContextHeader() + context
@@ -264,30 +272,7 @@ export async function* streamChatWithRAGAndHistory(
         ? buildEnhancedPrompt(message, formattedContext)
         : message;
 
-    // If we have conversation history, use chat session for memory
-    if (history.length > 0) {
-        // Convert history to Gemini format
-        const geminiHistory = historyToGeminiFormat(history);
-
-        // Start chat with history
-        const chat = model.startChat({
-            history: geminiHistory
-        });
-
-        // Send new message with streaming
-        const result = await chat.sendMessageStream(prompt);
-
-        for await (const chunk of result.stream) {
-            yield chunk.text();
-        }
-    } else {
-        // No history - use simple generate
-        const result = await model.generateContentStream(prompt);
-
-        for await (const chunk of result.stream) {
-            yield chunk.text();
-        }
-    }
+    yield* streamViaApi(prompt, history.length > 0 ? history : undefined);
 }
 
 
@@ -297,33 +282,11 @@ export async function chatWithImage(
     imageBase64: string,
     context?: string
 ): Promise<string> {
-    const model = getModel();
-
-    // Extract base64 data (remove data URL prefix if present)
-    const base64Data = imageBase64.includes(',')
-        ? imageBase64.split(',')[1]
-        : imageBase64;
-
-    // Detect mime type from data URL or default to PNG
-    let mimeType = 'image/png';
-    if (imageBase64.startsWith('data:')) {
-        const match = imageBase64.match(/data:([^;]+);/);
-        if (match) mimeType = match[1];
-    }
-
-    const imagePart = {
-        inlineData: {
-            mimeType,
-            data: base64Data,
-        },
-    };
-
     const textPrompt = context
         ? `Döküman bağlamı:\n${context}\n\nKullanıcı sorusu: ${message}\n\nLütfen görseli analiz ederek soruyu yanıtla.`
         : message;
 
-    const result = await model.generateContent([textPrompt, imagePart]);
-    return result.response.text();
+    return generateViaApi(textPrompt, imageBase64);
 }
 
 // Stream chat with image - for real-time responses with image
@@ -332,34 +295,9 @@ export async function* streamChatWithImage(
     imageBase64: string,
     context?: string
 ): AsyncGenerator<string, void, unknown> {
-    const model = getModel();
-
-    // Extract base64 data
-    const base64Data = imageBase64.includes(',')
-        ? imageBase64.split(',')[1]
-        : imageBase64;
-
-    // Detect mime type
-    let mimeType = 'image/png';
-    if (imageBase64.startsWith('data:')) {
-        const match = imageBase64.match(/data:([^;]+);/);
-        if (match) mimeType = match[1];
-    }
-
-    const imagePart = {
-        inlineData: {
-            mimeType,
-            data: base64Data,
-        },
-    };
-
     const textPrompt = context
         ? `Döküman bağlamı:\n${context}\n\nKullanıcı sorusu: ${message}\n\nLütfen görseli analiz ederek soruyu yanıtla.`
         : message;
 
-    const result = await model.generateContentStream([textPrompt, imagePart]);
-
-    for await (const chunk of result.stream) {
-        yield chunk.text();
-    }
+    yield* streamViaApi(textPrompt, undefined, imageBase64);
 }

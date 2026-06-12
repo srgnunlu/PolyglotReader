@@ -1,25 +1,32 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import "./globals.css";
-import { ToastProvider } from "@/contexts/ToastContext";
-import { ToastContainer } from "@/components/ui/Toast";
+import { Inter, Literata, JetBrains_Mono } from "next/font/google";
+import { cn } from "@/lib/utils";
+import { ThemeProvider } from "@/components/shared/ThemeProvider";
+import { Toaster } from "@/components/shared/Toaster";
 
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 5,
-  viewportFit: "cover",
-  themeColor: "#0f172a",
-};
+const inter = Inter({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const literata = Literata({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-reading",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Corio Docs",
   description: "Akıllı Doküman Asistanı - AI-powered document analysis",
   keywords: ["PDF reader", "document analysis", "AI", "notes", "annotations", "Corio"],
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Corio Docs",
-  },
 };
 
 export default function RootLayout({
@@ -28,12 +35,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr" suppressHydrationWarning>
-      <body>
-        <ToastProvider>
+    <html
+      lang="tr"
+      suppressHydrationWarning
+      className={cn("font-sans", inter.variable, literata.variable, jetbrainsMono.variable)}
+    >
+      <body className={`${inter.variable} ${literata.variable} ${jetbrainsMono.variable} font-sans bg-corio-bg text-corio-fg antialiased`}>
+        <ThemeProvider>
           {children}
-          <ToastContainer />
-        </ToastProvider>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

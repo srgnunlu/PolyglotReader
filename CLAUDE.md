@@ -222,16 +222,17 @@ All services are singletons (`*.shared`) and `@MainActor`. They are organized in
 
 Companion Next.js app with the following structure:
 
-- `app/(auth)/login/` - Authentication page
+- `app/(auth)/` and `app/login/` - Authentication pages
 - `app/auth/callback/` - OAuth callback handler
-- `app/library/` - PDF library browser
-- `app/reader/[id]/` - PDF reader with annotations
-- `app/notes/` - Notes/annotations viewer
-- `app/api/chat/` - Server-side Gemini chat endpoint
-- `app/api/translate/` - Server-side translation endpoint
-- `app/api/embed/` - Server-side embedding generation
+- `app/(app)/library/` - PDF library browser
+- `app/(app)/reader/[id]/` - PDF reader with annotations
+- `app/(app)/notes/` - Notes/annotations viewer
+- `app/(app)/settings/` - Settings page
+- `app/api/gemini/generate/` - Server-side non-streaming Gemini endpoint
+- `app/api/gemini/stream/` - Server-side streaming Gemini chat endpoint
+- `app/api/gemini/embed/` - Server-side embedding generation
 - `components/` - React components (PDFViewer, ChatPanel, AnnotationLayer, etc.)
-- `hooks/` - Custom hooks (useAuth, useDocuments)
+- `hooks/` - Custom hooks (useAuth, useDocuments, useFileUpload, usePDFRenderer, usePDFNavigation)
 
 All Gemini API operations are server-side to protect API keys. Authentication is required for all API routes.
 

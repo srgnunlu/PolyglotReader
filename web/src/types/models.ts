@@ -79,9 +79,6 @@ export interface ChatMessage {
   role: MessageRole;
   text: string;
   timestamp: Date;
-  error?: boolean;
-  saveError?: boolean;
-  originalUserMessage?: string;
   attachment?: {
     type: 'image';
     content: string;

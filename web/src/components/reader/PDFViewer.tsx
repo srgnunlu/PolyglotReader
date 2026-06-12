@@ -1,38 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Annotation } from '@/types/models';
 import { AnnotationLayer } from './AnnotationLayer';
-import { pdfCache } from '@/lib/pdfCache';
-import { getSupabase } from '@/lib/supabase';
+import { PDFToolbar } from './PDFToolbar';
+import { usePDFRenderer } from '@/hooks/usePDFRenderer';
+import { usePDFNavigation } from '@/hooks/usePDFNavigation';
+import { useTextSelection } from '@/hooks/useTextSelection';
+import { usePDFImageSelection } from '@/hooks/usePDFImageSelection';
 import '@/lib/pdfjs-config'; // Initialize PDF.js worker configuration
 
-const defaultScale = 1.2;
-const minScale = 0.5;
-const maxScale = 3;
-const pdfjsVersion = pdfjs.version || '5.4.296';
-const overscanPages = 2;
-const fallbackPageSize = { width: 595, height: 842 };
-
-function useIsMobile() {
-    const [isMobile, setIsMobile] = useState(false);
-    useEffect(() => {
-        const check = () => setIsMobile(window.innerWidth <= 768);
-        check();
-        window.addEventListener('resize', check);
-        return () => window.removeEventListener('resize', check);
-    }, []);
-    return isMobile;
-}
-
-// Highlight colors
-const HIGHLIGHT_COLORS = [
-    { name: 'Sarı', value: '#fef08a', shortcut: '1' },
-    { name: 'Yeşil', value: '#bbf7d0', shortcut: '2' },
-    { name: 'Mavi', value: '#bae6fd', shortcut: '3' },
-    { name: 'Pembe', value: '#fbcfe8', shortcut: '4' },
-];
+const overscanPages = 10;
 
 interface PDFViewerProps {
     pdfUrl: string;
@@ -53,6 +32,7 @@ interface PDFViewerProps {
         position: { x: number; y: number }
     ) => void;
     onPageChange?: (page: number) => void;
+    onTotalPagesChange?: (total: number) => void;
     onScaleChange?: (scale: number) => void;
     onProgressChange?: (page: number, x: number, y: number, scale: number) => void;
     initialPage?: number;
@@ -73,8 +53,6 @@ interface PDFViewerProps {
     onToggleChat?: () => void;
 }
 
-type DocumentLoadSuccess = pdfjs.PDFDocumentProxy;
-
 export function PDFViewer({
     pdfUrl,
     storagePath,
@@ -82,6 +60,7 @@ export function PDFViewer({
     onTextSelect,
     onImageSelect,
     onPageChange,
+    onTotalPagesChange,
     onScaleChange,
     onProgressChange,
     initialPage = 1,
@@ -102,490 +81,79 @@ export function PDFViewer({
     const wrapperRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-    const pdfDocumentRef = useRef<pdfjs.PDFDocumentProxy | null>(null);
-    const isMobile = useIsMobile();
-    const [showMoreTools, setShowMoreTools] = useState(false);
-    const moreToolsRef = useRef<HTMLDivElement>(null);
-    const [currentPage, setCurrentPage] = useState(initialPage);
-    const [totalPages, setTotalPages] = useState(0);
-    const [displayScale, setDisplayScale] = useState(initialScroll?.scale || defaultScale);
-    const [renderScale, setRenderScale] = useState(initialScroll?.scale || defaultScale);
-    const [isRestored, setIsRestored] = useState(false);
-    const [pageDimensions, setPageDimensions] = useState<Map<number, { width: number; height: number }>>(new Map());
-    const [defaultPageSize, setDefaultPageSize] = useState<{ width: number; height: number } | null>(null);
-    const initialScaleRef = useRef(initialScroll?.scale || defaultScale);
-    const fitToWidthApplied = useRef(false);
 
-    // Cache-first PDF loading
-    const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
-    const [isLoadingPDF, setIsLoadingPDF] = useState(true);
-    const [loadError, setLoadError] = useState<string | null>(null);
+    // Document loading, zoom and page dimensions
+    const {
+        pdfDataUrl,
+        displayScale,
+        renderScale,
+        isZooming,
+        totalPages,
+        pageDimensions,
+        defaultPageSize,
+        documentOptions,
+        pdfDocumentRef,
+        handleDocumentLoadSuccess,
+        handleDocumentLoadError,
+        handlePageLoadSuccess,
+        handleZoom,
+        setScaleImmediate,
+    } = usePDFRenderer({
+        pdfUrl,
+        storagePath,
+        initialScale: initialScroll?.scale,
+    });
 
-    const documentOptions = useMemo(() => ({
-        cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsVersion}/cmaps/`,
-        cMapPacked: true,
-        standardFontDataUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsVersion}/standard_fonts/`,
-        verbosity: 0,
-    }), []);
-
-    // Cache-first PDF loading
-    useEffect(() => {
-        let objectUrl: string | null = null;
-        const abortController = new AbortController();
-        const signal = abortController.signal;
-
-        const loadPDF = async () => {
-            setIsLoadingPDF(true);
-            setLoadError(null);
-
-            try {
-                // If we have a storagePath, try cache-first strategy
-                if (storagePath) {
-                    // 1. Check cache first
-                    const cachedBlob = await pdfCache.getCachedPDF(storagePath);
-
-                    if (signal.aborted) return;
-
-                    if (cachedBlob) {
-                        objectUrl = URL.createObjectURL(cachedBlob);
-                        setPdfDataUrl(objectUrl);
-                        setIsLoadingPDF(false);
-                        return;
-                    }
-
-                    // 2. Cache miss - download from Supabase
-                    console.log('[PDFViewer] Cache miss, downloading from Supabase...');
-                    const supabase = getSupabase();
-                    const { data: blob, error } = await supabase.storage
-                        .from('user_files')
-                        .download(storagePath, { signal });
-
-                    if (signal.aborted) return;
-                    if (error) throw error;
-                    if (!blob) throw new Error('No blob returned from Supabase');
-
-                    // 3. Cache for next time
-                    await pdfCache.cachePDF(blob, storagePath);
-
-                    if (signal.aborted) return;
-
-                    // 4. Create object URL and set
-                    objectUrl = URL.createObjectURL(blob);
-                    setPdfDataUrl(objectUrl);
-                } else {
-                    // Fallback: use pdfUrl directly (no caching)
-                    setPdfDataUrl(pdfUrl);
-                }
-
-                if (signal.aborted) return;
-                setIsLoadingPDF(false);
-            } catch (error) {
-                if (signal.aborted) return;
-                console.error('[PDFViewer] Error loading PDF:', error);
-                setLoadError(error instanceof Error ? error.message : 'Failed to load PDF');
-                setIsLoadingPDF(false);
-                // Fallback to direct URL
-                setPdfDataUrl(pdfUrl);
-            }
-        };
-
-        loadPDF();
-
-        // Cleanup: abort in-flight requests and revoke object URL to prevent memory leaks
-        return () => {
-            abortController.abort();
-            if (objectUrl) {
-                URL.revokeObjectURL(objectUrl);
-            }
-        };
-    }, [pdfUrl, storagePath]);
-
-    // Fit-to-width on mobile when first page loads (no saved progress)
-    useEffect(() => {
-        if (!isMobile || fitToWidthApplied.current || !defaultPageSize || !containerRef.current) return;
-        if (initialScroll?.scale) return; // User has saved progress, don't override
-
-        const containerWidth = containerRef.current.clientWidth;
-        const padding = 8; // mobile padding
-        const fitScale = (containerWidth - padding * 2) / defaultPageSize.width;
-        const clampedScale = Math.max(minScale, Math.min(maxScale, fitScale));
-
-        fitToWidthApplied.current = true;
-        setDisplayScale(clampedScale);
-        setRenderScale(clampedScale);
-    }, [isMobile, defaultPageSize, initialScroll]);
-
-    const fitToWidth = useCallback(() => {
-        if (!containerRef.current || !defaultPageSize) return;
-        const containerWidth = containerRef.current.clientWidth;
-        const padding = isMobile ? 8 : 32;
-        const fitScale = (containerWidth - padding * 2) / defaultPageSize.width;
-        const clampedScale = Math.max(minScale, Math.min(maxScale, fitScale));
-        handleZoom(clampedScale);
-    }, [defaultPageSize, isMobile]);
+    // Page tracking, scroll restoration and progress reporting
+    const { currentPage, setCurrentPage, goToPage } = usePDFNavigation({
+        totalPages,
+        initialPage,
+        initialScroll,
+        containerRef,
+        pageRefs,
+        displayScale,
+        onPageChange,
+        onProgressChange,
+        restoreScale: setScaleImmediate,
+    });
 
     useEffect(() => {
         onScaleChange?.(displayScale);
     }, [onScaleChange, displayScale]);
 
-    useEffect(() => {
-        if (!totalPages) return;
-        const targetPage = Math.min(Math.max(initialPage, 1), totalPages);
-        const pageElement = pageRefs.current.get(targetPage);
-        pageElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, [initialPage, totalPages]);
-
-    // Track current page based on scroll position
-    useEffect(() => {
-        if (!containerRef.current || totalPages === 0) return;
-
-        const observerOptions = {
-            root: containerRef.current,
-            threshold: [0, 0.25, 0.5, 0.75, 1],
-            rootMargin: '-10% 0px -10% 0px',
-        };
-
-        const observer = new IntersectionObserver((entries) => {
-            let maxRatio = 0;
-            let mostVisiblePage = currentPage;
-
-            entries.forEach((entry) => {
-                if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
-                    const pageNum = Number(entry.target.getAttribute('data-page-number'));
-                    if (pageNum && pageNum >= 1) {
-                        maxRatio = entry.intersectionRatio;
-                        mostVisiblePage = pageNum;
-                    }
-                }
-            });
-
-            if (mostVisiblePage !== currentPage && maxRatio > 0) {
-                setCurrentPage(mostVisiblePage);
-                onPageChange?.(mostVisiblePage);
-            }
-        }, observerOptions);
-
-        pageRefs.current.forEach((el) => {
-            observer.observe(el);
-        });
-
-        return () => observer.disconnect();
-    }, [totalPages, onPageChange, currentPage]);
-
-    // Handle initial scroll restoration
-    useEffect(() => {
-        if (!containerRef.current || totalPages === 0 || isRestored || !initialScroll) return;
-
-        const timer = setTimeout(() => {
-            if (initialScroll && containerRef.current) {
-                if (initialScroll.scale !== displayScale) {
-                    setDisplayScale(initialScroll.scale);
-                    setRenderScale(initialScroll.scale);
-                }
-
-                const pageElement = pageRefs.current.get(initialPage);
-                if (pageElement) {
-                    pageElement.scrollIntoView({ behavior: 'auto', block: 'start' });
-                }
-            }
-            setIsRestored(true);
-        }, 500);
-
-        return () => clearTimeout(timer);
-    }, [totalPages, initialScroll, isRestored, initialPage, displayScale]);
-
-    // Monitor scroll for progress updates
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container || !onProgressChange) return;
-
-        const handleScroll = () => {
-            if (!container) return;
-
-            const pageElement = pageRefs.current.get(currentPage);
-            let offsetX = 0;
-            let offsetY = 0;
-
-            if (pageElement) {
-                const containerRect = container.getBoundingClientRect();
-                const pageRect = pageElement.getBoundingClientRect();
-
-                offsetY = Math.max(0, containerRect.top - pageRect.top) / displayScale;
-                offsetX = Math.max(0, containerRect.left - pageRect.left) / displayScale;
-            }
-
-            onProgressChange(currentPage, offsetX, offsetY, displayScale);
-        };
-
-        let timeoutId: NodeJS.Timeout;
-        const debouncedScroll = () => {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(handleScroll, 500);
-        };
-
-        container.addEventListener('scroll', debouncedScroll);
-        return () => {
-            container.removeEventListener('scroll', debouncedScroll);
-            clearTimeout(timeoutId);
-        };
-    }, [currentPage, displayScale, onProgressChange]);
-
-    const handleDocumentLoadSuccess = useCallback((pdf: DocumentLoadSuccess) => {
-        pdfDocumentRef.current = pdf;
-        setTotalPages(pdf.numPages);
+    const handleLoadSuccess = useCallback((pdf: pdfjs.PDFDocumentProxy) => {
+        handleDocumentLoadSuccess(pdf);
         setCurrentPage(prev => Math.min(Math.max(prev, 1), pdf.numPages));
-    }, []);
+        onTotalPagesChange?.(pdf.numPages);
+    }, [handleDocumentLoadSuccess, setCurrentPage, onTotalPagesChange]);
 
-    const handleDocumentLoadError = useCallback((err: Error) => {
-        if (err.message && err.message.includes('Worker was terminated')) {
-            return;
-        }
-        console.error('PDF load error:', err);
-    }, []);
-
-    const handleSelectionEnd = useCallback(() => {
-        const selection = window.getSelection();
-        if (!selection || selection.isCollapsed) return;
-
-        const text = selection.toString().trim();
-        if (!text) return;
-
-        const range = selection.getRangeAt(0);
-        if (!containerRef.current?.contains(range.commonAncestorContainer)) {
-            return;
-        }
-
-        const rect = range.getBoundingClientRect();
-        const wrapperRect = wrapperRef.current?.getBoundingClientRect();
-
-        if (!wrapperRect) return;
-
-        let element: HTMLElement | null = range.commonAncestorContainer as HTMLElement;
-        if (element.nodeType === Node.TEXT_NODE) {
-            element = element.parentElement;
-        }
-
-        const pageElement = element?.closest('[data-page-number]') as HTMLElement | null;
-        if (!pageElement) return;
-
-        const pageNumber = Number(pageElement.dataset.pageNumber);
-        if (!Number.isFinite(pageNumber) || pageNumber < 1) return;
-
-        const canvas = pageElement.querySelector('.react-pdf__Page__canvas') as HTMLCanvasElement | null;
-        const pageRect = (canvas ?? pageElement).getBoundingClientRect();
-
-        if (!pageRect.width || !pageRect.height) return;
-
-        const selectionRects = Array.from(range.getClientRects())
-            .filter(r => r.width > 0 && r.height > 0)
-            .map(r => ({
-                x: ((r.left - pageRect.left) / pageRect.width) * 100,
-                y: ((r.top - pageRect.top) / pageRect.height) * 100,
-                width: (r.width / pageRect.width) * 100,
-                height: (r.height / pageRect.height) * 100,
-            }));
-
-        const selectionBounds = {
-            x: rect.left - wrapperRect.left,
-            y: rect.top - wrapperRect.top,
-            width: rect.width,
-            height: rect.height,
-        };
-
-        if (onTextSelect) {
-            const dims = pageDimensions.get(pageNumber);
-            onTextSelect(
-                text,
-                pageNumber,
-                {
-                    x: rect.left - wrapperRect.left + rect.width / 2,
-                    y: rect.top - wrapperRect.top - 40,
-                },
-                selectionRects,
-                selectionBounds,
-                range,
-                dims
-            );
-        }
-
+    // Text selection — selecting also moves the current page
+    const handleSelectPage = useCallback((pageNumber: number) => {
         setCurrentPage(pageNumber);
         onPageChange?.(pageNumber);
-    }, [onPageChange, onTextSelect, pageDimensions]);
+    }, [setCurrentPage, onPageChange]);
 
-    const handleImageContextMenu = useCallback(async (e: React.MouseEvent) => {
-        if (e.type !== 'contextmenu') return;
-        e.preventDefault();
+    const { handleSelectionEnd } = useTextSelection({
+        wrapperRef,
+        containerRef,
+        pageDimensions,
+        onTextSelect,
+        onSelectPage: handleSelectPage,
+    });
 
-        if (!onImageSelect || !containerRef.current) return;
+    // Right-click image extraction
+    const { handleImageContextMenu } = usePDFImageSelection({
+        pdfUrl,
+        displayScale,
+        renderScale,
+        pdfDocumentRef,
+        containerRef,
+        onImageSelect,
+    });
 
-        const selection = window.getSelection();
-        if (selection && !selection.isCollapsed) return;
-
-        const target = e.target as HTMLElement;
-        const pageElement = target.closest('.pdf-page') as HTMLElement;
-
-        if (!pageElement) return;
-
-        const pageNumber = Number(pageElement.getAttribute('data-page-number'));
-        if (!pageNumber) return;
-
-        const canvas = pageElement.querySelector('canvas');
-        if (!canvas) return;
-
-        try {
-            if (!pdfDocumentRef.current) {
-                pdfDocumentRef.current = await pdfjs.getDocument(pdfUrl).promise;
-            }
-            const pdf = pdfDocumentRef.current;
-            const page = await pdf.getPage(pageNumber);
-            const ops = await page.getOperatorList();
-
-            const pageRect = pageElement.getBoundingClientRect();
-            const displayViewport = page.getViewport({ scale: displayScale });
-            const renderViewport = page.getViewport({ scale: renderScale });
-
-            const [clickX, clickY] = displayViewport.convertToPdfPoint(
-                e.clientX - pageRect.left,
-                e.clientY - pageRect.top
-            );
-
-            const multiply = (m1: number[], m2: number[]) => {
-                return [
-                    m1[0] * m2[0] + m1[1] * m2[2],
-                    m1[0] * m2[1] + m1[1] * m2[3],
-                    m1[2] * m2[0] + m1[3] * m2[2],
-                    m1[2] * m2[1] + m1[3] * m2[3],
-                    m1[4] * m2[0] + m1[5] * m2[2] + m2[4],
-                    m1[4] * m2[1] + m1[5] * m2[3] + m2[5]
-                ];
-            };
-
-            const transform = (p: { x: number, y: number }, m: number[]) => {
-                return {
-                    x: m[0] * p.x + m[2] * p.y + m[4],
-                    y: m[1] * p.x + m[3] * p.y + m[5]
-                };
-            };
-
-            let ctm = [1, 0, 0, 1, 0, 0];
-            const ctmStack: number[][] = [];
-
-            for (let i = 0; i < ops.fnArray.length; i++) {
-                const fn = ops.fnArray[i];
-                const args = ops.argsArray[i];
-
-                if (fn === pdfjs.OPS.save) {
-                    ctmStack.push([...ctm]);
-                } else if (fn === pdfjs.OPS.restore) {
-                    if (ctmStack.length > 0) {
-                        ctm = ctmStack.pop()!;
-                    }
-                } else if (fn === pdfjs.OPS.transform) {
-                    ctm = multiply(args, ctm);
-                } else if (fn === pdfjs.OPS.paintImageXObject) {
-                    const p1 = transform({ x: 0, y: 0 }, ctm);
-                    const p2 = transform({ x: 1, y: 0 }, ctm);
-                    const p3 = transform({ x: 1, y: 1 }, ctm);
-                    const p4 = transform({ x: 0, y: 1 }, ctm);
-
-                    const minX = Math.min(p1.x, p2.x, p3.x, p4.x);
-                    const maxX = Math.max(p1.x, p2.x, p3.x, p4.x);
-                    const minY = Math.min(p1.y, p2.y, p3.y, p4.y);
-                    const maxY = Math.max(p1.y, p2.y, p3.y, p4.y);
-
-                    if (clickX >= minX && clickX <= maxX && clickY >= minY && clickY <= maxY) {
-                        const pixelRatio = canvas.width / renderViewport.width;
-                        const corners = [p1, p2, p3, p4].map(p => {
-                            const vp = renderViewport.convertToViewportPoint(p.x, p.y);
-                            return { x: vp[0] * pixelRatio, y: vp[1] * pixelRatio };
-                        });
-
-                        const cMinX = Math.min(...corners.map(c => c.x));
-                        const cMaxX = Math.max(...corners.map(c => c.x));
-                        const cMinY = Math.min(...corners.map(c => c.y));
-                        const cMaxY = Math.max(...corners.map(c => c.y));
-
-                        const cropW = cMaxX - cMinX;
-                        const cropH = cMaxY - cMinY;
-
-                        if (cropW <= 0 || cropH <= 0) continue;
-
-                        const tempCanvas = document.createElement('canvas');
-                        tempCanvas.width = cropW;
-                        tempCanvas.height = cropH;
-                        const tempCtx = tempCanvas.getContext('2d');
-                        if (!tempCtx) continue;
-
-                        tempCtx.drawImage(
-                            canvas,
-                            cMinX, cMinY, cropW, cropH,
-                            0, 0, cropW, cropH
-                        );
-
-                        const imageBase64 = tempCanvas.toDataURL('image/png').split(',')[1];
-
-                        onImageSelect(imageBase64, pageNumber, {
-                            x: e.clientX,
-                            y: e.clientY
-                        });
-                        return;
-                    }
-                }
-            }
-        } catch (err) {
-            console.error('Error selecting image:', err);
-        }
-    }, [onImageSelect, pdfUrl, displayScale, renderScale]);
-
-    const goToPage = (page: number) => {
-        if (!totalPages) return;
-        const newPage = Math.max(1, Math.min(page, totalPages));
-        setCurrentPage(newPage);
-        onPageChange?.(newPage);
-
-        const pageElement = pageRefs.current.get(newPage);
-        pageElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
-
-    // Scroll-aware zoom: maintain scroll position relative to current page
-    const handleZoom = useCallback((newScale: number) => {
-        const container = containerRef.current;
-        if (!container) {
-            setDisplayScale(newScale);
-            setRenderScale(newScale);
-            return;
-        }
-
-        // Get current scroll position ratio
-        const currentScrollTop = container.scrollTop;
-        const currentScrollHeight = container.scrollHeight || 1;
-        const scrollRatio = currentScrollTop / currentScrollHeight;
-
-        // Apply new scale — always render at displayScale for correct text selection
-        setDisplayScale(newScale);
-        setRenderScale(newScale);
-
-        // After render, restore scroll position
-        requestAnimationFrame(() => {
-            const newScrollHeight = container.scrollHeight || 1;
-            container.scrollTop = scrollRatio * newScrollHeight;
-        });
-    }, []);
-
-    const zoomIn = () => handleZoom(Math.min(displayScale + 0.2, maxScale));
-    const zoomOut = () => handleZoom(Math.max(displayScale - 0.2, minScale));
-    const resetZoom = () => fitToWidth();
-
-    // Page load success callback
-    const handlePageLoadSuccess = useCallback((page: pdfjs.PDFPageProxy) => {
-        const viewport = page.getViewport({ scale: 1 });
-        setPageDimensions(prev => {
-            const next = new Map(prev);
-            next.set(page.pageNumber, { width: viewport.width, height: viewport.height });
-            return next;
-        });
-        setDefaultPageSize(prev => prev ?? { width: viewport.width, height: viewport.height });
-    }, []);
+    const zoomIn = () => handleZoom(Math.min(displayScale + 0.2, 3), containerRef.current);
+    const zoomOut = () => handleZoom(Math.max(displayScale - 0.2, 0.5), containerRef.current);
+    const resetZoom = () => handleZoom(1.2, containerRef.current);
 
     // Render persistent highlight
     const renderPersistentHighlight = (pageNum: number) => {
@@ -629,170 +197,27 @@ export function PDFViewer({
         </div>
     );
 
-    // Close more tools dropdown when clicking outside
-    useEffect(() => {
-        if (!showMoreTools) return;
-        const handleClick = (e: MouseEvent) => {
-            if (moreToolsRef.current && !moreToolsRef.current.contains(e.target as Node)) {
-                setShowMoreTools(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClick);
-        return () => document.removeEventListener('mousedown', handleClick);
-    }, [showMoreTools]);
-
     return (
         <div ref={wrapperRef} className="pdf-viewer-wrapper">
-            <div className={`pdf-toolbar ${isNavHidden ? 'toolbar-hidden' : ''}`} data-pdf-toolbar="true">
-                {/* Page Navigation */}
-                <div className="pdf-toolbar-group">
-                    <button
-                        className="pdf-toolbar-btn"
-                        onClick={() => goToPage(currentPage - 1)}
-                        disabled={currentPage <= 1}
-                        title="Önceki sayfa"
-                    >
-                        ←
-                    </button>
-                    <span className="pdf-page-info">
-                        <input
-                            type="number"
-                            value={currentPage}
-                            onChange={(e) => goToPage(parseInt(e.target.value) || 1)}
-                            min={1}
-                            max={totalPages}
-                            className="pdf-page-input"
-                        />
-                        <span>/ {totalPages || 0}</span>
-                    </span>
-                    <button
-                        className="pdf-toolbar-btn"
-                        onClick={() => goToPage(currentPage + 1)}
-                        disabled={currentPage >= totalPages}
-                        title="Sonraki sayfa"
-                    >
-                        →
-                    </button>
-                </div>
-
-                {/* Zoom Controls */}
-                <div className="pdf-toolbar-group">
-                    <button className="pdf-toolbar-btn" onClick={zoomOut} title="Uzaklaştır">−</button>
-                    <span className="pdf-zoom-info">{Math.round(displayScale * 100)}%</span>
-                    <button className="pdf-toolbar-btn" onClick={zoomIn} title="Yakınlaştır">+</button>
-                    <button className="pdf-toolbar-btn" onClick={resetZoom} title="Sığdır">⤢</button>
-                </div>
-
-                {/* Desktop: show all tools inline */}
-                {!isMobile && (
-                    <>
-                        {/* Color Picker */}
-                        <div className="pdf-toolbar-group pdf-color-group">
-                            {HIGHLIGHT_COLORS.map(({ name, value, shortcut }) => (
-                                <button
-                                    key={value}
-                                    className={`pdf-color-btn ${selectedColor === value ? 'active' : ''}`}
-                                    style={{ backgroundColor: value }}
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => {
-                                        onColorChange?.(value);
-                                        onQuickHighlight?.(value);
-                                    }}
-                                    title={`${name} (${shortcut})`}
-                                />
-                            ))}
-                        </div>
-
-                        {/* Translation & Chat Toggle */}
-                        <div className="pdf-toolbar-group">
-                            <button
-                                className={`pdf-toolbar-btn pdf-translation-btn ${isQuickTranslationMode ? 'active' : ''}`}
-                                onClick={onToggleTranslation}
-                                title={isQuickTranslationMode ? 'Hızlı çeviri modu açık' : 'Hızlı çeviri modu'}
-                            >
-                                🌐
-                            </button>
-                            <button
-                                className={`pdf-toolbar-btn pdf-chat-btn ${isChatOpen ? 'active' : ''}`}
-                                onClick={onToggleChat}
-                                title="AI Sohbet"
-                            >
-                                ✨
-                            </button>
-                        </div>
-
-                        {/* Fullscreen Button */}
-                        <div className="pdf-toolbar-group">
-                            <button
-                                className={`pdf-toolbar-btn pdf-fullscreen-btn ${isFullscreen ? 'active' : ''}`}
-                                onClick={onToggleFullscreen}
-                                title={isFullscreen ? 'Tam ekrandan çık (ESC)' : 'Tam ekran (F11)'}
-                            >
-                                ⛶
-                            </button>
-                        </div>
-                    </>
-                )}
-
-                {/* Mobile: overflow menu for secondary tools */}
-                {isMobile && (
-                    <div className="pdf-toolbar-group pdf-more-container" ref={moreToolsRef}>
-                        <button
-                            className={`pdf-toolbar-btn pdf-translation-btn ${isQuickTranslationMode ? 'active' : ''}`}
-                            onClick={onToggleTranslation}
-                            title="Hızlı çeviri"
-                        >
-                            🌐
-                        </button>
-                        <button
-                            className={`pdf-toolbar-btn pdf-chat-btn ${isChatOpen ? 'active' : ''}`}
-                            onClick={onToggleChat}
-                            title="AI Sohbet"
-                        >
-                            ✨
-                        </button>
-                        <button
-                            className={`pdf-toolbar-btn ${showMoreTools ? 'active' : ''}`}
-                            onClick={() => setShowMoreTools(!showMoreTools)}
-                            title="Daha fazla"
-                        >
-                            ⋯
-                        </button>
-                        {showMoreTools && (
-                            <div className="pdf-more-dropdown">
-                                <div className="pdf-more-section">
-                                    <span className="pdf-more-label">Renk</span>
-                                    <div className="pdf-more-colors">
-                                        {HIGHLIGHT_COLORS.map(({ name, value }) => (
-                                            <button
-                                                key={value}
-                                                className={`pdf-color-btn ${selectedColor === value ? 'active' : ''}`}
-                                                style={{ backgroundColor: value }}
-                                                onMouseDown={(e) => e.preventDefault()}
-                                                onClick={() => {
-                                                    onColorChange?.(value);
-                                                    onQuickHighlight?.(value);
-                                                    setShowMoreTools(false);
-                                                }}
-                                                title={name}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                                <button
-                                    className="pdf-more-item"
-                                    onClick={() => {
-                                        onToggleFullscreen?.();
-                                        setShowMoreTools(false);
-                                    }}
-                                >
-                                    ⛶ {isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
+            <PDFToolbar
+                currentPage={currentPage}
+                totalPages={totalPages}
+                displayScale={displayScale}
+                goToPage={goToPage}
+                zoomIn={zoomIn}
+                zoomOut={zoomOut}
+                resetZoom={resetZoom}
+                selectedColor={selectedColor}
+                onColorChange={onColorChange}
+                onQuickHighlight={onQuickHighlight}
+                isQuickTranslationMode={isQuickTranslationMode}
+                onToggleTranslation={onToggleTranslation}
+                isChatOpen={isChatOpen}
+                onToggleChat={onToggleChat}
+                isFullscreen={isFullscreen}
+                onToggleFullscreen={onToggleFullscreen}
+                isNavHidden={isNavHidden}
+            />
 
             <div
                 ref={containerRef}
@@ -803,7 +228,7 @@ export function PDFViewer({
             >
                 <Document
                     file={pdfDataUrl}
-                    onLoadSuccess={handleDocumentLoadSuccess}
+                    onLoadSuccess={handleLoadSuccess}
                     onLoadError={handleDocumentLoadError}
                     onSourceError={handleDocumentLoadError}
                     options={documentOptions}
@@ -814,9 +239,10 @@ export function PDFViewer({
                         const renderStart = Math.max(1, currentPage - overscanPages);
                         const renderEnd = Math.min(totalPages, currentPage + overscanPages);
                         const shouldRender = pageNum >= renderStart && pageNum <= renderEnd;
-                        const pageSize = pageDimensions.get(pageNum) ?? defaultPageSize ?? fallbackPageSize;
+                        const pageSize = pageDimensions.get(pageNum) ?? defaultPageSize;
                         const displayWidth = pageSize.width * displayScale;
                         const displayHeight = pageSize.height * displayScale;
+                        const scaleRatio = displayScale / renderScale;
 
                         return (
                             <div
@@ -835,12 +261,18 @@ export function PDFViewer({
                             >
                                 {shouldRender ? (
                                     <>
-                                        <div className="pdf-page-inner">
+                                        <div
+                                            className="pdf-page-inner"
+                                            style={{
+                                                transform: scaleRatio === 1 ? undefined : `scale(${scaleRatio})`,
+                                                transformOrigin: 'top left',
+                                            }}
+                                        >
                                             <Page
                                                 pageNumber={pageNum}
-                                                scale={displayScale}
-                                                renderTextLayer={true}
-                                                renderAnnotationLayer={true}
+                                                scale={renderScale}
+                                                renderTextLayer={!isZooming}
+                                                renderAnnotationLayer={!isZooming}
                                                 onLoadSuccess={handlePageLoadSuccess}
                                             />
                                         </div>
@@ -872,147 +304,11 @@ export function PDFViewer({
           background: var(--color-gray-800);
         }
 
-        .pdf-toolbar {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 16px;
-          padding: 8px 16px;
-          background: var(--bg-secondary);
-          border-bottom: 1px solid var(--border-color);
-          transition: opacity 0.3s ease, transform 0.3s ease;
-          z-index: 100;
-          flex-shrink: 0;
-        }
-
-        .pdf-toolbar-group {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-
-        .pdf-toolbar-btn {
-          width: 32px;
-          height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: var(--bg-tertiary);
-          border: 1px solid var(--border-color);
-          border-radius: var(--radius-md);
-          color: var(--text-primary);
-          font-size: 1rem;
-          cursor: pointer;
-          transition: all var(--transition-fast);
-          flex-shrink: 0;
-        }
-
-        .pdf-toolbar-btn:hover:not(:disabled) {
-          background: var(--color-primary-500);
-          color: white;
-          border-color: var(--color-primary-500);
-        }
-
-        .pdf-toolbar-btn:disabled {
-          opacity: 0.4;
-          cursor: not-allowed;
-        }
-
-        .pdf-toolbar-btn:active:not(:disabled) {
-          transform: scale(0.92);
-        }
-
-        /* Auto-hide toolbar */
-        .toolbar-hidden {
-          opacity: 0;
-          pointer-events: none;
-          transform: translateY(-100%);
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-        }
-
-        /* Color picker buttons */
-        .pdf-color-group {
-          gap: 6px;
-          padding: 0 8px;
-          border-left: 1px solid var(--border-color);
-          border-right: 1px solid var(--border-color);
-        }
-
-        .pdf-color-btn {
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          border: 2px solid transparent;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-          flex-shrink: 0;
-        }
-
-        .pdf-color-btn:hover {
-          transform: scale(1.15);
-          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-        }
-
-        .pdf-color-btn.active {
-          border-color: var(--text-primary);
-          transform: scale(1.1);
-          box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--color-primary-500);
-        }
-
-        /* Fullscreen button */
-        .pdf-fullscreen-btn {
-          font-size: 1.25rem;
-        }
-
-        .pdf-fullscreen-btn.active,
-        .pdf-translation-btn.active,
-        .pdf-chat-btn.active {
-          background: var(--color-primary-500);
-          color: white;
-          border-color: var(--color-primary-500);
-        }
-
-        .pdf-page-info {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          font-size: 0.875rem;
-          color: var(--text-secondary);
-        }
-
-        .pdf-page-input {
-          width: 44px;
-          padding: 4px 6px;
-          text-align: center;
-          background: var(--bg-tertiary);
-          border: 1px solid var(--border-color);
-          border-radius: var(--radius-sm);
-          color: var(--text-primary);
-          font-size: 0.875rem;
-        }
-
-        .pdf-page-input:focus {
-          outline: none;
-          border-color: var(--color-primary-500);
-        }
-
-        .pdf-zoom-info {
-          min-width: 40px;
-          text-align: center;
-          font-size: 0.8rem;
-          color: var(--text-secondary);
-        }
-
         .pdf-container {
           flex: 1;
           overflow: auto;
-          padding: 16px;
+          padding: 24px;
           position: relative;
-          -webkit-overflow-scrolling: touch;
         }
 
         .pdf-page {
@@ -1028,6 +324,7 @@ export function PDFViewer({
           position: absolute;
           top: 0;
           left: 0;
+          will-change: transform;
         }
 
         .pdf-page-placeholder {
@@ -1078,113 +375,6 @@ export function PDFViewer({
 
         .pdf-error span {
           font-size: 2rem;
-        }
-
-        /* Mobile more tools dropdown */
-        .pdf-more-container {
-          position: relative;
-        }
-
-        .pdf-more-dropdown {
-          position: absolute;
-          top: calc(100% + 8px);
-          right: 0;
-          min-width: 200px;
-          background: var(--bg-secondary);
-          border: 1px solid var(--border-color);
-          border-radius: 12px;
-          box-shadow: var(--shadow-xl);
-          z-index: 200;
-          overflow: hidden;
-          animation: dropdownIn 0.15s ease;
-        }
-
-        @keyframes dropdownIn {
-          from { opacity: 0; transform: translateY(-4px) scale(0.97); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .pdf-more-section {
-          padding: 12px 16px;
-          border-bottom: 1px solid var(--border-color);
-        }
-
-        .pdf-more-label {
-          display: block;
-          font-size: 0.7rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          color: var(--text-tertiary);
-          margin-bottom: 8px;
-        }
-
-        .pdf-more-colors {
-          display: flex;
-          gap: 8px;
-          justify-content: center;
-        }
-
-        .pdf-more-item {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          width: 100%;
-          padding: 12px 16px;
-          background: transparent;
-          border: none;
-          color: var(--text-primary);
-          font-size: 0.875rem;
-          cursor: pointer;
-          text-align: left;
-          transition: background 0.15s;
-        }
-
-        .pdf-more-item:hover {
-          background: var(--bg-tertiary);
-        }
-
-        /* Mobile toolbar */
-        @media (max-width: 768px) {
-          .pdf-toolbar {
-            gap: 6px;
-            padding: 6px 8px;
-            justify-content: center;
-          }
-
-          .pdf-toolbar-group {
-            gap: 4px;
-          }
-
-          .pdf-toolbar-btn {
-            width: 32px;
-            height: 32px;
-            font-size: 0.9rem;
-            border-radius: 8px;
-          }
-
-          .pdf-page-input {
-            width: 36px;
-            padding: 2px 4px;
-            font-size: 0.8rem;
-          }
-
-          .pdf-page-info {
-            font-size: 0.8rem;
-          }
-
-          .pdf-zoom-info {
-            min-width: 32px;
-            font-size: 0.75rem;
-          }
-
-          .pdf-container {
-            padding: 4px;
-          }
-
-          :global(.react-pdf__Document) {
-            gap: 8px;
-          }
         }
       `}</style>
         </div>

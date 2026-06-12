@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { getAccessToken } from '@/lib/supabase';
+import { translateText } from '@/lib/gemini';
 import styles from './QuickTranslationPopup.module.css';
 
 interface QuickTranslationPopupProps {
@@ -36,10 +36,7 @@ export function QuickTranslationPopup({
         y: anchorBounds.y + anchorBounds.height + 12,
     });
 
-    const [currentPosition, setCurrentPosition] = useState(() => ({
-        x: anchorBounds.x + anchorBounds.width / 2,
-        y: anchorBounds.y + anchorBounds.height + 12,
-    }));
+    const [currentPosition, setCurrentPosition] = useState(initialPosition.current);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const isDragging = useRef(false);
     const dragStart = useRef({ x: 0, y: 0 });
@@ -97,7 +94,7 @@ export function QuickTranslationPopup({
                         setCurrentPosition({ x, y });
                     }
                 }
-            } catch (_e) {
+            } catch (e) {
                 // Range might be detached
             }
             animationFrameId = requestAnimationFrame(updatePosition);
@@ -123,29 +120,16 @@ export function QuickTranslationPopup({
             setIsLoading(true);
             setError(null);
 
-            getAccessToken()
-                .then(token => {
-                    if (!token) throw new Error('Oturum bulunamadı, lütfen tekrar giriş yapın');
-                    return fetch('/api/translate', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({ text, targetLang })
-                    });
-                })
-                .then(res => res.json())
-                .then(data => {
+            translateText(text, targetLang)
+                .then(result => {
                     if (!isActive || requestIdRef.current !== requestId) return;
-                    if (data.error) throw new Error(data.error);
-                    setTranslation(data.translation.trim());
+                    setTranslation(result.trim());
                     setIsLoading(false);
                 })
                 .catch(err => {
                     if (!isActive || requestIdRef.current !== requestId) return;
                     console.error('Quick translation error:', err);
-                    setError(err instanceof Error ? err.message : 'Çeviri yapılamadı');
+                    setError('Çeviri yapılamadı');
                     setIsLoading(false);
                 });
 
@@ -245,23 +229,10 @@ export function QuickTranslationPopup({
         '--qt-max-height': `${Math.max(120, maxHeight)}px`,
     } as CSSProperties;
 
-    // Clamp position to viewport boundaries
-    const clampToViewport = (left: number, top: number) => {
-        const popup = popupRef.current;
-        if (!popup || !popup.offsetParent) return { left, top };
-        const parentRect = (popup.offsetParent as HTMLElement).getBoundingClientRect();
-        const popupWidth = popup.offsetWidth || preferredWidth;
-        const maxLeft = parentRect.width - popupWidth / 2;
-        const minLeft = popupWidth / 2;
-        return {
-            left: Math.max(minLeft, Math.min(maxLeft, left)),
-            top: Math.max(16, Math.min(parentRect.height - 80, top)),
-        };
-    };
-
-    const rawLeft = currentPosition.x + dragOffset.x;
-    const rawTop = currentPosition.y + dragOffset.y;
-    const { left: finalLeft, top: finalTop } = clampToViewport(rawLeft, rawTop);
+    // Calculate final position
+    // We center the popup horizontally on the calculate point, then apply drag offset
+    const finalLeft = currentPosition.x + dragOffset.x;
+    const finalTop = currentPosition.y + dragOffset.y;
 
     return (
         <div
@@ -270,8 +241,7 @@ export function QuickTranslationPopup({
             style={{
                 left: finalLeft,
                 top: finalTop,
-                transform: 'translateX(-50%)',
-                touchAction: 'none',
+                transform: 'translateX(-50%)', // Center horizontally
                 ...styleVars,
             }}
         >
