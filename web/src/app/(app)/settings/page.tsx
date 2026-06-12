@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/hooks/useAuth';
+import { pdfCache } from '@/lib/pdfCache';
+import { thumbnailCache } from '@/lib/thumbnailCache';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -59,9 +61,18 @@ function SettingsContent() {
         .slice(0, 2)
     : '?';
 
-  const handleClearCache = () => {
-    // TODO: implement actual cache clearing logic
-    toast.success('Önbellek başarıyla temizlendi');
+  const [isClearingCache, setIsClearingCache] = useState(false);
+
+  const handleClearCache = async () => {
+    setIsClearingCache(true);
+    try {
+      await Promise.all([pdfCache.clearCache(), thumbnailCache.clearCache()]);
+      toast.success('Önbellek başarıyla temizlendi');
+    } catch {
+      toast.error('Önbellek temizlenirken bir sorun oluştu');
+    } finally {
+      setIsClearingCache(false);
+    }
   };
 
   return (
@@ -167,7 +178,7 @@ function SettingsContent() {
           <CardContent className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-corio-fg/70">Model</Label>
-              <span className="text-sm text-corio-fg">Gemini 1.5 Pro</span>
+              <span className="text-sm text-corio-fg">Gemini 3 Flash</span>
             </div>
             <Separator className="bg-corio-border-subtle" />
             <div className="flex items-center justify-between">
@@ -195,10 +206,14 @@ function SettingsContent() {
               variant="outline"
               size="sm"
               onClick={handleClearCache}
+              disabled={isClearingCache}
               className="w-full gap-2 border-corio-border text-corio-fg hover:bg-corio-surface-2"
             >
-              Önbelleği Temizle
+              {isClearingCache ? 'Temizleniyor...' : 'Önbelleği Temizle'}
             </Button>
+            <p className="mt-2 text-xs text-corio-fg/50">
+              Cihazda saklanan PDF ve küçük resim önbelleğini siler. Dosyalarınız buluttan tekrar indirilir.
+            </p>
           </CardContent>
         </Card>
 

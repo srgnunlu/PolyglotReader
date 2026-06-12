@@ -9,7 +9,6 @@ import { getSupabase } from "@/lib/supabase";
 const DEFAULT_SCALE = 1.2;
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
-const PDFJS_VERSION = pdfjs.version || "5.4.296";
 const FALLBACK_PAGE_SIZE = { width: 595, height: 842 };
 
 interface UsePDFRendererOptions {

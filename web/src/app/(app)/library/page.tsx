@@ -9,6 +9,7 @@ import { PDFList } from '@/components/library/PDFList';
 import { EmptyLibrary } from '@/components/library/EmptyLibrary';
 import { UploadArea } from '@/components/library/UploadArea';
 import { useFileUpload } from '@/hooks/useFileUpload';
+import { useLibraryStore } from '@/stores/useLibraryStore';
 import { LayoutGrid, List, Search, AlertCircle, Upload, Loader2 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
@@ -32,7 +33,8 @@ function LibraryContent() {
   } = useDocuments();
 
   const { uploadFiles, isUploading } = useFileUpload();
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  // Persisted view preference (survives reloads via localStorage)
+  const { viewMode, setViewMode } = useLibraryStore();
   const [showUpload, setShowUpload] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);

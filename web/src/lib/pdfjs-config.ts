@@ -26,7 +26,7 @@ if (typeof window !== 'undefined' && !isInitialized) {
 
     // Store original console.error to filter PDF.js worker termination errors
     const originalConsoleError = console.error;
-    console.error = (...args: any[]) => {
+    console.error = (...args: unknown[]) => {
         // Filter out worker termination errors
         const message = args[0]?.toString() || '';
         if (
