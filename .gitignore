@@ -71,3 +71,8 @@ xcuserdata/
 .supabase/
 PolyglotReader/Config.plist
 *.log
+
+## Debug artifacts (screenshots, transcripts, scratch output)
+/*.png
+/*.txt
+/web/*.txt
