@@ -33,9 +33,10 @@ export function usePDFRenderer({ pdfUrl, storagePath, initialScale }: UsePDFRend
   const [defaultPageSize, setDefaultPageSize] = useState<{ width: number; height: number } | null>(null);
 
   const documentOptions = useMemo(() => ({
-    cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/cmaps/`,
+    // Self-hosted assets (scripts/copy-pdf-assets.mjs) — no CDN dependency.
+    cMapUrl: "/pdfjs/cmaps/",
     cMapPacked: true,
-    standardFontDataUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/standard_fonts/`,
+    standardFontDataUrl: "/pdfjs/standard_fonts/",
     verbosity: 0,
   }), []);
 

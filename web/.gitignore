@@ -42,3 +42,6 @@ next-env.d.ts
 
 # keep the example env file tracked
 !.env.example
+
+# PDF.js assets copied from node_modules by scripts/copy-pdf-assets.mjs
+/public/pdfjs/

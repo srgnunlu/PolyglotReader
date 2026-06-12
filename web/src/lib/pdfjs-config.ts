@@ -9,6 +9,10 @@ import { pdfjs } from 'react-pdf';
 
 const pdfjsVersion = pdfjs.version || '5.4.296';
 
+// Served from public/pdfjs/, populated by scripts/copy-pdf-assets.mjs on
+// predev/prebuild — always matches the installed pdfjs-dist version.
+const SELF_HOSTED_WORKER_SRC = '/pdfjs/pdf.worker.min.mjs';
+
 // Keep track of initialization to prevent multiple setups
 let isInitialized = false;
 
@@ -16,12 +20,9 @@ let isInitialized = false;
 if (typeof window !== 'undefined' && !isInitialized) {
     isInitialized = true;
 
-    // Always use CDN for maximum reliability
-    // This prevents issues with Next.js Fast Refresh and import.meta.url
-    const cdnWorkerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsVersion}/build/pdf.worker.min.mjs`;
-
-    // Force set worker source even if already set (to ensure CDN is used)
-    pdfjs.GlobalWorkerOptions.workerSrc = cdnWorkerSrc;
+    // Self-hosted worker — the reader keeps working even if a CDN is
+    // unreachable, and the version always matches the installed package.
+    pdfjs.GlobalWorkerOptions.workerSrc = SELF_HOSTED_WORKER_SRC;
 
     // Store original console.error to filter PDF.js worker termination errors
     const originalConsoleError = console.error;
@@ -75,7 +76,7 @@ if (typeof window !== 'undefined' && !isInitialized) {
 
 // Export worker source for direct use if needed
 export const PDF_WORKER_SRC = typeof window !== 'undefined'
-    ? `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsVersion}/build/pdf.worker.min.mjs`
+    ? SELF_HOSTED_WORKER_SRC
     : undefined;
 
 // Export version for consistency
