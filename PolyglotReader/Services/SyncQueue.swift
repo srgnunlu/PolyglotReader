@@ -72,6 +72,8 @@ final class SyncQueue: ObservableObject {
 
     private let storageKey = "polyglotreader.sync_queue"
     private let maxRetries = 3
+    private let baseRetryDelay: TimeInterval = 2.0
+    private let maxRetryDelay: TimeInterval = 60.0
     private var pendingOperations: [PendingOperation] = []
     private var cancellables = Set<AnyCancellable>()
     private var syncTask: Task<Void, Never>?
@@ -169,11 +171,19 @@ final class SyncQueue: ObservableObject {
         var failedOperations: [UUID] = []
         let totalOperations = Float(pendingOperations.count)
 
-        for (index, operation) in pendingOperations.enumerated() {
+        // Snapshot the ids to process; we mutate `pendingOperations` in place below.
+        let operations = pendingOperations
+        for (index, operation) in operations.enumerated() {
             guard !Task.isCancelled else { break }
 
             // Update progress
             status = .syncing(progress: Float(index) / totalOperations)
+
+            // Respect exponential backoff for operations that already failed.
+            guard isReadyForRetry(operation) else {
+                logDebug("SyncQueue", "Backoff active - skipping operation", details: operation.type.rawValue)
+                continue
+            }
 
             do {
                 try await processOperation(operation)
@@ -182,15 +192,16 @@ final class SyncQueue: ObservableObject {
             } catch {
                 logWarning("SyncQueue", "Operation failed", details: error.localizedDescription)
 
-                // Update retry count
-                if var op = pendingOperations.first(where: { $0.id == operation.id }) {
-                    op.retryCount += 1
-                    op.lastRetryAt = Date()
+                // Update retry count IN PLACE so it actually persists across runs.
+                guard let opIndex = pendingOperations.firstIndex(where: { $0.id == operation.id }) else {
+                    continue
+                }
+                pendingOperations[opIndex].retryCount += 1
+                pendingOperations[opIndex].lastRetryAt = Date()
 
-                    if op.retryCount >= maxRetries {
-                        failedOperations.append(operation.id)
-                        logWarning("SyncQueue", "Max retries reached for operation", details: operation.type.rawValue)
-                    }
+                if pendingOperations[opIndex].retryCount >= maxRetries {
+                    failedOperations.append(operation.id)
+                    logWarning("SyncQueue", "Max retries reached for operation", details: operation.type.rawValue)
                 }
             }
         }
@@ -216,6 +227,16 @@ final class SyncQueue: ObservableObject {
         } else {
             status = .idle
         }
+    }
+
+    /// Exponential backoff gate: an operation that has failed before is only
+    /// retried once enough time has elapsed since its last attempt.
+    private func isReadyForRetry(_ operation: PendingOperation) -> Bool {
+        guard operation.retryCount > 0, let lastRetryAt = operation.lastRetryAt else {
+            return true
+        }
+        let backoff = min(baseRetryDelay * pow(2.0, Double(operation.retryCount - 1)), maxRetryDelay)
+        return Date().timeIntervalSince(lastRetryAt) >= backoff
     }
 
     private func processOperation(_ operation: PendingOperation) async throws {

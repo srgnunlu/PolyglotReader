@@ -7,6 +7,16 @@ struct LiquidGlassBackground: View {
     var intensity: LiquidGlassIntensity = .medium
     var accentColor: Color = .indigo
 
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var isDark: Bool { colorScheme == .dark }
+
+    // In light mode a pure-white glow washes out and white strokes become
+    // invisible borders. Dim the glow and use a subtle dark edge for definition.
+    private var glowOpacityScale: Double { isDark ? 1.0 : 0.35 }
+    private var edgeColor: Color { isDark ? .white : .black }
+    private var edgeOpacityScale: Double { isDark ? 1.0 : 0.2 }
+
     var body: some View {
         ZStack {
             // Ana blur katmanı
@@ -16,8 +26,8 @@ struct LiquidGlassBackground: View {
             // Gradient overlay - üst parlama
             LinearGradient(
                 colors: [
-                    .white.opacity(intensity.topGlowOpacity),
-                    .white.opacity(intensity.topGlowOpacity * 0.3),
+                    .white.opacity(intensity.topGlowOpacity * glowOpacityScale),
+                    .white.opacity(intensity.topGlowOpacity * 0.3 * glowOpacityScale),
                     .clear
                 ],
                 startPoint: .top,
@@ -38,15 +48,15 @@ struct LiquidGlassBackground: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
 
-            // İç glow - parlak kenar
+            // İç glow - parlak kenar (light mode'da koyu, görünür kenarlık)
             RoundedRectangle(cornerRadius: cornerRadius)
                 .stroke(
                     LinearGradient(
                         colors: [
-                            .white.opacity(0.6),
-                            .white.opacity(0.25),
-                            .white.opacity(0.1),
-                            .white.opacity(0.25)
+                            edgeColor.opacity(0.6 * edgeOpacityScale),
+                            edgeColor.opacity(0.25 * edgeOpacityScale),
+                            edgeColor.opacity(0.1 * edgeOpacityScale),
+                            edgeColor.opacity(0.25 * edgeOpacityScale)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -56,7 +66,7 @@ struct LiquidGlassBackground: View {
 
             // Dış ince kenar
             RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(.white.opacity(0.15), lineWidth: 0.5)
+                .stroke(edgeColor.opacity(0.15 * edgeOpacityScale), lineWidth: 0.5)
                 .blur(radius: 0.5)
         }
     }

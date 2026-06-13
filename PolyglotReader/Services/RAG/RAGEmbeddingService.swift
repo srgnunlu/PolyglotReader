@@ -250,7 +250,7 @@ class RAGEmbeddingService {
 
     private func buildEmbeddingRequest(text: String) throws -> URLRequest {
         let endpoint = "https://generativelanguage.googleapis.com/v1beta/models/"
-        let path = "\(RAGConfig.embeddingModel):embedContent?key=\(geminiApiKey)"
+        let path = "\(RAGConfig.embeddingModel):embedContent"
         guard let url = URL(string: endpoint + path) else {
             throw AppError.ai(reason: .unavailable, underlying: RAGError.embeddingFailed)
         }
@@ -258,6 +258,9 @@ class RAGEmbeddingService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Pass the API key in a header rather than the URL query string so it
+        // can never leak into request logs, proxies, or crash reports.
+        request.setValue(geminiApiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = try JSONSerialization.data(withJSONObject: buildEmbeddingBody(text: text))
         return request
     }

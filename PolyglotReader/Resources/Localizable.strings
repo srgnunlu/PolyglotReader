@@ -242,6 +242,12 @@
 
 /* Account */
 "settings.sign_out" = "Çıkış Yap";
+"settings.delete_account" = "Hesabı Sil";
+"settings.delete_account.footer" = "Hesabınızı sildiğinizde tüm dokümanlarınız, notlarınız, sohbetleriniz ve hesap bilgileriniz kalıcı olarak silinir. Bu işlem geri alınamaz.";
+"settings.delete_account.confirm.title" = "Hesabı Sil";
+"settings.delete_account.confirm.message" = "Hesabınız ve tüm verileriniz (dokümanlar, notlar, sohbetler) kalıcı olarak silinecek. Bu işlem geri alınamaz. Devam etmek istiyor musunuz?";
+"settings.delete_account.confirm.action" = "Hesabı Kalıcı Olarak Sil";
+"settings.delete_account.error" = "Hesap silinemedi. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.";
 
 /* Accessibility */
 "settings.accessibility.theme" = "Tema seçimi";

@@ -27,6 +27,12 @@ extension SupabaseService {
         }
     }
 
+    func deleteAccount() async throws {
+        try await perform(category: .auth) {
+            try await auth.deleteAccount()
+        }
+    }
+
     func getSession() async -> User? {
         await auth.getSession()
     }

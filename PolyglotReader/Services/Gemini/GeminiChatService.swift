@@ -5,7 +5,11 @@ import GoogleGenerativeAI
 @MainActor
 class GeminiChatService {
     private let model: GenerativeModel
-    private var chatSession: Chat?
+
+    /// Per-document chat sessions keyed by file ID.
+    /// A single shared session would let a second opened document overwrite the
+    /// first one's context, so the user could end up talking to the wrong PDF.
+    private var sessions: [String: Chat] = [:]
 
     // Status properties managed by Facade, but service can expose async methods
     // The Service is NOT ObservableObject, the Facade is.
@@ -16,7 +20,7 @@ class GeminiChatService {
 
     // MARK: - Session Management
 
-    func initChatSession(pdfContent: String? = nil) {
+    func initChatSession(fileId: String, pdfContent: String? = nil) {
         var history: [ModelContent] = []
 
         if let content = pdfContent, !content.isEmpty {
@@ -38,38 +42,60 @@ class GeminiChatService {
             ]))
         }
 
-        chatSession = model.startChat(history: history)
+        sessions[fileId] = model.startChat(history: history)
         #if DEBUG
         let mode = pdfContent == nil ? "RAG" : "Legacy"
-        logDebug("GeminiChatService", "Chat oturumu başlatıldı", details: "Mode: \(mode)")
+        logDebug("GeminiChatService", "Chat oturumu başlatıldı", details: "Mode: \(mode), File: \(fileId)")
         #endif
     }
 
-    func resetChatSession() {
-        chatSession = nil
+    func resetChatSession(fileId: String) {
+        sessions.removeValue(forKey: fileId)
     }
 
-    var isSessionInitialized: Bool {
-        chatSession != nil
+    func resetAllSessions() {
+        sessions.removeAll()
+    }
+
+    func isSessionInitialized(fileId: String) -> Bool {
+        sessions[fileId] != nil
+    }
+
+    /// Returns the chat session for the given file, lazily creating a RAG-mode
+    /// session if the document was never explicitly initialised. This keeps each
+    /// document isolated and avoids `sessionNotInitialized` race conditions.
+    private func session(for fileId: String) -> Chat {
+        if let chat = sessions[fileId] {
+            return chat
+        }
+        let history: [ModelContent] = [
+            ModelContent(role: "user", parts: [
+                .text("PDF dokümanı hakkında sorular soracağım. İlgili bölümleri her soru ile birlikte paylaşacağım.")
+            ]),
+            ModelContent(role: "model", parts: [
+                .text("Anladım! PDF'ten aldığınız bölümleri ve sorularınızı bekliyorum. Size yardımcı olmaya hazırım.")
+            ])
+        ]
+        let chat = model.startChat(history: history)
+        sessions[fileId] = chat
+        return chat
     }
 
     // MARK: - Messaging
 
+    /// Stateless one-shot generation (no conversation history).
+    /// Used for utility prompts such as smart-suggestion generation so they
+    /// never pollute or depend on a document's chat session.
     func sendMessage(_ message: String) async throws -> String {
         try await GeminiConfig.executeWithRetry(serviceName: "GeminiChat") {
-            guard let chat = self.chatSession else {
-                throw GeminiError.sessionNotInitialized
-            }
-            let response = try await chat.sendMessage(message)
+            let response = try await self.model.generateContent(message)
             return response.text ?? "Yanıt oluşturulamadı."
         }
     }
 
-    func sendMessageWithContext(_ message: String, context: String) async throws -> String {
+    func sendMessageWithContext(_ message: String, context: String, fileId: String) async throws -> String {
         try await GeminiConfig.executeWithRetry(serviceName: "GeminiChat") {
-            guard let chat = self.chatSession else {
-                throw GeminiError.sessionNotInitialized
-            }
+            let chat = self.session(for: fileId)
 
             let fullMessage = self.buildEnhancedPrompt(message: message, context: context)
 
@@ -118,27 +144,13 @@ class GeminiChatService {
         """
     }
 
-    func sendMessageStream(_ message: String) -> AsyncThrowingStream<String, Error> {
-        let streamSourceBlock: () throws -> AsyncThrowingStream<GenerateContentResponse, Error> = {
-            guard let chat = self.chatSession else {
-                throw GeminiError.sessionNotInitialized
-            }
-            return chat.sendMessageStream(message)
-        }
+    func sendMessageStream(_ message: String, fileId: String) -> AsyncThrowingStream<String, Error> {
+        let chat = session(for: fileId)
 
         return AsyncThrowingStream { continuation in
             Task {
                 do {
-                    // Check logic?
-                    // Stream isn't easily retriable in the middle, but we can retry init?
-                    // GeminiConfig.executeWithRetry doesn't support stream directly.
-                    // We assume stream is reliable or handled by caller?
-                    // Original code didn't retry stream creation explicitly inside the stream?
-                    // Actually original code did NOT wrap stream in `withRetry`.
-                    // It just started it.
-
-                    let streamSource = try streamSourceBlock()
-
+                    let streamSource = chat.sendMessageStream(message)
                     for try await chunk in streamSource {
                         if let text = chunk.text {
                             continuation.yield(text)
@@ -152,18 +164,20 @@ class GeminiChatService {
         }
     }
 
-    func sendMessageStreamWithContext(_ message: String, context: String) -> AsyncThrowingStream<String, Error> {
+    func sendMessageStreamWithContext(
+        _ message: String,
+        context: String,
+        fileId: String
+    ) -> AsyncThrowingStream<String, Error> {
         let fullMessage = buildEnhancedPrompt(message: message, context: context)
-        return sendMessageStream(fullMessage)
+        return sendMessageStream(fullMessage, fileId: fileId)
     }
 
     // MARK: - Image Questions
 
-    func askAboutImage(_ imageData: Data, question: String) async throws -> String {
+    func askAboutImage(_ imageData: Data, question: String, fileId: String) async throws -> String {
         try await GeminiConfig.executeWithRetry(serviceName: "GeminiChat") {
-            guard let chat = self.chatSession else {
-                throw GeminiError.sessionNotInitialized
-            }
+            let chat = self.session(for: fileId)
 
             let prompt = """
             Kullanıcı dokümanın bir bölümünü (görsel/tablo/grafik) seçti ve şu soruyu soruyor:
@@ -190,12 +204,11 @@ class GeminiChatService {
     func askWithPageImages(
         _ question: String,
         images: [(data: Data, caption: String?)],
-        pageNumber: Int
+        pageNumber: Int,
+        fileId: String
     ) async throws -> String {
         try await GeminiConfig.executeWithRetry(serviceName: "GeminiChat") {
-            guard let chat = self.chatSession else {
-                throw GeminiError.sessionNotInitialized
-            }
+            let chat = self.session(for: fileId)
 
             var prompt = """
             Kullanıcı Sayfa \(pageNumber) hakkında şunu soruyor: "\(question)"
