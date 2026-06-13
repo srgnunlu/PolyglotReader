@@ -6,9 +6,11 @@ struct PDFReaderView: View {
     @StateObject private var chatViewModel: ChatViewModel
     @Environment(\.dismiss) private var dismiss
     
+    @StateObject private var speech = SpeechService()
     @State private var showChat = false
     @State private var showQuiz = false
     @State private var showSearch = false
+    @State private var showNavigator = false
     @State private var barsVisible = true
     @State private var autoHideTimer: Timer?
     @State private var isPDFRendering = true  // PDF render durumu
@@ -133,6 +135,7 @@ struct PDFReaderView: View {
                                 ReaderTopBar(
                                     viewModel: viewModel,
                                     showSearch: $showSearch,
+                                    showNavigator: $showNavigator,
                                     onClose: { dismiss() }
                                 )
                                 .transition(.asymmetric(
@@ -146,12 +149,20 @@ struct PDFReaderView: View {
                             }
                             
                             Spacer()
-                            
+
+                            // Sesli okuma kontrol şeridi (okuma aktifken görünür)
+                            if speech.isSpeaking && !isPDFRendering {
+                                TTSControlStrip(speech: speech, viewModel: viewModel)
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                            }
+
                             // Bottom Bar with collapse animation
                             if barsVisible && !isPDFRendering {
                                 ReaderBottomBar(
-                                    viewModel: viewModel, 
-                                    showChat: $showChat
+                                    viewModel: viewModel,
+                                    speech: speech,
+                                    showChat: $showChat,
+                                    onToggleTTS: toggleTTS
                                 )
                                 .transition(.asymmetric(
                                     insertion: .move(edge: .bottom).combined(with: .opacity),
@@ -307,6 +318,16 @@ struct PDFReaderView: View {
             .sheet(isPresented: $showSearch) {
                 SearchSheet(viewModel: viewModel)
             }
+            .sheet(isPresented: $showNavigator) {
+                if let document = viewModel.document {
+                    DocumentNavigatorView(
+                        document: document,
+                        currentPage: viewModel.currentPage,
+                        onSelectPage: { viewModel.goToPage($0) },
+                        onDismiss: { showNavigator = false }
+                    )
+                }
+            }
             .sheet(isPresented: $showAnnotationNote) {
                 if let annotation = selectedAnnotation {
                     NoteDetailSheet(
@@ -336,14 +357,17 @@ struct PDFReaderView: View {
                 if let document = viewModel.document {
                     logDebug("PDFReaderView", "Document loaded with \(document.pageCount) pages")
                 }
+                configureSpeechAutoAdvance()
                 startAutoHideTimer()
             }
             .onDisappear {
                 // PDF kapatıldığında popup session memory'sini sıfırla
                 QuickTranslationPopup.resetSessionMemory()
                 logDebug("PDFReaderView", "View disappeared, popup session memory reset")
+                speech.stop()
                 autoHideTimer?.invalidate()
             }
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: speech.isSpeaking)
             .onChange(of: showChat) { isOpen in
                 if isOpen {
                     autoHideTimer?.invalidate()
@@ -402,6 +426,31 @@ struct PDFReaderView: View {
             }
         }
     }
+
+    // MARK: - Text-to-Speech
+
+    /// TTS düğmesi: okuma sürüyorsa durdurur, değilse mevcut sayfayı okumaya başlar.
+    private func toggleTTS() {
+        if speech.isSpeaking {
+            speech.stop()
+        } else if let text = viewModel.currentPageText, !text.isEmpty {
+            speech.speak(text)
+        }
+    }
+
+    /// Bir sayfa bitince otomatik olarak sonraki sayfaya geçip okumaya devam eder.
+    /// Nesneler `weak` yakalanır; closure'ın `speech` üzerinde tutulması döngü yaratmasın.
+    private func configureSpeechAutoAdvance() {
+        speech.onFinish = { [weak speech, weak viewModel] in
+            guard let speech, let viewModel else { return }
+            let next = viewModel.currentPage + 1
+            guard next <= viewModel.totalPages else { return }
+            viewModel.goToPage(next)
+            if let text = viewModel.currentPageText, !text.isEmpty {
+                speech.speak(text)
+            }
+        }
+    }
 }
 
 
@@ -427,27 +476,33 @@ struct CollapsedBarIndicator: View {
 struct ReaderTopBar: View {
     @ObservedObject var viewModel: PDFReaderViewModel
     @Binding var showSearch: Bool
+    @Binding var showNavigator: Bool
     let onClose: () -> Void
-    
+
     var body: some View {
         HStack(spacing: 12) {
             ReaderIconButton(systemName: "xmark", action: onClose)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(viewModel.fileMetadata.name)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .lineLimit(1)
-                
+
                 if viewModel.totalPages > 0 {
                     Text("Sayfa \(viewModel.currentPage) / \(viewModel.totalPages)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
-            
+
             Spacer()
-            
+
+            ReaderIconButton(systemName: "list.bullet.rectangle") {
+                showNavigator = true
+            }
+            .accessibilityLabel("navigator.title".localized)
+
             ReaderIconButton(systemName: "magnifyingglass") {
                 showSearch = true
             }
@@ -466,8 +521,10 @@ struct ReaderTopBar: View {
 // MARK: - Reader Bottom Bar
 struct ReaderBottomBar: View {
     @ObservedObject var viewModel: PDFReaderViewModel
+    @ObservedObject var speech: SpeechService
     @Binding var showChat: Bool
-    
+    let onToggleTTS: () -> Void
+
     var body: some View {
         HStack(spacing: 0) {
             // Sol: Sayfa Navigasyonu
@@ -560,29 +617,52 @@ struct ReaderBottomBar: View {
 
             Spacer()
 
-            // Sağ: Chat Butonu
-            if viewModel.isChatReady {
-                Button {
-                    showChat = true
-                } label: {
-                    Image(systemName: "message.fill")
+            // Sağ: Sesli Okuma + Chat Butonları
+            HStack(spacing: 10) {
+                Button(action: onToggleTTS) {
+                    Image(systemName: speech.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(speech.isSpeaking ? .white : .primary)
                         .frame(width: 44, height: 44)
                         .background {
                             Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.indigo, Color.indigo.opacity(0.8)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .shadow(color: .indigo.opacity(0.4), radius: 8, x: 0, y: 4)
+                                .fill(speech.isSpeaking ? Color.indigo : Color.clear)
+                            if !speech.isSpeaking {
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .overlay {
+                                        Circle().stroke(.white.opacity(0.2), lineWidth: 0.5)
+                                    }
+                            }
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Sohbet")
+                .accessibilityLabel("reader.tts.toggle".localized)
+                .accessibilityValue(speech.isSpeaking ? "accessibility.selected".localized : "accessibility.not_selected".localized)
+
+                if viewModel.isChatReady {
+                    Button {
+                        showChat = true
+                    } label: {
+                        Image(systemName: "message.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.indigo, Color.indigo.opacity(0.8)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .shadow(color: .indigo.opacity(0.4), radius: 8, x: 0, y: 4)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Sohbet")
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -594,6 +674,60 @@ struct ReaderBottomBar: View {
         .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
         .padding(.bottom, 16)
         .padding(.horizontal, 12)
+    }
+}
+
+// MARK: - TTS Control Strip
+/// Sesli okuma aktifken bottom bar üstünde beliren kompakt kontrol şeridi.
+struct TTSControlStrip: View {
+    @ObservedObject var speech: SpeechService
+    @ObservedObject var viewModel: PDFReaderViewModel
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "speaker.wave.2.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.indigo)
+
+            Text("reader.tts.reading_page".localized(with: viewModel.currentPage))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            Spacer()
+
+            Button {
+                if speech.isPaused { speech.resume() } else { speech.pause() }
+            } label: {
+                Image(systemName: speech.isPaused ? "play.fill" : "pause.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(.ultraThinMaterial))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(speech.isPaused ? "reader.tts.resume".localized : "reader.tts.pause".localized)
+
+            Button {
+                speech.stop()
+            } label: {
+                Image(systemName: "stop.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Color.red))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("reader.tts.stop".localized)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background {
+            LiquidGlassBackground(cornerRadius: 24, intensity: .medium, accentColor: .indigo)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
     }
 }
 

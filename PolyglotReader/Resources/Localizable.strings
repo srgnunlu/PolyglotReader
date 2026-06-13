@@ -470,3 +470,35 @@
 "debug.logs.warnings" = "Uyarı";
 "debug.logs.all" = "Tümü";
 "debug.logs.search_source" = "Kaynak ara...";
+
+/* ===========================================
+   MARK: - Sprint 3: Annotation Export
+   =========================================== */
+
+"annotation.export.title" = "Notları Dışa Aktar";
+"annotation.export.format" = "Biçim";
+"annotation.export.format.markdown" = "Markdown";
+"annotation.export.format.text" = "Düz Metin";
+"annotation.export.share" = "Paylaş";
+"annotation.export.subtitle" = "Toplam %d anotasyon";
+"annotation.export.page" = "Sayfa %d";
+"annotation.export.note" = "Not";
+
+/* ===========================================
+   MARK: - Sprint 3: Document Navigator (TOC/Thumbnails)
+   =========================================== */
+
+"navigator.title" = "Gezinme";
+"navigator.tab.outline" = "İçindekiler";
+"navigator.tab.pages" = "Sayfalar";
+"navigator.page" = "Sayfa %d";
+
+/* ===========================================
+   MARK: - Sprint 3: Text-to-Speech (Sesli Okuma)
+   =========================================== */
+
+"reader.tts.toggle" = "Sesli Oku";
+"reader.tts.reading_page" = "Sayfa %d okunuyor";
+"reader.tts.pause" = "Duraklat";
+"reader.tts.resume" = "Devam Et";
+"reader.tts.stop" = "Durdur";
