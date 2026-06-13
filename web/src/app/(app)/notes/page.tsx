@@ -128,7 +128,7 @@ function NotesContent() {
       {/* Page header */}
       <div className="sticky top-0 z-10 px-4 sm:px-6 py-4 bg-corio-bg/90 backdrop-blur-xl border-b border-corio-border-subtle">
         <div className="flex flex-col gap-3">
-          <h1 className="text-xl font-semibold text-corio-fg">Notlarim</h1>
+          <h1 className="text-xl font-semibold text-corio-fg">Notlarım</h1>
           <NotebookFilters
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -171,10 +171,10 @@ function NotesContent() {
             </div>
             <div className="space-y-1">
               <h3 className="text-base font-medium text-corio-fg">
-                Henuz not yok
+                Henüz not yok
               </h3>
               <p className="text-sm text-corio-fg/50 max-w-xs">
-                PDF dosyalarinizda metin secip isaretleme yapabilir ve not ekleyebilirsiniz.
+                PDF dosyalarınızda metin seçip işaretleme yapabilir ve not ekleyebilirsiniz.
               </p>
             </div>
             <button
@@ -182,7 +182,7 @@ function NotesContent() {
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-corio-accent text-white hover:bg-corio-accent-hover transition-colors"
             >
               <Library className="size-4" />
-              Kutuphaneye Git
+              Kütüphaneye Git
             </button>
           </div>
         )}

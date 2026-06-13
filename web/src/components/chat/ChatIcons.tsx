@@ -20,9 +20,9 @@ export function CorioLogo({ size = 24, className = '' }: IconProps) {
         >
             <defs>
                 <linearGradient id="corioGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#818cf8" />
-                    <stop offset="50%" stopColor="#6366f1" />
-                    <stop offset="100%" stopColor="#4f46e5" />
+                    <stop offset="0%" stopColor="#E8946A" />
+                    <stop offset="50%" stopColor="#D4713C" />
+                    <stop offset="100%" stopColor="#C0632F" />
                 </linearGradient>
             </defs>
             <path
@@ -152,9 +152,9 @@ export function AIAvatarIcon({ size = 20, className = '' }: IconProps) {
         >
             <defs>
                 <linearGradient id="aiGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#a78bfa" />
-                    <stop offset="50%" stopColor="#818cf8" />
-                    <stop offset="100%" stopColor="#6366f1" />
+                    <stop offset="0%" stopColor="#E8946A" />
+                    <stop offset="50%" stopColor="#D4713C" />
+                    <stop offset="100%" stopColor="#C0632F" />
                 </linearGradient>
             </defs>
             <circle cx="12" cy="12" r="10" fill="url(#aiGradient)" />
@@ -249,8 +249,8 @@ export function MessageIcon({ size = 48, className = '' }: IconProps) {
         >
             <defs>
                 <linearGradient id="messageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#a78bfa" />
-                    <stop offset="100%" stopColor="#6366f1" />
+                    <stop offset="0%" stopColor="#E8946A" />
+                    <stop offset="100%" stopColor="#D4713C" />
                 </linearGradient>
             </defs>
             <path

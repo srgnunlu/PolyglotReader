@@ -86,44 +86,24 @@ function LibraryContent() {
   }, []);
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: '#FDFAF6' }}
-    >
+    <div className="min-h-screen bg-corio-bg">
       {/* Page header */}
-      <div
-        className="sticky top-0 z-10 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3"
-        style={{
-          background: 'rgba(253, 250, 246, 0.9)',
-          backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(42, 37, 32, 0.06)',
-        }}
-      >
+      <div className="sticky top-0 z-10 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-corio-bg/90 backdrop-blur-xl border-b border-corio-border-subtle">
         {/* Title */}
-        <h1
-          className="text-xl font-semibold shrink-0"
-          style={{ color: '#2A2520' }}
-        >
+        <h1 className="text-xl font-semibold shrink-0 text-corio-fg">
           Kütüphane
         </h1>
 
         {/* Search */}
         <div className="relative flex-1 sm:max-w-md">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
-            style={{ color: 'rgba(42, 37, 32, 0.4)' }}
-          />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-corio-fg/40" />
           <input
             type="text"
             placeholder="Belge ara..."
             value={localSearch}
             onChange={e => handleSearchChange(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none transition-all"
-            style={{
-              background: 'rgba(255, 255, 255, 0.7)',
-              border: '1px solid rgba(42, 37, 32, 0.1)',
-              color: '#2A2520',
-            }}
+            aria-label="Belge ara"
+            className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none transition-all bg-corio-surface-2 border border-corio-border text-corio-fg placeholder:text-corio-fg/40 focus:border-corio-accent focus:ring-2 focus:ring-corio-accent/20"
           />
         </div>
 
@@ -133,11 +113,7 @@ function LibraryContent() {
           <button
             onClick={() => setShowUpload(prev => !prev)}
             disabled={isUploading}
-            className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-medium transition-all disabled:opacity-60"
-            style={{
-              background: '#D4713C',
-              color: '#FFFFFF',
-            }}
+            className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-medium transition-all disabled:opacity-60 bg-corio-accent text-white hover:bg-corio-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-corio-accent/40"
           >
             {isUploading
               ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -146,33 +122,30 @@ function LibraryContent() {
           </button>
 
           {/* View toggle */}
-          <div
-            className="flex items-center rounded-xl p-1 gap-0.5"
-            style={{
-              background: 'rgba(42, 37, 32, 0.06)',
-            }}
-          >
+          <div className="flex items-center rounded-xl p-1 gap-0.5 bg-corio-surface-2">
             <button
               onClick={() => setViewMode('grid')}
-              className="flex items-center justify-center w-8 h-7 rounded-lg transition-all"
+              className={`flex items-center justify-center w-8 h-7 rounded-lg transition-all ${
+                viewMode === 'grid'
+                  ? 'bg-corio-bg text-corio-accent shadow-sm'
+                  : 'text-corio-fg/50 hover:text-corio-fg/80'
+              }`}
               title="Grid görünümü"
-              style={{
-                background: viewMode === 'grid' ? 'rgba(255,255,255,0.9)' : 'transparent',
-                color: viewMode === 'grid' ? '#D4713C' : 'rgba(42, 37, 32, 0.5)',
-                boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(42,37,32,0.1)' : 'none',
-              }}
+              aria-label="Grid görünümü"
+              aria-pressed={viewMode === 'grid'}
             >
               <LayoutGrid className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className="flex items-center justify-center w-8 h-7 rounded-lg transition-all"
+              className={`flex items-center justify-center w-8 h-7 rounded-lg transition-all ${
+                viewMode === 'list'
+                  ? 'bg-corio-bg text-corio-accent shadow-sm'
+                  : 'text-corio-fg/50 hover:text-corio-fg/80'
+              }`}
               title="Liste görünümü"
-              style={{
-                background: viewMode === 'list' ? 'rgba(255,255,255,0.9)' : 'transparent',
-                color: viewMode === 'list' ? '#D4713C' : 'rgba(42, 37, 32, 0.5)',
-                boxShadow: viewMode === 'list' ? '0 1px 3px rgba(42,37,32,0.1)' : 'none',
-              }}
+              aria-label="Liste görünümü"
+              aria-pressed={viewMode === 'list'}
             >
               <List className="w-4 h-4" />
             </button>
@@ -199,19 +172,14 @@ function LibraryContent() {
 
         {/* Error state */}
         {!isLoading && error && (
-          <div
-            className="flex flex-col items-center gap-3 py-16 text-center"
-          >
-            <div
-              className="flex items-center justify-center w-14 h-14 rounded-2xl"
-              style={{ background: 'rgba(220, 38, 38, 0.08)' }}
-            >
-              <AlertCircle className="w-7 h-7" style={{ color: '#DC2626' }} />
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-corio-destructive/10">
+              <AlertCircle className="w-7 h-7 text-corio-destructive" />
             </div>
-            <p className="text-sm font-medium" style={{ color: '#2A2520' }}>
+            <p className="text-sm font-medium text-corio-fg">
               Belgeler yüklenirken hata oluştu
             </p>
-            <p className="text-xs max-w-xs" style={{ color: 'rgba(42, 37, 32, 0.5)' }}>
+            <p className="text-xs max-w-xs text-corio-fg/50">
               {error}
             </p>
           </div>

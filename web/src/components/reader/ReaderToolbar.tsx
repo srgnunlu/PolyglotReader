@@ -35,14 +35,15 @@ export function ReaderToolbar({
   onToggleFullscreen,
 }: ReaderToolbarProps) {
   return (
-    <div className="flex items-center justify-center gap-3 border-t border-corio-border bg-corio-surface-1 px-4 py-2">
+    <div className="flex items-center gap-3 px-3 py-2">
       {/* Highlight color picker */}
       <div className="flex items-center gap-1.5 border-r border-corio-border pr-3">
         {HIGHLIGHT_COLORS.map(({ name, value, shortcut }) => (
           <button
             key={value}
             title={`${name} (${shortcut})`}
-            className={`h-6 w-6 rounded-full border-2 transition-all hover:scale-110 ${
+            aria-label={`${name} ile işaretle`}
+            className={`h-6 w-6 rounded-full border-2 transition-all hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-corio-accent/40 ${
               selectedColor === value
                 ? "border-corio-fg/60 scale-110 ring-2 ring-corio-accent/30"
                 : "border-transparent"

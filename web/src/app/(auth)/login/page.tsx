@@ -3,7 +3,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { motion, type Variants } from 'framer-motion';
 import { BookOpen } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -192,9 +191,9 @@ export default function LoginPage() {
           <CardFooter className="justify-center pt-0">
             <p className="text-center text-xs text-corio-fg/40 leading-relaxed">
               Giriş yaparak{' '}
-              <Link href="/legal/terms-of-service" className="underline underline-offset-2 hover:text-corio-accent">
+              <a href="/legal/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-corio-accent">
                 Kullanım Şartlarını
-              </Link>{' '}
+              </a>{' '}
               kabul ediyorsunuz
             </p>
           </CardFooter>

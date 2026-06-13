@@ -134,18 +134,18 @@ export function HeroSection({
           </button>
         </div>
 
-        {/* Stats */}
-        <div className="mt-14 flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
+        {/* Capability highlights — honest feature claims, not fabricated metrics */}
+        <div className="mt-14 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
           {[
-            { value: '10K+', label: 'Aktif Kullanıcı' },
-            { value: '50K+', label: 'Analiz Edilen Belge' },
-            { value: '4.8★', label: 'App Store' },
-          ].map((stat, i) => (
-            <div key={stat.label} className="flex items-center gap-3">
+            'RAG destekli sohbet',
+            'Anında TR↔EN çeviri',
+            'Akıllı notlar & işaretleme',
+          ].map((label, i) => (
+            <div key={label} className="flex items-center gap-3">
               {i > 0 && <div className="hidden h-4 w-px sm:block" style={{ backgroundColor: 'rgba(42, 37, 32, 0.1)' }} />}
-              <div className="text-center sm:text-left">
-                <span className="text-lg font-bold tracking-tight" style={{ color: '#2A2520' }}>{stat.value}</span>
-                <span className="ml-1.5 text-xs" style={{ color: 'rgba(42, 37, 32, 0.4)' }}>{stat.label}</span>
+              <div className="flex items-center gap-2">
+                <span className="size-1.5 rounded-full" style={{ backgroundColor: '#D4713C' }} />
+                <span className="text-sm font-medium" style={{ color: 'rgba(42, 37, 32, 0.6)' }}>{label}</span>
               </div>
             </div>
           ))}

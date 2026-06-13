@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { HeroSection } from '@/components/landing/HeroSection';
 import { FeaturesGrid } from '@/components/landing/FeaturesGrid';
@@ -48,10 +48,8 @@ export default function LandingPage() {
   };
 
   const handleAppleSignIn = () => {
-    setAuthLoading('apple');
-    // Apple Sign-In will be implemented — redirect to Google for now
-    alert('Apple ile giriş yakında aktif olacak. Lütfen Google ile giriş yapın.');
-    setAuthLoading(null);
+    // Apple Sign-In not yet wired on web — guide the user to Google for now
+    toast.info('Apple ile giriş yakında aktif olacak. Şimdilik Google ile giriş yapabilirsiniz.');
   };
 
   const scrollTo = (id: string) => (e: React.MouseEvent) => {
@@ -146,9 +144,9 @@ export default function LandingPage() {
             </button>
             <p className="mt-5 text-xs" style={{ color: 'rgba(42,37,32,0.3)' }}>
               Giriş yaparak{' '}
-              <Link href="/legal/terms-of-service" className="underline underline-offset-2 transition-colors" style={{ textDecorationColor: 'rgba(42,37,32,0.2)' }}>
+              <a href="/legal/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 transition-colors" style={{ textDecorationColor: 'rgba(42,37,32,0.2)' }}>
                 Kullanım Şartlarını
-              </Link>{' '}
+              </a>{' '}
               kabul ediyorsunuz
             </p>
           </div>

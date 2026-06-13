@@ -318,7 +318,7 @@
 
 @media (prefers-color-scheme: dark) {
     .suggestionChip:hover {
-        background: rgba(99, 102, 241, 0.15);
+        background: rgba(212, 113, 60, 0.15);
         border-color: var(--color-primary-700);
     }
 }
@@ -493,7 +493,7 @@
 }
 
 .messageMarkdown code {
-    font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+    font-family: var(--font-mono), 'SF Mono', 'Menlo', 'Monaco', monospace;
     font-size: 0.875em;
     padding: 0.15em 0.4em;
     border-radius: 6px;
@@ -508,6 +508,8 @@
     border-radius: 10px;
     background: var(--code-block-bg, #f6f8fa);
     border: 1px solid var(--border-color);
+    font-family: var(--font-mono), 'SF Mono', 'Menlo', 'Monaco', monospace;
+    font-size: 0.85em;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -630,7 +632,7 @@
 
 .inputContainer:focus-within {
     border-color: var(--color-primary-400);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    box-shadow: 0 0 0 3px rgba(212, 113, 60, 0.1);
 }
 
 /* Selected Text Quote */
@@ -639,7 +641,7 @@
     align-items: flex-start;
     gap: 10px;
     padding: 10px 12px;
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0.04) 100%);
+    background: linear-gradient(135deg, rgba(212, 113, 60, 0.08) 0%, rgba(212, 113, 60, 0.04) 100%);
     border-left: 3px solid var(--color-primary-500);
     border-radius: 8px;
     margin-bottom: 4px;
@@ -761,7 +763,7 @@
 
 .sendBtn:hover:not(:disabled) {
     transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 12px rgba(212, 113, 60, 0.4);
 }
 
 .sendBtn:active:not(:disabled) {

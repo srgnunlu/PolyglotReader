@@ -11,8 +11,8 @@ interface NotebookFiltersProps {
 }
 
 const HIGHLIGHT_COLORS = [
-  { value: '#fef08a', label: 'Sari' },
-  { value: '#bbf7d0', label: 'Yesil' },
+  { value: '#fef08a', label: 'Sarı' },
+  { value: '#bbf7d0', label: 'Yeşil' },
   { value: '#bae6fd', label: 'Mavi' },
   { value: '#fbcfe8', label: 'Pembe' },
 ];

@@ -19,7 +19,7 @@ export default function AuthCallbackPage() {
         router.push(data.session ? '/library' : '/login');
       } catch (err) {
         console.error('Auth callback error:', err);
-        setError(err instanceof Error ? err.message : 'Authentication failed');
+        setError('Giriş sırasında bir sorun oluştu. Lütfen tekrar deneyin.');
       }
     };
     handleCallback();

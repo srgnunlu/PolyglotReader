@@ -1,12 +1,12 @@
 // Footer — minimal, warm, editorial
 import { BookOpen } from 'lucide-react';
-import Link from 'next/link';
 
+// Legal documents are static HTML in /public/legal — link to the .html files directly
 const legalLinks = [
-  { label: 'Gizlilik Politikası', href: '/legal/privacy-policy' },
-  { label: 'Kullanım Koşulları', href: '/legal/terms-of-service' },
-  { label: 'EULA', href: '/legal/eula' },
-  { label: 'Veri Silme', href: '/legal/data-deletion' },
+  { label: 'Gizlilik Politikası', href: '/legal/privacy-policy.html' },
+  { label: 'Kullanım Koşulları', href: '/legal/terms-of-service.html' },
+  { label: 'EULA', href: '/legal/eula.html' },
+  { label: 'Veri Silme', href: '/legal/data-deletion.html' },
 ];
 
 export function Footer() {
@@ -33,12 +33,14 @@ export function Footer() {
             <ul className="space-y-2.5">
               {legalLinks.map((link) => (
                 <li key={link.label}>
-                  <Link
+                  <a
                     href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="text-[13px] text-[#2A2520]/50 transition-colors duration-150 hover:text-[#D4713C]"
                   >
                     {link.label}
-                  </Link>
+                  </a>
                 </li>
               ))}
             </ul>
