@@ -82,7 +82,7 @@ async function getDocumentLanguage(fileId: string): Promise<DocumentLanguage> {
     return detected;
 }
 
-interface BM25SearchResult {
+export interface BM25SearchResult {
     id: string;
     file_id: string;
     chunk_index: number;
@@ -91,7 +91,7 @@ interface BM25SearchResult {
     rank: number;
 }
 
-interface VectorSearchResult {
+export interface VectorSearchResult {
     id: string;
     file_id: string;
     chunk_index: number;
@@ -100,7 +100,7 @@ interface VectorSearchResult {
     similarity: number;
 }
 
-interface ScoredChunk {
+export interface ScoredChunk {
     id: string;
     content: string;
     page_number: number | null;
@@ -532,7 +532,7 @@ async function bm25Search(
 /**
  * RRF (Reciprocal Rank Fusion) - İki sonuç listesini birleştirir
  */
-function rrfFusion(
+export function rrfFusion(
     vectorResults: VectorSearchResult[],
     bm25Results: BM25SearchResult[]
 ): ScoredChunk[] {

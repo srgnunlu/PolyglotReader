@@ -1,7 +1,7 @@
 // Reader toolbar — annotation color picker, translation/chat toggles, fullscreen
 "use client";
 
-import { Globe, MessageSquare, Maximize, ListTree, Search, Quote } from "lucide-react";
+import { Globe, MessageSquare, Maximize, ListTree, Search, Quote, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export type ReaderPanel = "outline" | "search" | null;
@@ -27,6 +27,7 @@ interface ReaderToolbarProps {
   onToggleOutline: () => void;
   onToggleSearch: () => void;
   onOpenCitation: () => void;
+  onOpenQuiz: () => void;
 }
 
 export function ReaderToolbar({
@@ -43,6 +44,7 @@ export function ReaderToolbar({
   onToggleOutline,
   onToggleSearch,
   onOpenCitation,
+  onOpenQuiz,
 }: ReaderToolbarProps) {
   return (
     <div className="flex items-center gap-3 px-3 py-2">
@@ -74,6 +76,15 @@ export function ReaderToolbar({
           title="Atıf çıkar"
         >
           <Quote className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={onOpenQuiz}
+          title="Bilgi sınavı"
+        >
+          <Brain className="h-4 w-4" />
         </Button>
       </div>
 

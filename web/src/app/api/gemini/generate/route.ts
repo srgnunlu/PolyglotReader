@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUserId, getGeminiModel, toImagePart } from '@/lib/server/gemini';
+import { AI_GENERATE_LIMIT, enforceRateLimit } from '@/lib/server/rateLimit';
 
 // Non-streaming Gemini generation (translation, summary, smart note, image Q&A).
 export async function POST(req: NextRequest) {
@@ -7,6 +8,9 @@ export async function POST(req: NextRequest) {
     if (!userId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const limited = enforceRateLimit('generate', userId, AI_GENERATE_LIMIT);
+    if (limited) return limited;
 
     let body: { prompt?: unknown; imageBase64?: unknown };
     try {

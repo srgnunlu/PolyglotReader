@@ -9,6 +9,7 @@ import { PageNavigation } from './PageNavigation';
 import { DocumentOutline } from './DocumentOutline';
 import { DocumentSearchPanel } from './DocumentSearchPanel';
 import { CitationDialog } from './CitationDialog';
+import { QuizDialog } from './QuizDialog';
 import { usePDFRenderer } from '@/hooks/usePDFRenderer';
 import { usePDFNavigation } from '@/hooks/usePDFNavigation';
 import { useTextSelection } from '@/hooks/useTextSelection';
@@ -99,6 +100,7 @@ export function PDFViewer({
     // Side panels (outline / search) and the citation dialog.
     const [activePanel, setActivePanel] = useState<ReaderPanel>(null);
     const [citationOpen, setCitationOpen] = useState(false);
+    const [quizOpen, setQuizOpen] = useState(false);
     const togglePanel = useCallback((panel: Exclude<ReaderPanel, null>) => {
         setActivePanel(prev => (prev === panel ? null : panel));
     }, []);
@@ -263,6 +265,7 @@ export function PDFViewer({
                     onToggleOutline={() => togglePanel('outline')}
                     onToggleSearch={() => togglePanel('search')}
                     onOpenCitation={() => setCitationOpen(true)}
+                    onOpenQuiz={() => setQuizOpen(true)}
                 />
             </div>
 
@@ -365,6 +368,12 @@ export function PDFViewer({
                 documentName={documentName}
                 open={citationOpen}
                 onOpenChange={setCitationOpen}
+            />
+
+            <QuizDialog
+                pdf={pdfDocument}
+                open={quizOpen}
+                onOpenChange={setQuizOpen}
             />
 
             <style jsx>{`

@@ -6,6 +6,7 @@ import {
     historyToGeminiFormat,
     toImagePart,
 } from '@/lib/server/gemini';
+import { AI_STREAM_LIMIT, enforceRateLimit } from '@/lib/server/rateLimit';
 
 function isValidHistory(value: unknown): value is ChatHistoryMessage[] {
     if (!Array.isArray(value)) return false;
@@ -22,6 +23,9 @@ export async function POST(req: NextRequest) {
     if (!userId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const limited = enforceRateLimit('stream', userId, AI_STREAM_LIMIT);
+    if (limited) return limited;
 
     let body: { prompt?: unknown; history?: unknown; imageBase64?: unknown };
     try {
