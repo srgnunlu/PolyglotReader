@@ -285,87 +285,19 @@ extension ChatViewModel {
         }
     }
 
-    /// Henüz analiz edilmemiş görselleri arka planda analiz et
+    /// Henüz analiz edilmemiş görselleri arka planda analiz et.
+    /// Analiz/persist işi `PDFImageAnalysisService`'e devredildi; burada yalnızca
+    /// sonuçlar view model'in cache'ine yansıtılır.
     private func lazyAnalyzePageImages(_ images: [PDFImageMetadata], document: PDFDocument) async {
-        let requests = buildImageAnalysisRequests(from: images, document: document)
-        guard !requests.isEmpty else { return }
-
-        let results = await geminiService.batchAnalyzeImages(requests)
-        await persistImageAnalysisResults(results)
+        let results = await imageAnalysisService.analyzeUnanalyzedImages(images, document: document)
+        updateImageCache(results)
     }
 
-    private func buildImageAnalysisRequests(
-        from images: [PDFImageMetadata],
-        document: PDFDocument
-    ) -> [ImageAnalysisRequest] {
-        let unanalyzed = images.filter { !$0.isAnalyzed }
-        guard !unanalyzed.isEmpty else { return [] }
-
-        var requests: [ImageAnalysisRequest] = []
-
-        for image in unanalyzed {
-            guard let request = makeImageAnalysisRequest(for: image, document: document) else { continue }
-            requests.append(request)
-        }
-
-        return requests
-    }
-
-    private func makeImageAnalysisRequest(
-        for image: PDFImageMetadata,
-        document: PDFDocument
-    ) -> ImageAnalysisRequest? {
-        guard let bounds = image.bounds,
-              let page = document.page(at: image.pageNumber - 1),
-              let renderedImage = imageService.renderRegionFullSize(
-                rect: bounds.cgRect,
-                in: page
-              ),
-              let jpegData = renderedImage.jpegData(compressionQuality: 0.8) else {
-            return nil
-        }
-
-        let contextRect = bounds.cgRect.insetBy(dx: -50, dy: -50)
-        let context = page.selection(for: contextRect)?.string
-
-        return ImageAnalysisRequest(
-            imageId: image.id,
-            imageData: jpegData,
-            pageNumber: image.pageNumber,
-            context: context
-        )
-    }
-
-    private func persistImageAnalysisResults(_ results: [ImageAnalysisResult]) async {
-        await updateImageCaptions(results)
-        await updateImageCache(results)
-    }
-
-    private func updateImageCaptions(_ results: [ImageAnalysisResult]) async {
+    private func updateImageCache(_ results: [ImageAnalysisResult]) {
         for result in results {
-            do {
-                try await supabaseService.updateImageCaption(
-                    imageId: result.imageId.uuidString,
-                    caption: result.caption,
-                    embedding: result.captionEmbedding
-                )
-            } catch {
-                logWarning(
-                    "ChatViewModel",
-                    "Görsel açıklaması güncellenemedi",
-                    details: error.localizedDescription
-                )
-            }
-        }
-    }
-
-    private func updateImageCache(_ results: [ImageAnalysisResult]) async {
-        await MainActor.run {
-            for result in results {
-                if let index = cachedImageMetadata.firstIndex(where: { $0.id == result.imageId }) {
-                    cachedImageMetadata[index].caption = result.caption
-                    cachedImageMetadata[index].analyzedAt = result.analyzedAt
-                }
+            if let index = cachedImageMetadata.firstIndex(where: { $0.id == result.imageId }) {
+                cachedImageMetadata[index].caption = result.caption
+                cachedImageMetadata[index].analyzedAt = result.analyzedAt
             }
         }
     }

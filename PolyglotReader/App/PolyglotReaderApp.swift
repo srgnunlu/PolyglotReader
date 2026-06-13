@@ -10,6 +10,9 @@ struct PolyglotReaderApp: App {
     init() {
         SecurityManager.shared.configure()
         ErrorHandlingService.shared.configureGlobalHandlers()
+        #if canImport(MetricKit) && os(iOS)
+        MetricKitService.shared.start()
+        #endif
     }
 
     var body: some Scene {

@@ -31,6 +31,10 @@ class LibraryViewModel: ObservableObject {
     @Published var selectedTags: Set<UUID> = []
     @Published var showTagFilter: Bool = false
 
+    // Çoklu seçim / toplu işlem
+    @Published var isSelectionMode = false
+    @Published var selectedFileIds: Set<String> = []
+
     let supabaseService = SupabaseService.shared
     let pdfService = PDFService.shared
 

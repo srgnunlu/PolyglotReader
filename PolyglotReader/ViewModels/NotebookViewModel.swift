@@ -243,7 +243,8 @@ class NotebookViewModel: ObservableObject {
 
             logInfo("NotebookVM", "Annotations yüklendi", details: "\(annotations.count) adet")
         } catch {
-            errorMessage = "Notlar yüklenirken hata oluştu: \(error.localizedDescription)"
+            let appError = ErrorHandlingService.mapToAppError(error)
+            errorMessage = "Notlar yüklenirken hata oluştu: \(appError.localizedDescription)"
             logError("NotebookVM", "Annotations yükleme hatası", error: error)
         }
     }
@@ -354,7 +355,8 @@ class NotebookViewModel: ObservableObject {
 
             logInfo("NotebookVM", "Annotation silindi", details: "ID: \(id)")
         } catch {
-            errorMessage = "Silme işlemi başarısız: \(error.localizedDescription)"
+            let appError = ErrorHandlingService.mapToAppError(error)
+            errorMessage = "Silme işlemi başarısız: \(appError.localizedDescription)"
             logError("NotebookVM", "Annotation silme hatası", error: error)
         }
     }

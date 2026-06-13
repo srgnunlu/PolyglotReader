@@ -347,6 +347,8 @@ struct CreateFolderSheet: View {
 
     @State private var folderName = ""
     @State private var selectedColor = "#6366F1"
+    @State private var selectedIcon = "folder.fill"
+    @State private var selectedParentId: UUID?
 
     private let colors = [
         "#6366F1", // indigo
@@ -364,6 +366,38 @@ struct CreateFolderSheet: View {
             Form {
                 Section("Klasör Adı") {
                     TextField("Klasör adı girin", text: $folderName)
+                }
+
+                Section("Üst Klasör") {
+                    Picker("Konum", selection: $selectedParentId) {
+                        Text("Ana Klasör").tag(UUID?.none)
+                        ForEach(viewModel.folders) { folder in
+                            Label(folder.name, systemImage: folder.sfSymbol)
+                                .tag(UUID?.some(folder.id))
+                        }
+                    }
+                }
+
+                Section("İkon") {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 14) {
+                        ForEach(FolderIconStore.availableIcons, id: \.self) { icon in
+                            Image(systemName: icon)
+                                .font(.system(size: 20))
+                                .foregroundStyle(
+                                    selectedIcon == icon ? (Color(hex: selectedColor) ?? .indigo) : .secondary
+                                )
+                                .frame(width: 44, height: 44)
+                                .background {
+                                    if selectedIcon == icon {
+                                        Circle().fill((Color(hex: selectedColor) ?? .indigo).opacity(0.15))
+                                    }
+                                }
+                                .onTapGesture { selectedIcon = icon }
+                                .accessibilityLabel(icon)
+                                .accessibilityAddTraits(selectedIcon == icon ? [.isSelected] : [])
+                        }
+                    }
+                    .padding(.vertical, 8)
                 }
 
                 Section("Renk") {
@@ -390,7 +424,7 @@ struct CreateFolderSheet: View {
                 // Önizleme
                 Section("Önizleme") {
                     HStack {
-                        Image(systemName: "folder.fill")
+                        Image(systemName: selectedIcon)
                             .font(.system(size: 32))
                             .foregroundStyle(Color(hex: selectedColor) ?? .indigo)
 
@@ -401,6 +435,11 @@ struct CreateFolderSheet: View {
             }
             .navigationTitle("Yeni Klasör")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                if selectedParentId == nil {
+                    selectedParentId = viewModel.currentFolder?.id
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("İptal") {
@@ -410,8 +449,15 @@ struct CreateFolderSheet: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Oluştur") {
+                        let parentId = selectedParentId
+                        let icon = selectedIcon
                         Task {
-                            await viewModel.createFolder(name: folderName, color: selectedColor)
+                            await viewModel.createFolder(
+                                name: folderName,
+                                color: selectedColor,
+                                icon: icon,
+                                parentId: parentId
+                            )
                             dismiss()
                         }
                     }

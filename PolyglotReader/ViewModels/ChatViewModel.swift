@@ -67,6 +67,7 @@ class ChatViewModel: ObservableObject {
     let supabaseService = SupabaseService.shared
     let ragService = RAGService.shared
     let imageService = PDFImageService.shared
+    let imageAnalysisService = PDFImageAnalysisService.shared
     let smartSuggestionService = SmartSuggestionService.shared
 
     // Sayfa referansı algılama regex'i
@@ -209,10 +210,24 @@ class ChatViewModel: ObservableObject {
                     }
                     self.indexingStatus = .indexing
                 } else if wasIndexing && !isIndexingForFile {
-                    self.isDocumentIndexed = true
-                    self.indexingProgress = max(self.indexingProgress, 1.0)
-                    self.indexingStatus = .ready
-                    logInfo("ChatViewModel", "Doküman indexleme tamamlandı ✅ (observer)")
+                    // Indexing stopped for our file: distinguish success from failure
+                    // so we don't silently mark a failed document as ready.
+                    if self.matchesCurrentFile(self.ragService.indexingFailedFileId) {
+                        self.isDocumentIndexed = false
+                        self.indexingStatus = .failed(
+                            "Doküman hazırlanamadı. Tekrar deneyin."
+                        )
+                        logError(
+                            "ChatViewModel",
+                            "Doküman indexleme başarısız ❌ (observer)",
+                            error: nil
+                        )
+                    } else {
+                        self.isDocumentIndexed = true
+                        self.indexingProgress = max(self.indexingProgress, 1.0)
+                        self.indexingStatus = .ready
+                        logInfo("ChatViewModel", "Doküman indexleme tamamlandı ✅ (observer)")
+                    }
                 }
             }
 

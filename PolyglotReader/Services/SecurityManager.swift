@@ -356,13 +356,6 @@ final class SecurityManager {
     #endif
 
     private func makePinningConfiguration() -> PinningConfiguration {
-        var enforcedHosts: Set<String> = []
-
-        if let supabaseHost = URL(string: Config.supabaseUrl)?.host {
-            enforcedHosts.insert(supabaseHost)
-        }
-        enforcedHosts.insert(Self.geminiHost)
-
         let supabasePins = loadPins(fromInfoKey: Self.supabasePinsInfoKey)
         let geminiPins = loadPins(fromInfoKey: Self.geminiPinsInfoKey)
 
@@ -373,6 +366,12 @@ final class SecurityManager {
         if !geminiPins.isEmpty {
             pinsByHost[Self.geminiHost] = geminiPins
         }
+
+        // Only enforce hosts that actually have SPKI pins configured (via Info.plist).
+        // This makes pinning a true no-op until pins are supplied, so a Release build
+        // can never lock itself out of Supabase/Gemini because pins were left empty.
+        // Adding pins to Info.plist automatically activates enforcement for that host.
+        let enforcedHosts = Set(pinsByHost.keys)
 
         return PinningConfiguration(
             enforcedHosts: enforcedHosts,

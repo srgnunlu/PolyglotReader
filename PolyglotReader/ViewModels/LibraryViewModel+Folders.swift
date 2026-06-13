@@ -28,13 +28,23 @@ extension LibraryViewModel {
         }
     }
 
-    /// Yeni klasör oluştur
-    func createFolder(name: String, color: String = "#6366F1") async {
+    /// Yeni klasör oluştur. `parentId` verilmezse mevcut klasörün altına oluşturulur
+    /// (iç-içe klasör). `icon` verilirse seçilen SF Symbol yerel olarak saklanır.
+    func createFolder(
+        name: String,
+        color: String = "#6366F1",
+        icon: String? = nil,
+        parentId: UUID? = nil
+    ) async {
         do {
             let folder = try await supabaseService.createFolder(
                 name: name,
-                parentId: currentFolder?.id
+                color: color,
+                parentId: parentId
             )
+            if let icon {
+                FolderIconStore.shared.setIcon(icon, for: folder.id)
+            }
             await loadFoldersAndTags()
             logInfo("LibraryViewModel", "Klasör oluşturuldu", details: folder.name)
         } catch {
@@ -47,7 +57,7 @@ extension LibraryViewModel {
                     source: "LibraryViewModel",
                     operation: "CreateFolder"
                 ) { [weak self] in
-                    Task { await self?.createFolder(name: name, color: color) }
+                    Task { await self?.createFolder(name: name, color: color, icon: icon, parentId: parentId) }
                     return
                 }
             )

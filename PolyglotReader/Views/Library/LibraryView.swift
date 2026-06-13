@@ -10,6 +10,8 @@ struct LibraryView: View {
     @State private var showCreateFolder = false
     @State private var isSearchActive = false
     @State private var searchInput = ""  // Local state for immediate input
+    @State private var showBulkDeleteConfirm = false
+    @State private var showBulkMoveDialog = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -71,6 +73,81 @@ struct LibraryView: View {
                 fileScrollView
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            if viewModel.isSelectionMode {
+                selectionActionBar
+            }
+        }
+        .confirmationDialog(
+            "Seçili \(viewModel.selectedCount) dosya silinsin mi?",
+            isPresented: $showBulkDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Sil", role: .destructive) {
+                Task { await viewModel.deleteSelectedFiles() }
+            }
+            Button("İptal", role: .cancel) {}
+        }
+        .confirmationDialog(
+            "Klasöre Taşı",
+            isPresented: $showBulkMoveDialog,
+            titleVisibility: .visible
+        ) {
+            Button("Ana Klasör") {
+                Task { await viewModel.moveSelectedFiles(to: nil) }
+            }
+            ForEach(viewModel.folders) { folder in
+                Button(folder.name) {
+                    Task { await viewModel.moveSelectedFiles(to: folder) }
+                }
+            }
+            Button("İptal", role: .cancel) {}
+        }
+    }
+
+    // MARK: - Selection Action Bar
+    private var selectionActionBar: some View {
+        HStack(spacing: 20) {
+            Button {
+                viewModel.selectAllVisible()
+            } label: {
+                Label("Tümü", systemImage: "checkmark.circle")
+                    .font(.subheadline.weight(.medium))
+            }
+            .accessibilityIdentifier("select_all_button")
+
+            Spacer()
+
+            Text("\(viewModel.selectedCount) seçili")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Button {
+                showBulkMoveDialog = true
+            } label: {
+                Image(systemName: "folder")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .disabled(viewModel.selectedCount == 0 || viewModel.folders.isEmpty)
+            .accessibilityLabel("Klasöre taşı")
+
+            Button {
+                showBulkDeleteConfirm = true
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.red)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .disabled(viewModel.selectedCount == 0)
+            .accessibilityLabel("Seçilenleri sil")
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
     }
 
     private var fileScrollView: some View {
@@ -150,19 +227,30 @@ struct LibraryView: View {
             GridItem(.flexible(), spacing: 16)
         ], spacing: 16) {
             ForEach(viewModel.filteredFiles) { file in
-                FlippablePDFCardView(
-                    file: file,
-                    onTap: { selectedFile = file },
-                    onDelete: { Task { await viewModel.deleteFile(file) } },
-                    onGenerateSummary: { force in
-                        Task { await viewModel.generateSummary(for: file, force: force) }
-                    },
-                    onMoveToFolder: { folder in
-                        Task { await viewModel.moveFile(file, to: folder) }
-                    },
-                    availableFolders: viewModel.folders
-                )
-                .id(file.id)
+                if viewModel.isSelectionMode {
+                    PDFCardView(
+                        file: file,
+                        onTap: { viewModel.toggleSelection(file) },
+                        onDelete: {},
+                        isSelectionMode: true,
+                        isSelected: viewModel.isSelected(file)
+                    )
+                    .id(file.id)
+                } else {
+                    FlippablePDFCardView(
+                        file: file,
+                        onTap: { selectedFile = file },
+                        onDelete: { Task { await viewModel.deleteFile(file) } },
+                        onGenerateSummary: { force in
+                            Task { await viewModel.generateSummary(for: file, force: force) }
+                        },
+                        onMoveToFolder: { folder in
+                            Task { await viewModel.moveFile(file, to: folder) }
+                        },
+                        availableFolders: viewModel.folders
+                    )
+                    .id(file.id)
+                }
             }
         }
         .padding(.horizontal)
@@ -171,11 +259,21 @@ struct LibraryView: View {
     private var fileList: some View {
         VStack(spacing: 12) {
             ForEach(viewModel.filteredFiles) { file in
-                PDFListRowView(file: file) {
-                    selectedFile = file
-                } onDelete: {
-                    Task { await viewModel.deleteFile(file) }
-                }
+                PDFListRowView(
+                    file: file,
+                    onTap: {
+                        if viewModel.isSelectionMode {
+                            viewModel.toggleSelection(file)
+                        } else {
+                            selectedFile = file
+                        }
+                    },
+                    onDelete: {
+                        Task { await viewModel.deleteFile(file) }
+                    },
+                    isSelectionMode: viewModel.isSelectionMode,
+                    isSelected: viewModel.isSelected(file)
+                )
                 .padding(.horizontal)
             }
         }
@@ -239,6 +337,30 @@ struct LibraryView: View {
 
         ToolbarItem(placement: .topBarTrailing) {
             HStack(spacing: 8) {
+                // Çoklu seçim modu
+                Button {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8)) {
+                        viewModel.toggleSelectionMode()
+                    }
+                } label: {
+                    Image(systemName: viewModel.isSelectionMode ? "xmark" : "checklist")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(viewModel.isSelectionMode ? Color.indigo : Color.primary.opacity(0.7))
+                        .frame(width: 36, height: 36)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .background {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .overlay {
+                                    Circle()
+                                        .stroke(.white.opacity(0.2), lineWidth: 0.5)
+                                }
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(viewModel.isSelectionMode ? "Seçimi bitir" : "Çoklu seçim")
+                .accessibilityIdentifier("selection_mode_button")
+
                 // Arama butonu
                 Button {
                     withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8)) {

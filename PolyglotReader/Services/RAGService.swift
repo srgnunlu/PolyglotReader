@@ -11,6 +11,10 @@ class RAGService: ObservableObject {
     @Published var indexingFileId: UUID?
     @Published var indexingProgress: Float = 0
     @Published var currentOperation: String = ""
+    /// Set to the file ID when its most recent indexing attempt failed; cleared when
+    /// a new indexing run starts. Lets observers distinguish a failed run from a
+    /// successful one (indexing simply stops in both cases).
+    @Published var indexingFailedFileId: UUID?
 
     // Sub-services
     private let chunker = RAGChunker.shared
@@ -67,6 +71,19 @@ class RAGService: ObservableObject {
         startIndexing(for: fileId)
         defer { finishIndexing(for: fileId) }
 
+        do {
+            try await runIndexingPipeline(text: text, fileId: fileId, imageMetadata: imageMetadata)
+        } catch {
+            indexingFailedFileId = fileId
+            throw error
+        }
+    }
+
+    private func runIndexingPipeline(
+        text: String,
+        fileId: UUID,
+        imageMetadata: [PDFImageMetadata]
+    ) async throws {
         // Metin istatistikleri
         let wordCount = text.split(separator: " ").count
         let pageMarkers = text.components(separatedBy: "--- Sayfa ").count - 1
@@ -114,6 +131,10 @@ class RAGService: ObservableObject {
         indexingFileId = fileId
         indexingProgress = 0
         currentOperation = "Metin analiz ediliyor..."
+        // Clear any previous failure flag for a fresh attempt.
+        if indexingFailedFileId == fileId {
+            indexingFailedFileId = nil
+        }
     }
 
     private func finishIndexing(for fileId: UUID) {
@@ -190,32 +211,40 @@ class RAGService: ObservableObject {
 
         // Başarısız chunk'ları tekrar dene (son şans, yine paralel)
         if !failedChunks.isEmpty {
-            logWarning("RAGService", "Başarısız chunk'lar için son deneme", details: "\(failedChunks.count) chunk")
-            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 saniye bekle
-
-            let retryResults: [(chunk: DocumentChunk, embedding: [Float]?)] =
-                await withTaskGroup(of: (DocumentChunk, [Float]?).self) { group in
-                    for (_, chunk) in failedChunks {
-                        group.addTask {
-                            let embedding = try? await service.getOrCreateEmbedding(for: chunk.content)
-                            return (chunk, embedding)
-                        }
-                    }
-                    var collected: [(DocumentChunk, [Float]?)] = []
-                    for await result in group {
-                        collected.append(result)
-                    }
-                    return collected
-                }
-
-            for result in retryResults {
-                if let embedding = result.embedding {
-                    chunksWithEmbeddings.append((result.chunk, embedding))
-                }
-            }
+            let recovered = await retryFailedEmbeddings(failedChunks.map { $0.chunk })
+            chunksWithEmbeddings.append(contentsOf: recovered)
         }
 
         return chunksWithEmbeddings
+    }
+
+    /// Başarısız chunk'lar için son bir paralel embedding denemesi yapar.
+    private func retryFailedEmbeddings(
+        _ chunks: [DocumentChunk]
+    ) async -> [(chunk: DocumentChunk, embedding: [Float])] {
+        logWarning("RAGService", "Başarısız chunk'lar için son deneme", details: "\(chunks.count) chunk")
+        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 saniye bekle
+
+        let service = embeddingService
+        let retryResults: [(chunk: DocumentChunk, embedding: [Float]?)] =
+            await withTaskGroup(of: (DocumentChunk, [Float]?).self) { group in
+                for chunk in chunks {
+                    group.addTask {
+                        let embedding = try? await service.getOrCreateEmbedding(for: chunk.content)
+                        return (chunk, embedding)
+                    }
+                }
+                var collected: [(DocumentChunk, [Float]?)] = []
+                for await result in group {
+                    collected.append(result)
+                }
+                return collected
+            }
+
+        return retryResults.compactMap { result in
+            guard let embedding = result.embedding else { return nil }
+            return (result.chunk, embedding)
+        }
     }
 
     private func updateIndexingProgress(currentIndex: Int, total: Int) {
