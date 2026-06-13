@@ -13,6 +13,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  experimental: {
+    // Pull only the icons/exports actually used from large barrel-file packages
+    // instead of the whole module graph (Phase B perf — bundle size). Turbopack
+    // does this automatically; this covers the webpack build path.
+    optimizePackageImports: ["lucide-react", "framer-motion"],
+  },
   compiler: {
     // Debug console.* must not ship to production; error/warn stay for
     // real failure visibility.

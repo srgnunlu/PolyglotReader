@@ -17,10 +17,26 @@ const PDFViewer = dynamic(() => import('@/components/reader/PDFViewer').then(mod
     </div>
   ),
 });
-import { QuickTranslationPopup } from '@/components/reader/QuickTranslationPopup';
-import { SelectionPopup } from '@/components/reader/SelectionPopup';
-import { ImageSelectionPopup } from '@/components/reader/ImageSelectionPopup';
-import { ChatPanel } from '@/components/chat/ChatPanel';
+// Selection popups and the chat panel are pulled in lazily — they carry heavy
+// deps (translation logic, react-markdown, RAG/Gemini clients) that aren't
+// needed until the user actually selects text or opens chat (Phase B perf —
+// route-level code splitting).
+const QuickTranslationPopup = dynamic(
+  () => import('@/components/reader/QuickTranslationPopup').then(mod => mod.QuickTranslationPopup),
+  { ssr: false }
+);
+const SelectionPopup = dynamic(
+  () => import('@/components/reader/SelectionPopup').then(mod => mod.SelectionPopup),
+  { ssr: false }
+);
+const ImageSelectionPopup = dynamic(
+  () => import('@/components/reader/ImageSelectionPopup').then(mod => mod.ImageSelectionPopup),
+  { ssr: false }
+);
+const ChatPanel = dynamic(
+  () => import('@/components/chat/ChatPanel').then(mod => mod.ChatPanel),
+  { ssr: false }
+);
 import { ReadingProgress } from '@/components/reader/ReadingProgress';
 import { useAnnotationStore } from '@/stores/useAnnotationStore';
 import { useReaderStore } from '@/stores/useReaderStore';
@@ -181,18 +197,23 @@ function ReaderContent({ documentId }: { documentId: string }) {
           folderId: docData.folder_id, aiCategory: docData.ai_category, tags: [],
         });
 
-        const { data: signedUrl, error: urlError } = await supabase.storage
-          .from('user_files').createSignedUrl(docData.storage_path, 3600);
-        if (urlError) throw urlError;
-        setPdfUrl(signedUrl.signedUrl);
+        // Independent reads run together instead of in a serial waterfall.
+        // reading_progress relies on RLS (auth.uid() = user_id) plus the
+        // UNIQUE(user_id, file_id) constraint, so a file_id filter already
+        // returns just this user's row — no getUser() round-trip needed.
+        const [signedUrlRes, chunksRes, progressRes] = await Promise.all([
+          supabase.storage.from('user_files').createSignedUrl(docData.storage_path, 3600),
+          supabase.from('document_chunks').select('content').eq('file_id', documentId).limit(10),
+          supabase.from('reading_progress').select('*').eq('file_id', documentId).maybeSingle(),
+        ]);
 
-        const { data: chunks } = await supabase
-          .from('document_chunks').select('content').eq('file_id', documentId).limit(10);
+        if (signedUrlRes.error) throw signedUrlRes.error;
+        setPdfUrl(signedUrlRes.data.signedUrl);
+
+        const chunks = chunksRes.data;
         if (chunks) setDocumentContext(chunks.map((c: { content: string }) => c.content).join('\n\n'));
 
-        const { data: progressData } = await supabase
-          .from('reading_progress').select('*').eq('file_id', documentId)
-          .eq('user_id', (await supabase.auth.getUser()).data.user?.id).maybeSingle();
+        const progressData = progressRes.data;
         if (progressData) {
           setInitialProgress({ page: progressData.page, x: progressData.offset_x, y: progressData.offset_y, scale: progressData.zoom_scale });
           setPdfScale(progressData.zoom_scale);

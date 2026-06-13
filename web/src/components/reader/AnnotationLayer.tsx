@@ -1,17 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Annotation, AnnotationType } from '@/types/models';
+import { memo, useEffect, useRef, useState } from 'react';
+import { Annotation } from '@/types/models';
 
 interface AnnotationLayerProps {
     pageNumber: number;
+    /** Annotations for THIS page only — pre-grouped by the parent so an edit on
+     *  one page never re-renders another page's layer (Phase B perf — P5). */
     annotations: Annotation[];
     scale: number;
     pageWidth: number;
     pageHeight: number;
 }
 
-export function AnnotationLayer({
+function AnnotationLayerComponent({
     pageNumber,
     annotations,
     scale,
@@ -125,4 +127,9 @@ export function AnnotationLayer({
         />
     );
 }
+
+// Memoized: with annotations pre-grouped per page, a layer only re-renders when
+// its own page's annotations, scale, or dimensions actually change — scrolling
+// or editing another page leaves it untouched.
+export const AnnotationLayer = memo(AnnotationLayerComponent);
 

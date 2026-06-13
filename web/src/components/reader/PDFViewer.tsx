@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Annotation } from '@/types/models';
 import { AnnotationLayer } from './AnnotationLayer';
@@ -12,7 +12,15 @@ import { useTextSelection } from '@/hooks/useTextSelection';
 import { usePDFImageSelection } from '@/hooks/usePDFImageSelection';
 import '@/lib/pdfjs-config'; // Initialize PDF.js worker configuration
 
-const overscanPages = 10;
+// Only the current page ± this many neighbours mount a real react-pdf <Page>
+// (canvas + text + annotation layers). Everything outside the window is a
+// lightweight spacer that preserves scroll geometry. Keep this small — each
+// live page is expensive in RAM and paint cost (Phase B perf — P1/P3).
+const overscanPages = 2;
+
+// Stable reference for pages with no annotations, so their memoized layer
+// never re-renders just because a new empty array was created.
+const EMPTY_ANNOTATIONS: Annotation[] = [];
 
 interface PDFViewerProps {
     pdfUrl: string;
@@ -82,6 +90,19 @@ export function PDFViewer({
     const wrapperRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+    // Group annotations by page once per annotations change. Each page gets a
+    // stable array reference across scroll/zoom renders, so memoized
+    // AnnotationLayers only redraw when their own page's data changes (P5).
+    const annotationsByPage = useMemo(() => {
+        const map = new Map<number, Annotation[]>();
+        for (const annotation of annotations) {
+            const list = map.get(annotation.pageNumber);
+            if (list) list.push(annotation);
+            else map.set(annotation.pageNumber, [annotation]);
+        }
+        return map;
+    }, [annotations]);
 
     // Document loading, zoom and page dimensions
     const {
@@ -288,7 +309,7 @@ export function PDFViewer({
                                         {pageDimensions.has(pageNum) && (
                                             <AnnotationLayer
                                                 pageNumber={pageNum}
-                                                annotations={annotations}
+                                                annotations={annotationsByPage.get(pageNum) ?? EMPTY_ANNOTATIONS}
                                                 scale={displayScale}
                                                 pageWidth={pageDimensions.get(pageNum)!.width}
                                                 pageHeight={pageDimensions.get(pageNum)!.height}
@@ -336,12 +357,14 @@ export function PDFViewer({
           will-change: transform;
         }
 
+        /* Static spacer for windowed-out pages. Intentionally NOT animated:
+           a long PDF can have hundreds of these at once and a perpetual
+           shimmer on each would burn paint/GPU for content nobody is looking
+           at (Phase B perf — P1/P3). */
         .pdf-page-placeholder {
           width: 100%;
           height: 100%;
-          background: linear-gradient(90deg, rgba(0, 0, 0, 0.04) 25%, rgba(0, 0, 0, 0.08) 50%, rgba(0, 0, 0, 0.04) 75%);
-          background-size: 200% 100%;
-          animation: shimmer 1.4s ease infinite;
+          background: rgba(0, 0, 0, 0.03);
         }
 
         :global(.react-pdf__Document) {
@@ -354,11 +377,6 @@ export function PDFViewer({
         :global(.react-pdf__Page__canvas) {
           display: block;
           position: relative;
-        }
-
-        @keyframes shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
         }
 
         .persistent-highlight-layer {

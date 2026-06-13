@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { getSupabase } from '@/lib/supabase';
+import { generatePdfThumbnail } from '@/lib/pdfThumbnail';
 
 interface UploadResult {
     succeeded: string[];
@@ -48,12 +49,18 @@ export function useFileUpload() {
 
                     if (storageError) throw storageError;
 
+                    // Pre-render a small first-page thumbnail so the library grid
+                    // never downloads the full PDF just to draw a preview. Best
+                    // effort — a null result simply falls back to live rendering.
+                    const thumbnailBase64 = await generatePdfThumbnail(file);
+
                     const { error: insertError } = await supabase.from('files').insert({
                         user_id: user.id,
                         name: file.name,
                         storage_path: storagePath,
                         file_type: 'pdf',
                         size: file.size,
+                        thumbnail_base64: thumbnailBase64,
                     });
 
                     if (insertError) {
