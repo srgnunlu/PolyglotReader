@@ -155,9 +155,9 @@ function NotesContent() {
 
         {/* Error state */}
         {!isLoading && error && (
-          <div className="flex flex-col items-center gap-3 py-16 text-center">
-            <div className="flex items-center justify-center size-14 rounded-2xl bg-red-500/10">
-              <AlertCircle className="size-7 text-red-500" />
+          <div className="flex flex-col items-center gap-3 py-16 text-center animate-in fade-in duration-500">
+            <div className="flex items-center justify-center size-14 rounded-2xl bg-corio-destructive/10">
+              <AlertCircle className="size-7 text-corio-destructive" />
             </div>
             <p className="text-sm font-medium text-corio-fg">{error}</p>
           </div>
@@ -190,8 +190,12 @@ function NotesContent() {
         {/* Grouped annotations */}
         {!isLoading && !error && filteredNotes.length > 0 && (
           <div className="space-y-6">
-            {Object.entries(groupedNotes).map(([fileId, { fileName, notes: fileNotes }]) => (
-              <div key={fileId} className="space-y-3">
+            {Object.entries(groupedNotes).map(([fileId, { fileName, notes: fileNotes }], groupIndex) => (
+              <div
+                key={fileId}
+                style={{ animationDelay: `${Math.min(groupIndex, 10) * 50}ms` }}
+                className="space-y-3 animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-500 motion-reduce:animate-none"
+              >
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-semibold text-corio-fg truncate">
                     {fileName}

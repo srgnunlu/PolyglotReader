@@ -432,6 +432,10 @@
   --color-corio-border: var(--corio-border);
   --color-corio-border-subtle: var(--corio-border-subtle);
   --color-corio-reader: var(--corio-reader-bg);
+  --color-corio-success: var(--corio-success);
+  --color-corio-warning: var(--corio-warning);
+  --color-corio-destructive: var(--corio-destructive);
+  --color-corio-info: var(--corio-info);
   --color-highlight-yellow: var(--corio-highlight-yellow);
   --color-highlight-green: var(--corio-highlight-green);
   --color-highlight-blue: var(--corio-highlight-blue);

@@ -172,7 +172,7 @@ function LibraryContent() {
 
         {/* Error state */}
         {!isLoading && error && (
-          <div className="flex flex-col items-center gap-3 py-16 text-center">
+          <div className="flex flex-col items-center gap-3 py-16 text-center animate-in fade-in duration-500">
             <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-corio-destructive/10">
               <AlertCircle className="w-7 h-7 text-corio-destructive" />
             </div>
