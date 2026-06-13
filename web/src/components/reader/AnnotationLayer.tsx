@@ -21,12 +21,13 @@ export function AnnotationLayer({
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isVisible, setIsVisible] = useState(false);
 
-    // Fade in after a small delay to ensure canvas is painted
+    // Fade in once after mount, after the canvas has had a chance to paint.
+    // setState lives in the timer callback (not the effect body) so it stays
+    // off the synchronous render path.
     useEffect(() => {
-        setIsVisible(false);
         const timer = setTimeout(() => setIsVisible(true), 50);
         return () => clearTimeout(timer);
-    }, [pageNumber, scale]);
+    }, []);
 
     useEffect(() => {
         const canvas = canvasRef.current;
