@@ -79,12 +79,12 @@ class GeminiService: ObservableObject {
 
     // MARK: - Chat Session
 
-    func initChatSession(pdfContent: String? = nil) {
-        chatService.initChatSession(pdfContent: pdfContent)
+    func initChatSession(fileId: String, pdfContent: String? = nil) {
+        chatService.initChatSession(fileId: fileId, pdfContent: pdfContent)
     }
 
-    func resetChatSession() {
-        chatService.resetChatSession()
+    func resetChatSession(fileId: String) {
+        chatService.resetChatSession(fileId: fileId)
     }
 
     func sendMessage(_ message: String) async throws -> String {
@@ -93,17 +93,17 @@ class GeminiService: ObservableObject {
         }
     }
 
-    func sendMessageWithContext(_ message: String, context: String) async throws -> String {
+    func sendMessageWithContext(_ message: String, context: String, fileId: String) async throws -> String {
         try await executeServiceCall {
-            try await chatService.sendMessageWithContext(message, context: context)
+            try await chatService.sendMessageWithContext(message, context: context, fileId: fileId)
         }
     }
 
-    func sendMessageStream(_ message: String) async throws -> AsyncThrowingStream<String, Error> {
+    func sendMessageStream(_ message: String, fileId: String) async throws -> AsyncThrowingStream<String, Error> {
         isProcessing = true
         lastError = nil
 
-        let stream = chatService.sendMessageStream(message)
+        let stream = chatService.sendMessageStream(message, fileId: fileId)
 
         // Wrap stream to handle isProcessing state completion?
         // It's tricky with async stream return.
@@ -129,12 +129,13 @@ class GeminiService: ObservableObject {
 
     func sendMessageStreamWithContext(
         _ message: String,
-        context: String
+        context: String,
+        fileId: String
     ) async throws -> AsyncThrowingStream<String, Error> {
         isProcessing = true
         lastError = nil
 
-        let stream = chatService.sendMessageStreamWithContext(message, context: context)
+        let stream = chatService.sendMessageStreamWithContext(message, context: context, fileId: fileId)
 
         return AsyncThrowingStream { continuation in
             Task {
@@ -161,9 +162,9 @@ class GeminiService: ObservableObject {
         }
     }
 
-    func askAboutImage(_ imageData: Data, question: String) async throws -> String {
+    func askAboutImage(_ imageData: Data, question: String, fileId: String) async throws -> String {
         try await executeServiceCall {
-            try await chatService.askAboutImage(imageData, question: question)
+            try await chatService.askAboutImage(imageData, question: question, fileId: fileId)
         }
     }
 
@@ -181,10 +182,11 @@ class GeminiService: ObservableObject {
     func askWithPageImages(
         _ question: String,
         images: [(data: Data, caption: String?)],
-        pageNumber: Int
+        pageNumber: Int,
+        fileId: String
     ) async throws -> String {
         try await executeServiceCall {
-            try await chatService.askWithPageImages(question, images: images, pageNumber: pageNumber)
+            try await chatService.askWithPageImages(question, images: images, pageNumber: pageNumber, fileId: fileId)
         }
     }
 

@@ -147,6 +147,26 @@ class AuthViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Delete Account (App Store 5.1.1(v))
+
+    /// Permanently deletes the user's account and all associated data.
+    /// Returns `true` on success so the UI can confirm to the user.
+    @discardableResult
+    func deleteAccount() async -> Bool {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            try await supabaseService.deleteAccount()
+            currentUser = nil
+            isAuthenticated = false
+            return true
+        } catch {
+            handleAuthError(error, operation: "DeleteAccount")
+            return false
+        }
+    }
+
     private func handleAuthError(
         _ error: Error,
         operation: String,

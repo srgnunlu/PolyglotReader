@@ -137,6 +137,30 @@ final class SupabaseAuthService: ObservableObject {
         }
     }
 
+    /// Permanently deletes the signed-in user's account.
+    ///
+    /// Calls the `delete-account` Edge Function, which uses the service-role key
+    /// to remove the auth user (cascading to files, chats, annotations, chunks
+    /// via `ON DELETE CASCADE`) and the user's storage objects. App Store
+    /// Guideline 5.1.1(v) requires in-app account deletion for apps that create
+    /// accounts. On success the local session and sensitive data are cleared.
+    func deleteAccount() async throws {
+        await MainActor.run { isLoading = true }
+        defer { Task { await MainActor.run { isLoading = false } } }
+
+        // The SDK attaches the current user's access token automatically, so the
+        // Edge Function can authenticate the caller and delete only their data.
+        try await client.functions.invoke("delete-account")
+
+        // Account is gone server-side; tear down the local session.
+        try? await client.auth.signOut()
+        securityManager.clearSensitiveData()
+        await MainActor.run {
+            self.currentUser = nil
+        }
+        logInfo("SupabaseAuthService", "Hesap silindi ve oturum kapatıldı")
+    }
+
     func getSession() async -> User? {
         let session = await fetchSession()
         await MainActor.run {

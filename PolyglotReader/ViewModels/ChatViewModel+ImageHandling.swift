@@ -36,7 +36,7 @@ extension ChatViewModel {
         defer { isLoading = false }
 
         do {
-            let response = try await geminiService.askAboutImage(imageData, question: question)
+            let response = try await geminiService.askAboutImage(imageData, question: question, fileId: fileId)
             messages.append(ChatMessage(role: .model, text: response))
             saveChatMessage(role: "model", content: response)
         } catch {
@@ -197,7 +197,8 @@ extension ChatViewModel {
             let response = try await geminiService.askWithPageImages(
                 userText,
                 images: imagesWithData,
-                pageNumber: pageNumber
+                pageNumber: pageNumber,
+                fileId: fileId
             )
 
             messages.append(ChatMessage(role: .model, text: response))

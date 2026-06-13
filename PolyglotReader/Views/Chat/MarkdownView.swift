@@ -41,7 +41,21 @@ struct MarkdownView: View {
                 renderBlock(block)
             }
         }
+        // Intercept taps on `[label](jump:N)` citation links and navigate the
+        // reader to the cited page instead of opening a URL in the browser.
+        .environment(\.openURL, OpenURLAction { url in
+            guard url.scheme == Self.jumpLinkScheme,
+                  let host = url.host,
+                  let page = Int(host) else {
+                return .systemAction
+            }
+            onNavigateToPage(page)
+            return .handled
+        })
     }
+
+    /// Custom URL scheme used for in-document page citations.
+    static let jumpLinkScheme = "coriojump"
 
     // MARK: - Block Types
 
@@ -345,9 +359,19 @@ struct MarkdownView: View {
 
                 let linkText = String(remaining[linkMatch])
                 if let labelRange = linkText.range(of: #"\[([^\]]+)\]"#, options: .regularExpression),
-                   linkText.range(of: #"jump:(\d+)"#, options: .regularExpression) != nil {
+                   let pageRange = linkText.range(of: #"jump:(\d+)"#, options: .regularExpression) {
                     let label = String(linkText[labelRange]).dropFirst().dropLast()
-                    result = result + Text("[\(label)]").foregroundColor(.indigo).underline()
+                    let pageString = String(linkText[pageRange]).replacingOccurrences(of: "jump:", with: "")
+
+                    // Build a tappable link; the OpenURLAction on `body` handles navigation.
+                    var attributed = AttributedString(String(label))
+                    attributed.foregroundColor = .indigo
+                    attributed.underlineStyle = Text.LineStyle.single
+                    if let page = Int(pageString),
+                       let url = URL(string: "\(Self.jumpLinkScheme)://\(page)") {
+                        attributed.link = url
+                    }
+                    result = result + Text(attributed)
                 }
 
                 remaining = String(remaining[linkMatch.upperBound...])

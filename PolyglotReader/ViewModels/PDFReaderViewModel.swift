@@ -267,7 +267,7 @@ class PDFReaderViewModel: ObservableObject {
             self.extractedText = text
             // Chat butonunu hemen göster - PDF içeriği ile legacy modda başlat
             // Böylece RAG hazır olmasa bile kullanıcı soru sorabilir
-            GeminiService.shared.initChatSession(pdfContent: text)
+            GeminiService.shared.initChatSession(fileId: fileId, pdfContent: text)
             self.isChatReady = true
             logInfo("PDFReaderVM", "AI Chat hazır (PDF içeriği yüklendi)")
         }

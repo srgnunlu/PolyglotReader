@@ -5,6 +5,9 @@ struct SettingsView: View {
     @EnvironmentObject var settingsViewModel: SettingsViewModel
     @StateObject private var keepAliveService = KeepAliveService.shared
 
+    @State private var showDeleteAccountConfirm = false
+    @State private var showDeleteAccountError = false
+
     var body: some View {
         NavigationStack {
             List {
@@ -225,8 +228,42 @@ struct SettingsView: View {
                     .accessibilityHint("settings.accessibility.sign_out.hint".localized)
                     .accessibilityIdentifier("sign_out_button")
                 }
+
+                // Delete Account Section (App Store 5.1.1(v))
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteAccountConfirm = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Label("settings.delete_account".localized, systemImage: "trash")
+                            Spacer()
+                        }
+                    }
+                    .disabled(authViewModel.isLoading)
+                    .accessibilityLabel("settings.delete_account".localized)
+                    .accessibilityIdentifier("delete_account_button")
+                } footer: {
+                    Text("settings.delete_account.footer".localized)
+                }
             }
             .navigationTitle("settings.title".localized)
+            .alert("settings.delete_account.confirm.title".localized, isPresented: $showDeleteAccountConfirm) {
+                Button("common.cancel".localized, role: .cancel) {}
+                Button("settings.delete_account.confirm.action".localized, role: .destructive) {
+                    Task {
+                        let success = await authViewModel.deleteAccount()
+                        if !success {
+                            showDeleteAccountError = true
+                        }
+                    }
+                }
+            } message: {
+                Text("settings.delete_account.confirm.message".localized)
+            }
+            .alert("settings.delete_account.error".localized, isPresented: $showDeleteAccountError) {
+                Button("common.ok".localized, role: .cancel) {}
+            }
         }
     }
 }

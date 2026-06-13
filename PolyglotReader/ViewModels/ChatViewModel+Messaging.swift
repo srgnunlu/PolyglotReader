@@ -144,7 +144,7 @@ extension ChatViewModel {
 
     private func getResponseStream(for userText: String) async throws -> AsyncThrowingStream<String, Error> {
         guard isRAGEnabled, let fileUUID = UUID(uuidString: fileId) else {
-            return try await geminiService.sendMessageStream(userText)
+            return try await geminiService.sendMessageStream(userText, fileId: fileId)
         }
 
         // P0: Indexleme durumu kontrolü
@@ -160,7 +160,7 @@ extension ChatViewModel {
             }
 
             // Indexleme yapılmamış - legacy mod
-            return try await geminiService.sendMessageStream(userText)
+            return try await geminiService.sendMessageStream(userText, fileId: fileId)
         }
 
         logRagQuery(fileUUID: fileUUID, userText: userText)
@@ -198,7 +198,7 @@ extension ChatViewModel {
 
                 // Sonra genel yanıt (chat session ile)
                 do {
-                    let stream = try await self.geminiService.sendMessageStream(userText)
+                    let stream = try await self.geminiService.sendMessageStream(userText, fileId: self.fileId)
                     for try await chunk in stream {
                         continuation.yield(chunk)
                     }
@@ -220,7 +220,7 @@ extension ChatViewModel {
 
                 // Sonra genel yanıt
                 do {
-                    let stream = try await self.geminiService.sendMessageStream(userText)
+                    let stream = try await self.geminiService.sendMessageStream(userText, fileId: self.fileId)
                     for try await chunk in stream {
                         continuation.yield(chunk)
                     }
@@ -277,7 +277,7 @@ extension ChatViewModel {
         imageCount: Int
     ) async throws -> AsyncThrowingStream<String, Error> {
         logInfo("ChatVM", "RAG devrede", details: "\(chunkCount) chunk, \(imageCount) img")
-        return try await geminiService.sendMessageStreamWithContext(userText, context: context)
+        return try await geminiService.sendMessageStreamWithContext(userText, context: context, fileId: fileId)
     }
 
     func sendSuggestion(_ prompt: String) async {
