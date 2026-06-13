@@ -391,6 +391,7 @@ function ReaderContent({ documentId }: { documentId: string }) {
           <PDFViewer
             pdfUrl={pdfUrl}
             storagePath={document.storagePath}
+            documentName={document.name}
             annotations={annotations}
             onTextSelect={handleTextSelect}
             onImageSelect={handleImageSelect}

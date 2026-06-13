@@ -3,11 +3,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Library, Notebook, Settings } from "lucide-react";
+import { Library, MessagesSquare, Notebook, Settings } from "lucide-react";
 import { motion } from "framer-motion";
 
 const tabs = [
   { href: "/library", label: "Kütüphane", icon: Library },
+  { href: "/chat", label: "Sohbet", icon: MessagesSquare },
   { href: "/notes", label: "Defterim", icon: Notebook },
   { href: "/settings", label: "Ayarlar", icon: Settings },
 ];

@@ -644,3 +644,93 @@ ${chunk.content}`;
         return await searchRelevantChunks(fileId, query, limit);
     }
 }
+
+// MARK: - Library-wide Search (Multi-file Hybrid)
+
+/** Caps how many documents a single library query will scan, to bound cost. */
+const LIBRARY_MAX_FILES = 25;
+
+interface LibraryFile {
+    id: string;
+    name: string;
+}
+
+interface LibraryScoredChunk extends ScoredChunk {
+    fileId: string;
+    fileName: string;
+}
+
+/**
+ * Kütüphane-geneli hibrit arama: birden fazla dokümanda paralel olarak
+ * vektör + BM25 araması yapar, her dosya için RRF füzyonu uygular, sonra
+ * tüm dosyalardan gelen en iyi parçaları küresel olarak sıralar.
+ *
+ * Tek dosyalık `searchRelevantChunksHybrid` ile aynı düşük seviyeli (test
+ * edilmiş) arama yollarını yeniden kullanır; embedding sorgu başına bir kez
+ * hesaplanır.
+ *
+ * @param files - Aranacak dosyalar (id + görüntülenecek isim)
+ * @param query - Kullanıcının sorusu
+ * @param perFileLimit - Her dosyadan alınacak aday parça sayısı
+ * @param finalLimit - Bağlama dahil edilecek toplam parça sayısı
+ * @returns Dosya adı + sayfa atıflı, birleştirilmiş bağlam metni
+ */
+export async function searchLibraryChunks(
+    files: LibraryFile[],
+    query: string,
+    perFileLimit: number = 6,
+    finalLimit: number = 12
+): Promise<string> {
+    if (files.length === 0) return '';
+
+    // Bound the scan: most-recent files are passed first by the caller.
+    const scanned = files.slice(0, LIBRARY_MAX_FILES);
+    if (files.length > LIBRARY_MAX_FILES) {
+        console.log(`📚 Library search capped: scanning ${LIBRARY_MAX_FILES} of ${files.length} files`);
+    }
+
+    try {
+        const queryEmbedding = await createEmbedding(query);
+
+        const perFileResults = await Promise.all(
+            scanned.map(async (file): Promise<LibraryScoredChunk[]> => {
+                try {
+                    const [vectorResults, bm25Results] = await Promise.all([
+                        vectorSearch(file.id, queryEmbedding, perFileLimit),
+                        bm25Search(file.id, query, perFileLimit),
+                    ]);
+
+                    if (vectorResults.length === 0 && bm25Results.length === 0) {
+                        return [];
+                    }
+
+                    return rrfFusion(vectorResults, bm25Results)
+                        .slice(0, perFileLimit)
+                        .map(chunk => ({ ...chunk, fileId: file.id, fileName: file.name }));
+                } catch (fileErr) {
+                    console.error(`Library search failed for file ${file.id}:`, fileErr);
+                    return [];
+                }
+            })
+        );
+
+        const allChunks = perFileResults
+            .flat()
+            .sort((a, b) => b.rrfScore - a.rrfScore)
+            .slice(0, finalLimit);
+
+        if (allChunks.length === 0) return '';
+
+        return allChunks
+            .map((chunk, index) => {
+                const pageInfo = chunk.page_number ? `, Sayfa ${chunk.page_number}` : '';
+                return `---
+[${index + 1}] (${chunk.fileName}${pageInfo})
+${chunk.content}`;
+            })
+            .join('\n\n');
+    } catch (err) {
+        console.error('❌ Library search error:', err);
+        return '';
+    }
+}

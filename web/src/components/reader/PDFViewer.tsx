@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Annotation } from '@/types/models';
 import { AnnotationLayer } from './AnnotationLayer';
-import { ReaderToolbar } from './ReaderToolbar';
+import { ReaderToolbar, ReaderPanel } from './ReaderToolbar';
 import { PageNavigation } from './PageNavigation';
+import { DocumentOutline } from './DocumentOutline';
+import { DocumentSearchPanel } from './DocumentSearchPanel';
+import { CitationDialog } from './CitationDialog';
 import { usePDFRenderer } from '@/hooks/usePDFRenderer';
 import { usePDFNavigation } from '@/hooks/usePDFNavigation';
 import { useTextSelection } from '@/hooks/useTextSelection';
@@ -25,6 +28,7 @@ const EMPTY_ANNOTATIONS: Annotation[] = [];
 interface PDFViewerProps {
     pdfUrl: string;
     storagePath?: string;
+    documentName?: string;
     annotations?: Annotation[];
     onTextSelect?: (
         text: string,
@@ -65,6 +69,7 @@ interface PDFViewerProps {
 export function PDFViewer({
     pdfUrl,
     storagePath,
+    documentName = '',
     annotations = [],
     onTextSelect,
     onImageSelect,
@@ -91,6 +96,13 @@ export function PDFViewer({
     const containerRef = useRef<HTMLDivElement>(null);
     const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
+    // Side panels (outline / search) and the citation dialog.
+    const [activePanel, setActivePanel] = useState<ReaderPanel>(null);
+    const [citationOpen, setCitationOpen] = useState(false);
+    const togglePanel = useCallback((panel: Exclude<ReaderPanel, null>) => {
+        setActivePanel(prev => (prev === panel ? null : panel));
+    }, []);
+
     // Group annotations by page once per annotations change. Each page gets a
     // stable array reference across scroll/zoom renders, so memoized
     // AnnotationLayers only redraw when their own page's data changes (P5).
@@ -115,6 +127,7 @@ export function PDFViewer({
         defaultPageSize,
         documentOptions,
         pdfDocumentRef,
+        pdfDocument,
         handleDocumentLoadSuccess,
         handleDocumentLoadError,
         handlePageLoadSuccess,
@@ -246,16 +259,36 @@ export function PDFViewer({
                     onToggleChat={onToggleChat ?? (() => {})}
                     isFullscreen={isFullscreen}
                     onToggleFullscreen={onToggleFullscreen ?? (() => {})}
+                    activePanel={activePanel}
+                    onToggleOutline={() => togglePanel('outline')}
+                    onToggleSearch={() => togglePanel('search')}
+                    onOpenCitation={() => setCitationOpen(true)}
                 />
             </div>
 
-            <div
-                ref={containerRef}
-                className="pdf-container"
-                onMouseUp={handleSelectionEnd}
-                onTouchEnd={handleSelectionEnd}
-                onContextMenu={handleImageContextMenu}
-            >
+            <div className="reader-body">
+                {activePanel === 'outline' && (
+                    <DocumentOutline
+                        pdf={pdfDocument}
+                        currentPage={currentPage}
+                        onNavigate={goToPage}
+                        onClose={() => setActivePanel(null)}
+                    />
+                )}
+                {activePanel === 'search' && (
+                    <DocumentSearchPanel
+                        pdf={pdfDocument}
+                        onNavigate={goToPage}
+                        onClose={() => setActivePanel(null)}
+                    />
+                )}
+                <div
+                    ref={containerRef}
+                    className="pdf-container"
+                    onMouseUp={handleSelectionEnd}
+                    onTouchEnd={handleSelectionEnd}
+                    onContextMenu={handleImageContextMenu}
+                >
                 <Document
                     file={pdfDataUrl}
                     onLoadSuccess={handleLoadSuccess}
@@ -324,7 +357,15 @@ export function PDFViewer({
                         );
                     })}
                 </Document>
+                </div>
             </div>
+
+            <CitationDialog
+                pdf={pdfDocument}
+                documentName={documentName}
+                open={citationOpen}
+                onOpenChange={setCitationOpen}
+            />
 
             <style jsx>{`
         .pdf-viewer-wrapper {
@@ -334,8 +375,16 @@ export function PDFViewer({
           background: var(--corio-reader-bg);
         }
 
+        .reader-body {
+          display: flex;
+          flex: 1;
+          min-height: 0;
+          overflow: hidden;
+        }
+
         .pdf-container {
           flex: 1;
+          min-width: 0;
           overflow: auto;
           padding: 24px;
           position: relative;
