@@ -74,7 +74,7 @@ async function getDocumentLanguage(fileId: string): Promise<DocumentLanguage> {
     }
 
     const sampleText = (data || [])
-        .map((chunk: any) => chunk.content)
+        .map((chunk: { content: string }) => chunk.content)
         .join(' ');
 
     const detected = estimateLanguage(sampleText);
@@ -503,7 +503,7 @@ async function bm25Search(
 
     let lastError: unknown = null;
     for (const attempt of attempts) {
-        const lang = (attempt.params as any).search_language;
+        const lang = (attempt.params as { search_language?: string }).search_language;
         const attemptDesc = lang ? `${attempt.name}(${lang})` : attempt.name;
         console.log(`  🔎 Attempting: ${attemptDesc}`);
 

@@ -1,7 +1,7 @@
 // ThemeSwitcher — dropdown to switch between light, dark, and sepia themes
 "use client";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Sun, Moon, BookOpen } from "lucide-react";
 import {
   DropdownMenu,
@@ -20,9 +20,13 @@ const themes = [
 
 export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
-  // Avoid hydration mismatch — don't render theme-dependent UI on the server
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // Avoid hydration mismatch — false on the server, true once the client
+  // mounts. useSyncExternalStore gives us this without a setState-in-effect.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   const currentTheme = mounted ? theme : "light";
   const current = themes.find((t) => t.id === currentTheme) ?? themes[0];

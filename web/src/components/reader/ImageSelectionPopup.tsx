@@ -48,6 +48,9 @@ export function ImageSelectionPopup({
             adjustedY = 60;
         }
 
+        // Reposition only after measuring the rendered popup's box — a
+        // genuine post-render DOM measurement, so setState here is required.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setAdjustedPosition({ x: adjustedX, y: adjustedY });
     }, [position]);
 
