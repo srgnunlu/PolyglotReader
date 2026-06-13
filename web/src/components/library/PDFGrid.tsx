@@ -11,8 +11,8 @@ interface PDFGridProps {
 export function PDFGrid({ documents }: PDFGridProps) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-      {documents.map(doc => (
-        <PDFCard key={doc.id} document={doc} />
+      {documents.map((doc, i) => (
+        <PDFCard key={doc.id} document={doc} index={i} />
       ))}
     </div>
   );

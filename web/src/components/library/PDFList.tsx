@@ -37,16 +37,23 @@ function formatDate(date: Date): string {
   });
 }
 
-function PDFListRow({ document }: { document: PDFDocumentMetadata }) {
+// Cap the stagger so a long list doesn't pile up seconds of delay
+const STAGGER_MS = 25;
+const MAX_STAGGER_STEPS = 14;
+
+function PDFListRow({ document, index = 0 }: { document: PDFDocumentMetadata; index?: number }) {
   const router = useRouter();
   const [isHovered, setIsHovered] = useState(false);
+
+  const staggerDelay = Math.min(index, MAX_STAGGER_STEPS) * STAGGER_MS;
 
   return (
     <div
       onClick={() => router.push(`/reader/${document.id}`)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer transition-colors border-b border-corio-border-subtle ${
+      style={{ animationDelay: `${staggerDelay}ms` }}
+      className={`flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer transition-colors border-b border-corio-border-subtle animate-in fade-in slide-in-from-bottom-1 fill-mode-both duration-300 motion-reduce:animate-none ${
         isHovered ? 'bg-corio-accent-subtle' : 'bg-transparent'
       }`}
     >
@@ -102,8 +109,8 @@ export function PDFList({ documents }: PDFListProps) {
       </div>
 
       {/* Rows */}
-      {documents.map(doc => (
-        <PDFListRow key={doc.id} document={doc} />
+      {documents.map((doc, i) => (
+        <PDFListRow key={doc.id} document={doc} index={i} />
       ))}
     </div>
   );

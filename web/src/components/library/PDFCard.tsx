@@ -21,7 +21,13 @@ const PDFThumbnail = dynamic(
 
 interface PDFCardProps {
   document: PDFDocumentMetadata;
+  /** Position in the grid — drives a capped stagger on entrance */
+  index?: number;
 }
+
+// Cap the stagger so a large library doesn't pile up seconds of delay
+const STAGGER_MS = 35;
+const MAX_STAGGER_STEPS = 12;
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -37,17 +43,20 @@ function formatDate(date: Date): string {
   });
 }
 
-export function PDFCard({ document }: PDFCardProps) {
+export function PDFCard({ document, index = 0 }: PDFCardProps) {
   const router = useRouter();
   const [isHovered, setIsHovered] = useState(false);
+
+  const staggerDelay = Math.min(index, MAX_STAGGER_STEPS) * STAGGER_MS;
 
   return (
     <div
       onClick={() => router.push(`/reader/${document.id}`)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="cursor-pointer rounded-xl overflow-hidden flex flex-col bg-corio-surface-1 border border-corio-border-subtle"
+      className="cursor-pointer rounded-xl overflow-hidden flex flex-col bg-corio-surface-1 border border-corio-border-subtle animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-300 motion-reduce:animate-none"
       style={{
+        animationDelay: `${staggerDelay}ms`,
         transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
         boxShadow: isHovered
           ? '0 8px 30px rgba(212, 113, 60, 0.15), 0 2px 8px rgba(42, 37, 32, 0.06)'
