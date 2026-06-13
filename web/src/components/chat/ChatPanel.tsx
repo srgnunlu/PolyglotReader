@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { ChatMessage } from '@/types/models';
 import { streamChat, streamChatWithImage, streamChatWithRAGAndHistory, ChatHistoryMessage } from '@/lib/gemini';
 import { searchRelevantChunks } from '@/lib/rag';
@@ -41,6 +41,50 @@ const DEFAULT_SUGGESTIONS = [
     "En önemli noktaları listele",
     "Bu konuyu basitçe açıkla",
 ];
+
+// Stable plugin reference — avoids handing react-markdown a fresh array each render.
+const REMARK_PLUGINS = [remarkGfm];
+
+// One chat message, memoized. During streaming, setMessages only replaces the
+// active message object; every other message keeps its identity, so this memo
+// skips re-parsing their markdown on every chunk (Phase B perf — P6).
+const ChatMessageItem = memo(function ChatMessageItem({ message }: { message: ChatMessage }) {
+    return (
+        <div className={`${styles.message} ${styles[message.role]}`}>
+            <div className={styles.messageAvatar}>
+                {message.role === 'user' ? (
+                    <UserAvatarIcon size={28} />
+                ) : (
+                    <AIAvatarIcon size={28} />
+                )}
+            </div>
+            <div className={styles.messageBubble}>
+                {message.attachment && message.attachment.type === 'image' && (
+                    <div className={styles.messageImageContainer}>
+                        <img
+                            src={`data:image/png;base64,${message.attachment.content}`}
+                            alt="Görsel eki"
+                            className={styles.messageImage}
+                        />
+                    </div>
+                )}
+                {message.text ? (
+                    <div className={styles.messageMarkdown}>
+                        <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>
+                            {message.text}
+                        </ReactMarkdown>
+                    </div>
+                ) : (
+                    <div className={styles.typingIndicator}>
+                        <span className={styles.typingDot} />
+                        <span className={styles.typingDot} />
+                        <span className={styles.typingDot} />
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+});
 
 export function ChatPanel({
     isOpen,
@@ -384,42 +428,7 @@ export function ChatPanel({
                     </div>
                 ) : (
                     messages.map(message => (
-                        <div
-                            key={message.id}
-                            className={`${styles.message} ${styles[message.role]}`}
-                        >
-                            <div className={styles.messageAvatar}>
-                                {message.role === 'user' ? (
-                                    <UserAvatarIcon size={28} />
-                                ) : (
-                                    <AIAvatarIcon size={28} />
-                                )}
-                            </div>
-                            <div className={styles.messageBubble}>
-                                {message.attachment && message.attachment.type === 'image' && (
-                                    <div className={styles.messageImageContainer}>
-                                        <img
-                                            src={`data:image/png;base64,${message.attachment.content}`}
-                                            alt="Görsel eki"
-                                            className={styles.messageImage}
-                                        />
-                                    </div>
-                                )}
-                                {message.text ? (
-                                    <div className={styles.messageMarkdown}>
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                            {message.text}
-                                        </ReactMarkdown>
-                                    </div>
-                                ) : (
-                                    <div className={styles.typingIndicator}>
-                                        <span className={styles.typingDot} />
-                                        <span className={styles.typingDot} />
-                                        <span className={styles.typingDot} />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        <ChatMessageItem key={message.id} message={message} />
                     ))
                 )}
                 <div ref={messagesEndRef} />
