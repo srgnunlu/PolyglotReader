@@ -4,8 +4,10 @@ Historical SQL scripts that were applied manually to the live Supabase project
 (`tftmypxwgccdgvldhaya`) at various points. They are kept for reference only —
 **do not re-run them blindly**; the live schema is the source of truth.
 
-Planned follow-up: pull the live schema with `supabase db pull` and start a
-numbered migration history under `supabase/migrations/`.
+The numbered migration history now lives under `supabase/migrations/`, pulled
+from the project's tracked `schema_migrations` table so the repo matches the
+live database. New schema changes should be added there as numbered migrations,
+not in this archive.
 
 | File | Purpose |
 |---|---|
