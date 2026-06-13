@@ -181,6 +181,12 @@ Kurallar:
     }
 }
 
+// Raw single-shot generation. Used by features that build their own prompt
+// (e.g. citation metadata extraction) and parse the model's reply themselves.
+export async function generateRaw(prompt: string): Promise<string> {
+    return generateViaApi(prompt);
+}
+
 // Chat with context
 export async function chatWithContext(
     message: string,
@@ -275,6 +281,54 @@ export async function* streamChatWithRAGAndHistory(
     yield* streamViaApi(prompt, history.length > 0 ? history : undefined);
 }
 
+
+// MARK: - Library-wide Chat (Multi-document RAG)
+
+interface LibraryFileRef {
+    id: string;
+    name: string;
+}
+
+function buildLibraryPrompt(message: string, context: string): string {
+    return `# Kütüphane Bölümleri
+Aşağıda kullanıcının sorusuyla ilgili, kütüphanedeki **birden fazla dokümandan** alınan bölümler yer almaktadır. Her bölümün başında kaynak dosya adı ve sayfası belirtilmiştir.
+
+${context}
+
+---
+
+## Kullanıcı Sorusu
+${message}
+
+---
+
+## Yanıt Kuralları
+- **SADECE** yukarıdaki doküman bölümlerini kullan; dış bilgi veya varsayım YAPMA
+- Her önemli bilgi için kaynağı belirt: dosya adı ve sayfa — örn. "(rapor.pdf, Sayfa 4)"
+- Farklı dokümanlardan gelen bilgileri karşılaştırırken hangi dosyadan geldiğini netleştir
+- Doküman İngilizce, soru Türkçe olabilir: terimlerin Türkçe karşılığını da ver
+- Akademik ama anlaşılır Türkçe kullan; gereksiz tekrardan kaçın
+- Eğer konu hiçbir dokümanda yoksa: "Kütüphanenizdeki dokümanlar bu konuda bilgi içermiyor." de — ASLA uydurma
+
+Şimdi yukarıdaki kurallara uyarak soruyu yanıtla:`;
+}
+
+/**
+ * Kütüphane-geneli sohbet: birden fazla doküman üzerinde RAG araması yapar
+ * ve konuşma geçmişiyle birlikte yanıt akışı döndürür.
+ */
+export async function* streamLibraryChat(
+    message: string,
+    files: LibraryFileRef[],
+    history: ChatHistoryMessage[]
+): AsyncGenerator<string, void, unknown> {
+    const { searchLibraryChunks } = await import('./rag');
+
+    const context = await searchLibraryChunks(files, message);
+    const prompt = context ? buildLibraryPrompt(message, context) : message;
+
+    yield* streamViaApi(prompt, history.length > 0 ? history : undefined);
+}
 
 // Chat with image - for image-based questions
 export async function chatWithImage(

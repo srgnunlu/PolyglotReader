@@ -1,8 +1,10 @@
 // Reader toolbar — annotation color picker, translation/chat toggles, fullscreen
 "use client";
 
-import { Globe, MessageSquare, Maximize } from "lucide-react";
+import { Globe, MessageSquare, Maximize, ListTree, Search, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+export type ReaderPanel = "outline" | "search" | null;
 
 const HIGHLIGHT_COLORS = [
   { name: "Sarı", value: "#fef08a", shortcut: "1" },
@@ -21,6 +23,10 @@ interface ReaderToolbarProps {
   onToggleChat: () => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
+  activePanel: ReaderPanel;
+  onToggleOutline: () => void;
+  onToggleSearch: () => void;
+  onOpenCitation: () => void;
 }
 
 export function ReaderToolbar({
@@ -33,9 +39,44 @@ export function ReaderToolbar({
   onToggleChat,
   isFullscreen,
   onToggleFullscreen,
+  activePanel,
+  onToggleOutline,
+  onToggleSearch,
+  onOpenCitation,
 }: ReaderToolbarProps) {
   return (
     <div className="flex items-center gap-3 px-3 py-2">
+      {/* Outline / search / citation */}
+      <div className="flex items-center gap-1 border-r border-corio-border pr-3">
+        <Button
+          variant={activePanel === "outline" ? "default" : "ghost"}
+          size="icon"
+          className={`h-8 w-8 ${activePanel === "outline" ? "bg-corio-accent text-white hover:bg-corio-accent-hover" : ""}`}
+          onClick={onToggleOutline}
+          title="İçindekiler"
+        >
+          <ListTree className="h-4 w-4" />
+        </Button>
+        <Button
+          variant={activePanel === "search" ? "default" : "ghost"}
+          size="icon"
+          className={`h-8 w-8 ${activePanel === "search" ? "bg-corio-accent text-white hover:bg-corio-accent-hover" : ""}`}
+          onClick={onToggleSearch}
+          title="Belgede ara"
+        >
+          <Search className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={onOpenCitation}
+          title="Atıf çıkar"
+        >
+          <Quote className="h-4 w-4" />
+        </Button>
+      </div>
+
       {/* Highlight color picker */}
       <div className="flex items-center gap-1.5 border-r border-corio-border pr-3">
         {HIGHLIGHT_COLORS.map(({ name, value, shortcut }) => (

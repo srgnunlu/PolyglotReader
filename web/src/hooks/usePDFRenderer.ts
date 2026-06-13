@@ -28,6 +28,9 @@ export function usePDFRenderer({ pdfUrl, storagePath, initialScale }: UsePDFRend
   const [renderScale, setRenderScale] = useState(initialScale ?? DEFAULT_SCALE);
   const [isZooming, setIsZooming] = useState(false);
   const [totalPages, setTotalPages] = useState(0);
+  // The loaded document as state (not just the ref) so panels that read it —
+  // outline, search, citation — render once it becomes available.
+  const [pdfDocument, setPdfDocument] = useState<pdfjs.PDFDocumentProxy | null>(null);
   const [pageDimensions, setPageDimensions] = useState<Map<number, { width: number; height: number }>>(new Map());
   const [defaultPageSize, setDefaultPageSize] = useState<{ width: number; height: number } | null>(null);
 
@@ -87,6 +90,7 @@ export function usePDFRenderer({ pdfUrl, storagePath, initialScale }: UsePDFRend
 
   const handleDocumentLoadSuccess = useCallback((pdf: pdfjs.PDFDocumentProxy) => {
     pdfDocumentRef.current = pdf;
+    setPdfDocument(pdf);
     setTotalPages(pdf.numPages);
   }, []);
 
@@ -167,6 +171,7 @@ export function usePDFRenderer({ pdfUrl, storagePath, initialScale }: UsePDFRend
     defaultPageSize: defaultPageSize ?? FALLBACK_PAGE_SIZE,
     documentOptions,
     pdfDocumentRef,
+    pdfDocument,
     handleDocumentLoadSuccess,
     handleDocumentLoadError,
     handlePageLoadSuccess,

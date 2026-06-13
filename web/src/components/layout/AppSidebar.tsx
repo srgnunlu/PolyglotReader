@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Library, Notebook, Settings } from "lucide-react";
+import { BookOpen, Library, MessagesSquare, Notebook, Settings } from "lucide-react";
 
 import {
   Sidebar,
@@ -21,6 +21,7 @@ import { ThemeSwitcher } from "@/components/shared/ThemeSwitcher";
 
 const navItems = [
   { href: "/library", label: "Kütüphane", icon: Library },
+  { href: "/chat", label: "Sohbet", icon: MessagesSquare },
   { href: "/notes", label: "Defterim", icon: Notebook },
   { href: "/settings", label: "Ayarlar", icon: Settings },
 ];
