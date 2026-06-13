@@ -12,6 +12,7 @@ struct NotebookView: View {
     @State private var path: [NotebookRoute] = []
     @State private var selectedFileForNavigation: PDFDocumentMetadata?
     @State private var selectedPageNumber: Int = 1
+    @State private var showExport = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -19,6 +20,20 @@ struct NotebookView: View {
                 .navigationTitle("notebook.title".localized)
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
+                    if !viewModel.annotations.isEmpty {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                showExport = true
+                            } label: {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.indigo)
+                                    .frame(minWidth: 44, minHeight: 44)
+                            }
+                            .accessibilityLabel("annotation.export.title".localized)
+                            .accessibilityIdentifier("export_notebook_button")
+                        }
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             Task { await viewModel.refreshAnnotations() }
@@ -52,6 +67,11 @@ struct NotebookView: View {
                 }
                 .fullScreenCover(item: $selectedFileForNavigation) { file in
                     PDFReaderView(file: file, initialPage: selectedPageNumber)
+                }
+                .sheet(isPresented: $showExport) {
+                    AnnotationExportView(annotations: viewModel.annotations) {
+                        showExport = false
+                    }
                 }
         }
     }
