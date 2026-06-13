@@ -7,11 +7,59 @@ struct PDFCardView: View {
     let onDelete: () -> Void
     var onMoveToFolder: ((Folder?) -> Void)?
     var availableFolders: [Folder] = []
+    var isSelectionMode: Bool = false
+    var isSelected: Bool = false
 
     @State private var showDeleteConfirmation = false
     @State private var isPressed = false
 
     var body: some View {
+        if isSelectionMode {
+            // No context menu / delete dialog while selecting — tap toggles selection.
+            cardButton
+        } else {
+            cardButton
+                .contextMenu {
+                    if let onMoveToFolder = onMoveToFolder, !availableFolders.isEmpty {
+                        Menu {
+                            Button {
+                                onMoveToFolder(nil)
+                            } label: {
+                                Label("Ana Klasör", systemImage: "house")
+                            }
+
+                            ForEach(availableFolders) { folder in
+                                Button {
+                                    onMoveToFolder(folder)
+                                } label: {
+                                    Label(folder.name, systemImage: folder.sfSymbol)
+                                }
+                            }
+                        } label: {
+                            Label("Klasöre Taşı", systemImage: "folder")
+                        }
+
+                        Divider()
+                    }
+
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Sil", systemImage: "trash")
+                    }
+                }
+                .confirmationDialog(
+                    "Bu dosyayı silmek istediğinizden emin misiniz?",
+                    isPresented: $showDeleteConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Sil", role: .destructive, action: onDelete)
+                    Button("İptal", role: .cancel) {}
+                }
+        }
+    }
+
+    private var cardButton: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 0) {
                 // Thumbnail Area
@@ -30,46 +78,26 @@ struct PDFCardView: View {
                 )
             }
             .clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay {
+                if isSelectionMode {
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(isSelected ? Color.indigo : Color.clear, lineWidth: 2.5)
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if isSelectionMode {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(isSelected ? Color.indigo : Color.white.opacity(0.9))
+                        .background(Circle().fill(.ultraThinMaterial))
+                        .padding(8)
+                        .accessibilityHidden(true)
+                }
+            }
             .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
         }
         .buttonStyle(PDFCardButtonStyle())
-        .contextMenu {
-            if let onMoveToFolder = onMoveToFolder, !availableFolders.isEmpty {
-                Menu {
-                    Button {
-                        onMoveToFolder(nil)
-                    } label: {
-                        Label("Ana Klasör", systemImage: "house")
-                    }
-
-                    ForEach(availableFolders) { folder in
-                        Button {
-                            onMoveToFolder(folder)
-                        } label: {
-                            Label(folder.name, systemImage: folder.sfSymbol)
-                        }
-                    }
-                } label: {
-                    Label("Klasöre Taşı", systemImage: "folder")
-                }
-
-                Divider()
-            }
-
-            Button(role: .destructive) {
-                showDeleteConfirmation = true
-            } label: {
-                Label("Sil", systemImage: "trash")
-            }
-        }
-        .confirmationDialog(
-            "Bu dosyayı silmek istediğinizden emin misiniz?",
-            isPresented: $showDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Sil", role: .destructive, action: onDelete)
-            Button("İptal", role: .cancel) {}
-        }
+        .accessibilityAddTraits(isSelectionMode && isSelected ? [.isSelected] : [])
     }
 
     // MARK: - Thumbnail View
@@ -212,12 +240,44 @@ struct PDFListRowView: View {
     let file: PDFDocumentMetadata
     let onTap: () -> Void
     let onDelete: () -> Void
+    var isSelectionMode: Bool = false
+    var isSelected: Bool = false
 
     @State private var showDeleteConfirmation = false
 
     var body: some View {
+        if isSelectionMode {
+            rowButton
+        } else {
+            rowButton
+                .contextMenu {
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Sil", systemImage: "trash")
+                    }
+                }
+                .confirmationDialog(
+                    "Bu dosyayı silmek istediğinizden emin misiniz?",
+                    isPresented: $showDeleteConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Sil", role: .destructive, action: onDelete)
+                    Button("İptal", role: .cancel) {}
+                }
+        }
+    }
+
+    private var rowButton: some View {
         Button(action: onTap) {
             HStack(spacing: 14) {
+                if isSelectionMode {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(isSelected ? Color.indigo : Color.secondary)
+                        .accessibilityHidden(true)
+                }
+
                 // Thumbnail
                 listThumbnail
 
@@ -259,23 +319,15 @@ struct PDFListRowView: View {
                 )
             }
             .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(PDFCardButtonStyle())
-        .contextMenu {
-            Button(role: .destructive) {
-                showDeleteConfirmation = true
-            } label: {
-                Label("Sil", systemImage: "trash")
+            .overlay {
+                if isSelectionMode && isSelected {
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.indigo, lineWidth: 2)
+                }
             }
         }
-        .confirmationDialog(
-            "Bu dosyayı silmek istediğinizden emin misiniz?",
-            isPresented: $showDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Sil", role: .destructive, action: onDelete)
-            Button("İptal", role: .cancel) {}
-        }
+        .buttonStyle(PDFCardButtonStyle())
+        .accessibilityAddTraits(isSelectionMode && isSelected ? [.isSelected] : [])
     }
 
     // MARK: - List Thumbnail

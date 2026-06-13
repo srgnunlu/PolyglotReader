@@ -13,10 +13,8 @@ struct FlippablePDFCardView: View {
 
     @State private var isFlipped = false
     @State private var flipProgress: CGFloat = 0
-    @State private var isDragging = false
     @State private var isGeneratingSummary = false
 
-    private let flipThreshold: CGFloat = 0.5
     private let cardHeight: CGFloat = 210
 
     var body: some View {
@@ -40,7 +38,6 @@ struct FlippablePDFCardView: View {
             perspective: 0.5
         )
         .compositingGroup() // Opacity ve blending optimizasyonu
-        .gesture(flipGesture)
         .onChange(of: isFlipped) { newValue in
             if newValue && file.summary == nil && !isGeneratingSummary {
                 isGeneratingSummary = true
@@ -291,48 +288,6 @@ struct FlippablePDFCardView: View {
         .background(category.color.opacity(0.15))
         .foregroundStyle(category.color)
         .clipShape(Capsule())
-    }
-
-    // MARK: - Flip Gesture
-    private var flipGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.3)
-            .sequenced(before: DragGesture(minimumDistance: 20))
-            .onChanged { value in
-                switch value {
-                case .first(true):
-                    // Long press başladı
-                    withAnimation(.easeOut(duration: 0.1)) {
-                        isDragging = true
-                    }
-                case .second(true, let drag):
-                    guard let drag = drag else { return }
-                    // Drag ile flip progress güncelle
-                    let dragAmount = drag.translation.width
-                    let newProgress = min(1.0, abs(dragAmount) / 100)
-
-                    withAnimation(.interactiveSpring()) {
-                        flipProgress = isFlipped ? (1.0 - newProgress) : newProgress
-                    }
-                default:
-                    break
-                }
-            }
-            .onEnded { _ in
-                isDragging = false
-
-                // Threshold'u geçtiyse flip yap
-                if flipProgress > flipThreshold {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                        isFlipped = true
-                        flipProgress = 1.0
-                    }
-                } else {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        isFlipped = false
-                        flipProgress = 0
-                    }
-                }
-            }
     }
 
     // MARK: - Category Detection

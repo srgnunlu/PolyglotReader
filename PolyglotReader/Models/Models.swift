@@ -31,10 +31,19 @@ struct User: Codable, Identifiable {
         self.avatarURL = avatarURL
     }
 
-    /// Check if the user is an admin/developer
+    /// Check if the user is an admin/developer.
+    ///
+    /// A client-side email allowlist is trivially bypassable, so admin-gated
+    /// surfaces (e.g. Debug Logs export) are only exposed in DEBUG builds.
+    /// Any production admin capability must be enforced server-side via Supabase
+    /// RLS policies or a JWT role claim — never trusted from the client.
     var isAdmin: Bool {
-        let adminEmails = ["sergennunluu@gmail.com"]
+        #if DEBUG
+        let adminEmails = ["zsrgnunlu@gmail.com"]
         return adminEmails.contains(email.lowercased())
+        #else
+        return false
+        #endif
     }
 }
 
@@ -68,8 +77,9 @@ struct Folder: Codable, Identifiable, Hashable {
     var createdAt: Date
     var fileCount: Int
 
+    /// User-selected glyph (stored locally) with a sensible default.
     var sfSymbol: String {
-        "folder.fill"
+        FolderIconStore.shared.icon(for: id) ?? "folder.fill"
     }
 
     init(

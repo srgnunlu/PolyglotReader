@@ -1,114 +1,27 @@
 import SwiftUI
 
+/// Type-safe navigation routes for the notebook stack.
+enum NotebookRoute: Hashable {
+    case allFiles
+    case category(NotebookCategory)
+    case file(String)
+}
+
 struct NotebookView: View {
     @StateObject private var viewModel = NotebookViewModel()
+    @State private var path: [NotebookRoute] = []
     @State private var selectedFileForNavigation: PDFDocumentMetadata?
     @State private var selectedPageNumber: Int = 1
-    @State private var showingCategory: NotebookCategory?
-    @State private var showingFileId: String?
-    @State private var showingAllFiles = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var isDetailViewActive: Bool {
-        showingAllFiles || showingCategory != nil || showingFileId != nil
-    }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Premium gradient arka plan
-                LinearGradient(
-                    colors: [
-                        Color(.systemGroupedBackground),
-                        Color.purple.opacity(0.04),
-                        Color.indigo.opacity(0.02),
-                        Color(.systemGroupedBackground)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-
-                if viewModel.isLoading && viewModel.annotations.isEmpty {
-                    NotebookLoadingView()
-                } else if showingAllFiles {
-                    // Tüm dosyalar view
-                    AllFilesView(
-                        files: viewModel.fileAnnotationCounts,
-                        onSelectFile: { fileId in
-                            withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
-                                showingAllFiles = false
-                                showingFileId = fileId
-                            }
-                        },
-                        onDismiss: {
-                            withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
-                                showingAllFiles = false
-                            }
-                        }
-                    )
-                    .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
-                } else if showingCategory != nil || showingFileId != nil {
-                    // Kategori veya dosya detay view
-                    NotebookCategoryView(
-                        viewModel: viewModel,
-                        category: showingCategory,
-                        fileId: showingFileId,
-                        onNavigateToAnnotation: { annotation in
-                            navigateToFile(annotation: annotation)
-                        },
-                        onDismiss: {
-                            withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
-                                showingCategory = nil
-                                showingFileId = nil
-                            }
-                        }
-                    )
-                    .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
-                } else if viewModel.annotations.isEmpty {
-                    EmptyNotebookView(
-                        hasFilters: false
-                    ) {
-                        // New users have no annotations yet; guide them to the
-                        // Library to open a PDF and start highlighting.
-                        NotificationCenter.default.post(name: .switchToLibraryTab, object: nil)
-                    }
-                } else {
-                    // Dashboard view
-                    NotebookDashboardView(
-                        viewModel: viewModel,
-                        onSelectCategory: { category in
-                            withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
-                                showingCategory = category
-                            }
-                        },
-                        onSelectFile: { fileId in
-                            withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
-                                showingFileId = fileId
-                            }
-                        },
-                        onSelectAnnotation: { annotation in
-                            navigateToFile(annotation: annotation)
-                        },
-                        onShowAllFiles: {
-                            withAnimation(reduceMotion ? nil : .spring(response: 0.3)) {
-                                showingAllFiles = true
-                            }
-                        }
-                    )
-                    .transition(.opacity)
-                }
-            }
-            .navigationTitle(isDetailViewActive ? "" : "notebook.title".localized)
-            .navigationBarTitleDisplayMode(isDetailViewActive ? .inline : .large)
-            .navigationBarHidden(isDetailViewActive)
-            .toolbar {
-                if showingCategory == nil && showingFileId == nil && !showingAllFiles {
+        NavigationStack(path: $path) {
+            rootContent
+                .navigationTitle("notebook.title".localized)
+                .navigationBarTitleDisplayMode(.large)
+                .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
-                            Task {
-                                await viewModel.refreshAnnotations()
-                            }
+                            Task { await viewModel.refreshAnnotations() }
                         } label: {
                             Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 16, weight: .medium))
@@ -120,38 +33,108 @@ struct NotebookView: View {
                         .accessibilityIdentifier("refresh_notebook_button")
                     }
                 }
-            }
-            .task {
-                await viewModel.loadDashboard()
-            }
-            .refreshable {
-                await viewModel.refreshAnnotations()
-            }
-            .alert("common.error".localized, isPresented: .init(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
-            )) {
-                Button("common.ok".localized, role: .cancel) { }
-            } message: {
-                Text(viewModel.errorMessage ?? "")
-            }
-            .fullScreenCover(item: $selectedFileForNavigation) { file in
-                PDFReaderView(file: file, initialPage: selectedPageNumber)
+                .navigationDestination(for: NotebookRoute.self) { route in
+                    destination(for: route)
+                }
+                .task {
+                    await viewModel.loadDashboard()
+                }
+                .refreshable {
+                    await viewModel.refreshAnnotations()
+                }
+                .alert("common.error".localized, isPresented: .init(
+                    get: { viewModel.errorMessage != nil },
+                    set: { if !$0 { viewModel.errorMessage = nil } }
+                )) {
+                    Button("common.ok".localized, role: .cancel) { }
+                } message: {
+                    Text(viewModel.errorMessage ?? "")
+                }
+                .fullScreenCover(item: $selectedFileForNavigation) { file in
+                    PDFReaderView(file: file, initialPage: selectedPageNumber)
+                }
+        }
+    }
+
+    // MARK: - Root Content
+
+    @ViewBuilder
+    private var rootContent: some View {
+        ZStack {
+            // Premium gradient arka plan
+            LinearGradient(
+                colors: [
+                    Color(.systemGroupedBackground),
+                    Color.purple.opacity(0.04),
+                    Color.indigo.opacity(0.02),
+                    Color(.systemGroupedBackground)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            if viewModel.isLoading && viewModel.annotations.isEmpty {
+                NotebookLoadingView()
+            } else if viewModel.annotations.isEmpty {
+                EmptyNotebookView(
+                    hasFilters: false
+                ) {
+                    // New users have no annotations yet; guide them to the
+                    // Library to open a PDF and start highlighting.
+                    NotificationCenter.default.post(name: .switchToLibraryTab, object: nil)
+                }
+            } else {
+                NotebookDashboardView(
+                    viewModel: viewModel,
+                    onSelectCategory: { path.append(.category($0)) },
+                    onSelectFile: { path.append(.file($0)) },
+                    onSelectAnnotation: { navigateToFile(annotation: $0) },
+                    onShowAllFiles: { path.append(.allFiles) }
+                )
+                .transition(.opacity)
             }
         }
     }
 
-    private var navigationTitle: String {
-        if showingAllFiles {
-            return "notebook.all_files".localized
+    // MARK: - Navigation Destinations
+
+    @ViewBuilder
+    private func destination(for route: NotebookRoute) -> some View {
+        switch route {
+        case .allFiles:
+            AllFilesView(
+                files: viewModel.fileAnnotationCounts,
+                onSelectFile: { path.append(.file($0)) },
+                onDismiss: popPath
+            )
+            .toolbar(.hidden, for: .navigationBar)
+
+        case .category(let category):
+            NotebookCategoryView(
+                viewModel: viewModel,
+                category: category,
+                fileId: nil,
+                onNavigateToAnnotation: { navigateToFile(annotation: $0) },
+                onDismiss: popPath
+            )
+            .toolbar(.hidden, for: .navigationBar)
+
+        case .file(let fileId):
+            NotebookCategoryView(
+                viewModel: viewModel,
+                category: nil,
+                fileId: fileId,
+                onNavigateToAnnotation: { navigateToFile(annotation: $0) },
+                onDismiss: popPath
+            )
+            .toolbar(.hidden, for: .navigationBar)
         }
-        if let category = showingCategory {
-            return category.rawValue
-        }
-        if showingFileId != nil {
-            return "notebook.file_notes".localized
-        }
-        return "notebook.title".localized
+    }
+
+    private func popPath() {
+        guard !path.isEmpty else { return }
+        path.removeLast()
     }
 
     // MARK: - Navigation
@@ -170,8 +153,9 @@ struct NotebookView: View {
                     }
                 }
             } catch {
+                let appError = ErrorHandlingService.mapToAppError(error)
                 await MainActor.run {
-                    viewModel.errorMessage = "\("notebook.error.file_open".localized) \(error.localizedDescription)"
+                    viewModel.errorMessage = "\("notebook.error.file_open".localized) \(appError.localizedDescription)"
                 }
             }
         }
