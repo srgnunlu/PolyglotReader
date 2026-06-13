@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EMBEDDING_MODEL, getAuthenticatedUserId, getGeminiApiKey } from '@/lib/server/gemini';
+import { AI_EMBED_LIMIT, enforceRateLimit } from '@/lib/server/rateLimit';
 
 // Generates a 768-dim embedding (text-embedding-004) for RAG search.
 export async function POST(req: NextRequest) {
@@ -7,6 +8,9 @@ export async function POST(req: NextRequest) {
     if (!userId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const limited = enforceRateLimit('embed', userId, AI_EMBED_LIMIT);
+    if (limited) return limited;
 
     let body: { text?: unknown };
     try {
