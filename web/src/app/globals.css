@@ -7,17 +7,17 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Primary - Warm Indigo */
-  --color-primary-50: #eef2ff;
-  --color-primary-100: #e0e7ff;
-  --color-primary-200: #c7d2fe;
-  --color-primary-300: #a5b4fc;
-  --color-primary-400: #818cf8;
-  --color-primary-500: #6366f1;
-  --color-primary-600: #4f46e5;
-  --color-primary-700: #4338ca;
-  --color-primary-800: #3730a3;
-  --color-primary-900: #312e81;
+  /* Primary - Corio Terracotta (single source of truth, replaces legacy indigo) */
+  --color-primary-50: #faf0e8;
+  --color-primary-100: #f5e0d0;
+  --color-primary-200: #ebc3a5;
+  --color-primary-300: #e0a179;
+  --color-primary-400: #e8946a;
+  --color-primary-500: #d4713c;
+  --color-primary-600: #c0632f;
+  --color-primary-700: #a5511f;
+  --color-primary-800: #834016;
+  --color-primary-900: #5e2e10;
 
   /* Accent - Warm Orange */
   --color-accent-400: #fb923c;
@@ -90,8 +90,9 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  /* Brand terracotta — was grayscale, made plain <Button> render black */
+  --primary: #d4713c;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -101,7 +102,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: #d4713c;
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
@@ -236,11 +237,11 @@
 
 /* Custom selection color */
 .textLayer ::selection {
-  background: rgba(99, 102, 241, 0.5);
+  background: rgba(212, 113, 60, 0.4);
 }
 
 .textLayer ::-moz-selection {
-  background: rgba(99, 102, 241, 0.5);
+  background: rgba(212, 113, 60, 0.4);
 }
 
 /* PDF Page transitions for smooth zoom */
@@ -272,8 +273,9 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  /* Brand terracotta (brighter for dark surfaces), dark text for contrast */
+  --primary: hsl(24 80% 60%);
+  --primary-foreground: hsl(30 10% 12%);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -283,7 +285,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: hsl(24 80% 60%);
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
@@ -313,6 +315,18 @@
   --corio-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
   --corio-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --corio-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4);
+
+  /* Legacy token overrides — keep CSS-module components (chat, popups,
+     reader fallbacks) themed in dark mode instead of stuck on light values */
+  --bg-primary: var(--corio-background);
+  --bg-secondary: var(--corio-surface-1);
+  --bg-tertiary: var(--corio-surface-2);
+  --text-primary: var(--corio-foreground);
+  --text-secondary: hsl(30 8% 62%);
+  --text-tertiary: hsl(30 8% 45%);
+  --border-color: var(--corio-border);
+  --glass-bg: rgba(28, 25, 23, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.08);
 }
 
 /* Corio Design Language — Sepia Theme */
@@ -354,6 +368,15 @@
   --sidebar-border: #E0D8CF;
   --sidebar-accent: #FAF0E8;
   --sidebar-accent-foreground: #1a1a1a;
+
+  /* Legacy token overrides — sepia warmth for CSS-module components */
+  --bg-primary: var(--corio-background);
+  --bg-secondary: #ffffff;
+  --bg-tertiary: var(--corio-surface-2);
+  --text-primary: var(--corio-foreground);
+  --text-secondary: #6b6b6b;
+  --text-tertiary: #999999;
+  --border-color: var(--corio-border);
 }
 
 @theme inline {

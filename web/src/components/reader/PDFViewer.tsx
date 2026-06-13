@@ -4,7 +4,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Annotation } from '@/types/models';
 import { AnnotationLayer } from './AnnotationLayer';
-import { PDFToolbar } from './PDFToolbar';
+import { ReaderToolbar } from './ReaderToolbar';
+import { PageNavigation } from './PageNavigation';
 import { usePDFRenderer } from '@/hooks/usePDFRenderer';
 import { usePDFNavigation } from '@/hooks/usePDFNavigation';
 import { useTextSelection } from '@/hooks/useTextSelection';
@@ -172,7 +173,7 @@ export function PDFViewer({
                             top: `${rect.y}%`,
                             width: `${rect.width}%`,
                             height: `${rect.height}%`,
-                            backgroundColor: 'rgba(99, 102, 241, 0.3)',
+                            backgroundColor: 'rgba(212, 113, 60, 0.3)',
                             position: 'absolute',
                             pointerEvents: 'none',
                             borderRadius: '2px',
@@ -199,25 +200,33 @@ export function PDFViewer({
 
     return (
         <div ref={wrapperRef} className="pdf-viewer-wrapper">
-            <PDFToolbar
-                currentPage={currentPage}
-                totalPages={totalPages}
-                displayScale={displayScale}
-                goToPage={goToPage}
-                zoomIn={zoomIn}
-                zoomOut={zoomOut}
-                resetZoom={resetZoom}
-                selectedColor={selectedColor}
-                onColorChange={onColorChange}
-                onQuickHighlight={onQuickHighlight}
-                isQuickTranslationMode={isQuickTranslationMode}
-                onToggleTranslation={onToggleTranslation}
-                isChatOpen={isChatOpen}
-                onToggleChat={onToggleChat}
-                isFullscreen={isFullscreen}
-                onToggleFullscreen={onToggleFullscreen}
-                isNavHidden={isNavHidden}
-            />
+            <div
+                data-pdf-toolbar="true"
+                className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-corio-border bg-corio-surface-1 transition-all duration-300 ${
+                    isNavHidden ? 'pointer-events-none -translate-y-full opacity-0' : ''
+                }`}
+            >
+                <PageNavigation
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    displayScale={displayScale}
+                    onGoToPage={goToPage}
+                    onZoomIn={zoomIn}
+                    onZoomOut={zoomOut}
+                    onResetZoom={resetZoom}
+                />
+                <ReaderToolbar
+                    selectedColor={selectedColor}
+                    onColorChange={onColorChange ?? (() => {})}
+                    onQuickHighlight={onQuickHighlight}
+                    isQuickTranslationMode={isQuickTranslationMode}
+                    onToggleTranslation={onToggleTranslation ?? (() => {})}
+                    isChatOpen={isChatOpen}
+                    onToggleChat={onToggleChat ?? (() => {})}
+                    isFullscreen={isFullscreen}
+                    onToggleFullscreen={onToggleFullscreen ?? (() => {})}
+                />
+            </div>
 
             <div
                 ref={containerRef}
@@ -301,7 +310,7 @@ export function PDFViewer({
           display: flex;
           flex-direction: column;
           height: 100%;
-          background: var(--color-gray-800);
+          background: var(--corio-reader-bg);
         }
 
         .pdf-container {
@@ -371,6 +380,17 @@ export function PDFViewer({
           min-height: 320px;
           gap: 16px;
           color: var(--text-secondary);
+        }
+
+        .pdf-loading .spinner {
+          border: 3px solid var(--corio-border);
+          border-top-color: var(--corio-accent);
+          border-radius: 9999px;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
 
         .pdf-error span {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { Sparkles, Copy, Check } from 'lucide-react';
 import styles from './ImageSelectionPopup.module.css';
 
 interface ImageSelectionPopupProps {
@@ -136,7 +137,7 @@ export function ImageSelectionPopup({
                     className={styles.actionBtn}
                     onClick={handleAskAI}
                 >
-                    <span className={styles.icon}>✨</span>
+                    <Sparkles className={styles.icon} size={16} />
                     <span>AI&apos;a Sor</span>
                 </button>
 
@@ -145,9 +146,9 @@ export function ImageSelectionPopup({
                     onClick={handleCopy}
                     disabled={copySuccess}
                 >
-                    <span className={styles.icon}>
-                        {copySuccess ? '✓' : '📋'}
-                    </span>
+                    {copySuccess
+                        ? <Check className={styles.icon} size={16} />
+                        : <Copy className={styles.icon} size={16} />}
                     <span>{copySuccess ? 'Kopyalandı!' : 'Kopyala'}</span>
                 </button>
             </div>

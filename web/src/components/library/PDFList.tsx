@@ -4,6 +4,7 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { FileText } from 'lucide-react';
 import { PDFDocumentMetadata } from '@/types/models';
 
 const PDFThumbnail = dynamic(
@@ -11,17 +12,8 @@ const PDFThumbnail = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 16,
-        }}
-      >
-        📄
+      <div className="flex h-full w-full items-center justify-center">
+        <FileText className="h-4 w-4 text-corio-fg/20" />
       </div>
     ),
   }
@@ -54,21 +46,12 @@ function PDFListRow({ document }: { document: PDFDocumentMetadata }) {
       onClick={() => router.push(`/reader/${document.id}`)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer transition-colors"
-      style={{
-        background: isHovered ? 'rgba(212, 113, 60, 0.04)' : 'transparent',
-        borderBottom: '1px solid rgba(42, 37, 32, 0.06)',
-      }}
+      className={`flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer transition-colors border-b border-corio-border-subtle ${
+        isHovered ? 'bg-corio-accent-subtle' : 'bg-transparent'
+      }`}
     >
       {/* Small thumbnail */}
-      <div
-        className="shrink-0 rounded-lg overflow-hidden"
-        style={{
-          width: 40,
-          height: 52,
-          background: 'rgba(42, 37, 32, 0.04)',
-        }}
-      >
+      <div className="shrink-0 rounded-lg overflow-hidden bg-corio-surface-2" style={{ width: 40, height: 52 }}>
         <PDFThumbnail
           storagePath={document.storagePath}
           alt={document.name}
@@ -78,35 +61,23 @@ function PDFListRow({ document }: { document: PDFDocumentMetadata }) {
 
       {/* Title — takes remaining space */}
       <div className="flex-1 min-w-0">
-        <p
-          className="text-sm font-medium truncate"
-          style={{ color: '#2A2520' }}
-        >
+        <p className="text-sm font-medium truncate text-corio-fg">
           {document.name}
         </p>
         {document.summary && (
-          <p
-            className="text-xs mt-0.5 truncate"
-            style={{ color: 'rgba(42, 37, 32, 0.5)' }}
-          >
+          <p className="text-xs mt-0.5 truncate text-corio-fg/50">
             {document.summary}
           </p>
         )}
       </div>
 
       {/* Date */}
-      <span
-        className="shrink-0 text-xs hidden sm:block"
-        style={{ color: 'rgba(42, 37, 32, 0.5)' }}
-      >
+      <span className="shrink-0 text-xs hidden sm:block text-corio-fg/50">
         {formatDate(document.uploadedAt)}
       </span>
 
       {/* Size */}
-      <span
-        className="shrink-0 text-xs w-16 text-right"
-        style={{ color: 'rgba(42, 37, 32, 0.5)' }}
-      >
+      <span className="shrink-0 text-xs w-16 text-right text-corio-fg/50">
         {formatFileSize(document.size)}
       </span>
     </div>
@@ -115,32 +86,17 @@ function PDFListRow({ document }: { document: PDFDocumentMetadata }) {
 
 export function PDFList({ documents }: PDFListProps) {
   return (
-    <div
-      className="rounded-xl overflow-hidden"
-      style={{
-        background: 'rgba(255, 255, 255, 0.7)',
-        border: '1px solid rgba(42, 37, 32, 0.06)',
-      }}
-    >
+    <div className="rounded-xl overflow-hidden bg-corio-surface-1 border border-corio-border-subtle">
       {/* Column headers */}
-      <div
-        className="flex items-center gap-4 px-4 py-2 border-b"
-        style={{ borderColor: 'rgba(42, 37, 32, 0.06)' }}
-      >
+      <div className="flex items-center gap-4 px-4 py-2 border-b border-corio-border-subtle">
         <div className="w-10 shrink-0" />
-        <span className="flex-1 text-xs font-medium" style={{ color: 'rgba(42, 37, 32, 0.5)' }}>
+        <span className="flex-1 text-xs font-medium text-corio-fg/50">
           Belge Adı
         </span>
-        <span
-          className="shrink-0 text-xs font-medium hidden sm:block"
-          style={{ color: 'rgba(42, 37, 32, 0.5)' }}
-        >
+        <span className="shrink-0 text-xs font-medium hidden sm:block text-corio-fg/50">
           Tarih
         </span>
-        <span
-          className="shrink-0 text-xs font-medium w-16 text-right"
-          style={{ color: 'rgba(42, 37, 32, 0.5)' }}
-        >
+        <span className="shrink-0 text-xs font-medium w-16 text-right text-corio-fg/50">
           Boyut
         </span>
       </div>

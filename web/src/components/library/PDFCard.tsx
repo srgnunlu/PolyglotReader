@@ -4,6 +4,7 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { FileText } from 'lucide-react';
 import { PDFDocumentMetadata } from '@/types/models';
 
 const PDFThumbnail = dynamic(
@@ -11,18 +12,8 @@ const PDFThumbnail = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(42, 37, 32, 0.04)',
-          fontSize: 32,
-        }}
-      >
-        📄
+      <div className="flex h-full w-full items-center justify-center bg-corio-surface-2 animate-pulse">
+        <FileText className="h-8 w-8 text-corio-fg/20" />
       </div>
     ),
   }
@@ -55,13 +46,11 @@ export function PDFCard({ document }: PDFCardProps) {
       onClick={() => router.push(`/reader/${document.id}`)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="cursor-pointer rounded-xl overflow-hidden flex flex-col"
+      className="cursor-pointer rounded-xl overflow-hidden flex flex-col bg-corio-surface-1 border border-corio-border-subtle"
       style={{
-        background: '#ffffff',
-        border: '1px solid rgba(42, 37, 32, 0.06)',
         transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
         boxShadow: isHovered
-          ? '0 8px 30px rgba(212, 113, 60, 0.12), 0 2px 8px rgba(42, 37, 32, 0.06)'
+          ? '0 8px 30px rgba(212, 113, 60, 0.15), 0 2px 8px rgba(42, 37, 32, 0.06)'
           : '0 1px 4px rgba(42, 37, 32, 0.04)',
         transition: 'transform 0.2s ease, box-shadow 0.2s ease',
       }}
@@ -81,9 +70,8 @@ export function PDFCard({ document }: PDFCardProps) {
       {/* Card info */}
       <div className="p-3 flex flex-col gap-1">
         <h4
-          className="text-sm font-medium leading-snug"
+          className="text-sm font-medium leading-snug text-corio-fg"
           style={{
-            color: '#2A2520',
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
@@ -92,10 +80,7 @@ export function PDFCard({ document }: PDFCardProps) {
         >
           {document.name}
         </h4>
-        <div
-          className="flex items-center gap-1.5 text-xs"
-          style={{ color: 'rgba(42, 37, 32, 0.5)' }}
-        >
+        <div className="flex items-center gap-1.5 text-xs text-corio-fg/50">
           <span>{formatFileSize(document.size)}</span>
           <span>·</span>
           <span>{formatDate(document.uploadedAt)}</span>

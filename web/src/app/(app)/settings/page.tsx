@@ -235,19 +235,29 @@ function SettingsContent() {
               <span className="text-sm text-corio-fg">1.0.0-beta</span>
             </div>
             <Separator className="bg-corio-border-subtle" />
-            <button className="flex w-full items-center justify-between py-1 group">
+            <a
+              href="/legal/terms-of-service.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-between py-1 group"
+            >
               <span className="text-sm text-corio-fg/70 group-hover:text-corio-fg transition-colors">
                 Kullanım Koşulları
               </span>
               <ChevronRight className="size-4 text-corio-fg/30 group-hover:text-corio-fg/50 transition-colors" />
-            </button>
+            </a>
             <Separator className="bg-corio-border-subtle" />
-            <button className="flex w-full items-center justify-between py-1 group">
+            <a
+              href="/legal/privacy-policy.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-between py-1 group"
+            >
               <span className="text-sm text-corio-fg/70 group-hover:text-corio-fg transition-colors">
                 Gizlilik Politikası
               </span>
               <ChevronRight className="size-4 text-corio-fg/30 group-hover:text-corio-fg/50 transition-colors" />
-            </button>
+            </a>
           </CardContent>
         </Card>
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { Languages, Sparkles, Highlighter, Copy } from 'lucide-react';
 import { translateText } from '@/lib/gemini';
 import styles from './SelectionPopup.module.css';
 
@@ -205,7 +206,7 @@ export function SelectionPopup({
                         <span className={styles.spinner} />
                     ) : (
                         <>
-                            <span className={styles.icon}>🌐</span>
+                            <Languages className={styles.icon} size={16} />
                             <span>Çevir</span>
                         </>
                     )}
@@ -215,7 +216,7 @@ export function SelectionPopup({
                     className={styles.actionBtn}
                     onClick={handleAskAI}
                 >
-                    <span className={styles.icon}>✨</span>
+                    <Sparkles className={styles.icon} size={16} />
                     <span>AI&apos;a Sor</span>
                 </button>
 
@@ -224,7 +225,7 @@ export function SelectionPopup({
                         className={styles.actionBtn}
                         onClick={() => setShowColors(!showColors)}
                     >
-                        <span className={styles.icon}>🖍️</span>
+                        <Highlighter className={styles.icon} size={16} />
                         <span>İşaretle</span>
                     </button>
                 )}
@@ -236,7 +237,7 @@ export function SelectionPopup({
                         onClose();
                     }}
                 >
-                    <span className={styles.icon}>📋</span>
+                    <Copy className={styles.icon} size={16} />
                     <span>Kopyala</span>
                 </button>
             </div>

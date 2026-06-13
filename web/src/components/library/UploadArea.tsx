@@ -52,30 +52,21 @@ export function UploadArea({ onFilesSelected }: UploadAreaProps) {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="flex flex-col items-center justify-center gap-3 rounded-xl cursor-pointer transition-all py-10 px-6"
-      style={{
-        border: `2px dashed ${isDragOver ? '#D4713C' : 'rgba(42, 37, 32, 0.15)'}`,
-        background: isDragOver
-          ? 'rgba(212, 113, 60, 0.04)'
-          : 'rgba(255, 255, 255, 0.4)',
-        transition: 'border-color 0.2s ease, background 0.2s ease',
-      }}
+      className={`flex flex-col items-center justify-center gap-3 rounded-xl cursor-pointer transition-all py-10 px-6 border-2 border-dashed ${
+        isDragOver
+          ? 'border-corio-accent bg-corio-accent-subtle'
+          : 'border-corio-border bg-corio-surface-1/60'
+      }`}
     >
-      <div
-        className="flex items-center justify-center w-12 h-12 rounded-full"
-        style={{ background: 'rgba(212, 113, 60, 0.1)' }}
-      >
-        <Upload
-          className="w-5 h-5"
-          style={{ color: '#D4713C' }}
-        />
+      <div className={`flex items-center justify-center w-12 h-12 rounded-full bg-corio-accent-subtle transition-transform ${isDragOver ? 'scale-110' : ''}`}>
+        <Upload className="w-5 h-5 text-corio-accent" />
       </div>
 
       <div className="text-center">
-        <p className="text-sm font-medium" style={{ color: '#2A2520' }}>
+        <p className="text-sm font-medium text-corio-fg">
           PDF dosyalarını buraya sürükleyin
         </p>
-        <p className="text-xs mt-1" style={{ color: 'rgba(42, 37, 32, 0.5)' }}>
+        <p className="text-xs mt-1 text-corio-fg/50">
           veya seçmek için tıklayın
         </p>
       </div>
