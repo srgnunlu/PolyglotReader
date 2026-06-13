@@ -213,13 +213,13 @@ private struct EmptyStateView: View {
     private func emptyMessage(for category: NotebookCategory) -> String {
         switch category {
         case .favorites:
-            return "Favori olarak isaretlediginiz notlar burada gorunecek"
+            return "Favori olarak işaretlediğiniz notlar burada görünecek"
         case .notes:
-            return "Eklediginiz notlar burada listelenecek"
+            return "Eklediğiniz notlar burada listelenecek"
         case .aiNotes:
-            return "AI tarafindan olusturulan notlar burada gorunecek"
+            return "AI tarafından oluşturulan notlar burada görünecek"
         default:
-            return "Vurgulariniz burada listelenecek"
+            return "Vurgularınız burada listelenecek"
         }
     }
 }
@@ -372,7 +372,7 @@ private struct AnnotationCard: View {
             titleVisibility: .visible
         ) {
             Button("Sil", role: .destructive, action: onDelete)
-            Button("Vazgec", role: .cancel) {}
+            Button("Vazgeç", role: .cancel) {}
         }
     }
 }

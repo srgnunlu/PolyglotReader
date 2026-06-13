@@ -3,6 +3,7 @@ import SwiftUI
 struct QuizView: View {
     @StateObject private var viewModel: QuizViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var showingReview = false
 
     init(textContext: String) {
         _viewModel = StateObject(wrappedValue: QuizViewModel(textContext: textContext))
@@ -17,13 +18,20 @@ struct QuizView: View {
                 if viewModel.isLoading {
                     LoadingQuizView()
                 } else if viewModel.questions.isEmpty {
-                    ErrorQuizView { dismiss() }
+                    ErrorQuizView(
+                        onRetry: { Task { await viewModel.generateQuiz() } },
+                        onClose: { dismiss() }
+                    )
                 } else if viewModel.showResult {
                     QuizResultView(
                         score: viewModel.score,
                         total: viewModel.questions.count,
-                        percentage: viewModel.scorePercentage
-                    ) { dismiss() }
+                        percentage: viewModel.scorePercentage,
+                        incorrectCount: viewModel.incorrectQuestionIndices.count,
+                        onReview: { showingReview = true },
+                        onRetry: { viewModel.reset() },
+                        onClose: { dismiss() }
+                    )
                 } else if let question = viewModel.currentQuestion {
                     QuestionView(
                         viewModel: viewModel,
@@ -33,6 +41,9 @@ struct QuizView: View {
             }
             .navigationTitle("quiz.title".localized)
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showingReview) {
+                QuizReviewView(viewModel: viewModel)
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -96,6 +107,7 @@ struct LoadingQuizView: View {
 
 // MARK: - Error View
 struct ErrorQuizView: View {
+    let onRetry: () -> Void
     let onClose: () -> Void
 
     var body: some View {
@@ -109,10 +121,23 @@ struct ErrorQuizView: View {
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
 
-            Button("common.close".localized, action: onClose)
-                .buttonStyle(.bordered)
-                .frame(minWidth: 44, minHeight: 44)
-                .accessibilityIdentifier("close_error_button")
+            VStack(spacing: 12) {
+                Button(action: onRetry) {
+                    Label("quiz.retry".localized, systemImage: "arrow.clockwise")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("retry_quiz_button")
+
+                Button("common.close".localized, action: onClose)
+                    .buttonStyle(.bordered)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("close_error_button")
+            }
+            .padding(.horizontal, 40)
         }
     }
 }
@@ -296,6 +321,9 @@ struct QuizResultView: View {
     let score: Int
     let total: Int
     let percentage: Int
+    let incorrectCount: Int
+    let onReview: () -> Void
+    let onRetry: () -> Void
     let onClose: () -> Void
 
     var body: some View {
@@ -329,20 +357,159 @@ struct QuizResultView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button(action: onClose) {
-                Text("common.close".localized)
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .frame(minHeight: 44)
-                    .background(Color.indigo)
-                    .cornerRadius(16)
+            VStack(spacing: 12) {
+                if incorrectCount > 0 {
+                    Button(action: onReview) {
+                        Label("quiz.review.button".localized, systemImage: "list.bullet.clipboard")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .frame(minHeight: 44)
+                            .background(Color.indigo)
+                            .cornerRadius(16)
+                    }
+                    .accessibilityIdentifier("review_answers_button")
+                }
+
+                Button(action: onRetry) {
+                    Label("quiz.retry".localized, systemImage: "arrow.clockwise")
+                        .font(.headline)
+                        .foregroundStyle(.indigo)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .frame(minHeight: 44)
+                        .background(Color.indigo.opacity(0.12))
+                        .cornerRadius(16)
+                }
+                .accessibilityIdentifier("retry_result_button")
+
+                Button(action: onClose) {
+                    Text("common.close".localized)
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .frame(minHeight: 44)
+                }
+                .accessibilityIdentifier("close_result_button")
             }
             .padding(.horizontal, 40)
-            .accessibilityIdentifier("close_result_button")
         }
         .padding()
+    }
+}
+
+// MARK: - Review View
+struct QuizReviewView: View {
+    @ObservedObject var viewModel: QuizViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    ForEach(Array(viewModel.questions.enumerated()), id: \.offset) { index, question in
+                        ReviewQuestionCard(
+                            number: index + 1,
+                            question: question,
+                            userAnswer: viewModel.userAnswers[index]
+                        )
+                    }
+                }
+                .padding()
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("quiz.review.title".localized)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("common.close".localized) { dismiss() }
+                        .accessibilityIdentifier("close_review_button")
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Review Question Card
+struct ReviewQuestionCard: View {
+    let number: Int
+    let question: QuizQuestion
+    let userAnswer: Int?
+
+    private var isCorrect: Bool {
+        userAnswer == question.correctAnswerIndex
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .foregroundStyle(isCorrect ? .green : .red)
+
+                Text("\(number). \(question.question)")
+                    .font(.subheadline.weight(.semibold))
+            }
+
+            VStack(spacing: 8) {
+                ForEach(Array(question.options.enumerated()), id: \.offset) { optionIndex, option in
+                    reviewOption(optionIndex: optionIndex, option: option)
+                }
+            }
+
+            if let explanation = question.explanation, !explanation.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("quiz.explanation".localized, systemImage: "lightbulb.fill")
+                        .font(.caption)
+                        .foregroundStyle(.indigo)
+                    Text(explanation)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground))
+        .cornerRadius(14)
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func reviewOption(optionIndex: Int, option: String) -> some View {
+        let isAnswer = optionIndex == question.correctAnswerIndex
+        let isUserWrong = optionIndex == userAnswer && !isCorrect
+
+        HStack(spacing: 8) {
+            Image(systemName: isAnswer ? "checkmark" : (isUserWrong ? "xmark" : "circle"))
+                .font(.caption2)
+                .foregroundStyle(isAnswer ? .green : (isUserWrong ? .red : .secondary))
+                .frame(width: 16)
+
+            Text(option)
+                .font(.caption)
+                .foregroundStyle(isAnswer ? .green : (isUserWrong ? .red : .primary))
+
+            Spacer()
+
+            if isUserWrong {
+                Text("quiz.review.your_answer".localized)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+            } else if isAnswer {
+                Text("quiz.review.correct_answer".localized)
+                    .font(.caption2)
+                    .foregroundStyle(.green)
+            }
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(
+            (isAnswer ? Color.green.opacity(0.1) : (isUserWrong ? Color.red.opacity(0.1) : Color.clear))
+        )
+        .cornerRadius(8)
     }
 }
 

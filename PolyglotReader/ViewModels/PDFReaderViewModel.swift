@@ -14,6 +14,9 @@ class PDFReaderViewModel: ObservableObject {
     @Published var searchQuery = ""
     @Published var searchResults: [PDFSearchResult] = []
     @Published var currentSearchIndex = 0
+    /// True once a search has run, so the UI can distinguish "no query yet" from
+    /// "no results found" instead of always showing the empty message.
+    @Published var hasSearched = false
     @Published var annotations: [Annotation] = []
     @Published var selectedText: String?
     @Published var selectionRect: CGRect?
@@ -374,11 +377,13 @@ class PDFReaderViewModel: ObservableObject {
     // MARK: - Search
 
     func search() {
-        guard let doc = document, !searchQuery.isEmpty else {
+        guard let doc = document, !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             searchResults = []
+            hasSearched = false
             return
         }
 
+        hasSearched = true
         do {
             searchResults = try pdfService.search(query: searchQuery, in: doc)
             currentSearchIndex = 0
@@ -394,6 +399,20 @@ class PDFReaderViewModel: ObservableObject {
             )
             searchResults = []
         }
+    }
+
+    func clearSearch() {
+        searchQuery = ""
+        searchResults = []
+        currentSearchIndex = 0
+        hasSearched = false
+    }
+
+    /// Jump to a specific result from the result list.
+    func selectSearchResult(at index: Int) {
+        guard searchResults.indices.contains(index) else { return }
+        currentSearchIndex = index
+        goToPage(searchResults[index].pageNumber)
     }
 
     func nextSearchResult() {

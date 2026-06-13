@@ -13,6 +13,10 @@ class QuizViewModel: ObservableObject {
     @Published var isLoading = true
     @Published var errorMessage: String?
 
+    /// User's chosen option per question index, kept so the result screen can offer
+    /// a question-by-question review of what was answered right vs. wrong.
+    @Published var userAnswers: [Int: Int] = [:]
+
     private let geminiService = GeminiService.shared
     let textContext: String
 
@@ -42,6 +46,11 @@ class QuizViewModel: ObservableObject {
     var scorePercentage: Int {
         guard !questions.isEmpty else { return 0 }
         return Int((Double(score) / Double(questions.count)) * 100)
+    }
+
+    /// Indices of questions answered incorrectly or left unanswered.
+    var incorrectQuestionIndices: [Int] {
+        questions.indices.filter { userAnswers[$0] != questions[$0].correctAnswerIndex }
     }
 
     // MARK: - Generate Quiz
@@ -75,6 +84,7 @@ class QuizViewModel: ObservableObject {
 
         selectedAnswer = index
         isAnswered = true
+        userAnswers[currentQuestionIndex] = index
 
         if index == question.correctAnswerIndex {
             score += 1
@@ -97,5 +107,6 @@ class QuizViewModel: ObservableObject {
         selectedAnswer = nil
         isAnswered = false
         showResult = false
+        userAnswers = [:]
     }
 }

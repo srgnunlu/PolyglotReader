@@ -15,6 +15,8 @@ struct ImageSelectionPopup: View {
     @State private var analysisTask: Task<Void, Never>?
     @State private var showCopiedToast = false
     @State private var showSavedToast = false
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
     @State private var showShareSheet = false
     @State private var showFullscreen = false
     
@@ -123,7 +125,45 @@ struct ImageSelectionPopup: View {
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
         .shadow(color: .indigo.opacity(0.1), radius: 40, x: 0, y: 20)
+        .overlay(alignment: .top) {
+            toastOverlay
+                .offset(y: -38)
+        }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showDescription)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCopiedToast)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSavedToast)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSaveError)
+    }
+
+    // MARK: - Toast Overlay
+
+    @ViewBuilder
+    private var toastOverlay: some View {
+        if showCopiedToast {
+            statusToast(icon: "checkmark.circle.fill", text: "Kopyalandı", color: .green)
+        } else if showSavedToast {
+            statusToast(icon: "checkmark.circle.fill", text: "Fotoğraflara kaydedildi", color: .green)
+        } else if showSaveError {
+            statusToast(icon: "exclamationmark.triangle.fill", text: saveErrorMessage, color: .orange)
+        }
+    }
+
+    private func statusToast(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Capsule().fill(color))
+        .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+        .frame(maxWidth: popupWidth - 16)
+        .fixedSize(horizontal: false, vertical: true)
+        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
     }
     
     // MARK: - Draggable Area
@@ -202,19 +242,20 @@ struct ImageSelectionPopup: View {
     private var mainActionBar: some View {
         HStack(spacing: 6) {
             // Kopyala
-            CompactActionButton(icon: "doc.on.doc", isActive: false) {
+            CompactActionButton(icon: "doc.on.doc", isActive: false, accessibilityLabel: "Kopyala") {
                 copyImage()
             }
-            
+
             // AI'a Sor
-            CompactActionButton(icon: "sparkles", isActive: false) {
+            CompactActionButton(icon: "sparkles", isActive: false, accessibilityLabel: "Yapay zekaya sor") {
                 onAskAI()
             }
-            
+
             // Açıkla
             CompactActionButton(
                 icon: showDescription ? "text.bubble.fill" : "text.bubble",
-                isActive: showDescription
+                isActive: showDescription,
+                accessibilityLabel: "Açıkla"
             ) {
                 toggleDescription()
             }
@@ -245,11 +286,12 @@ struct ImageSelectionPopup: View {
             } label: {
                 CompactActionLabel(icon: "ellipsis")
             }
-            
+            .accessibilityLabel("Diğer")
+
             Divider()
                 .frame(height: 20)
                 .padding(.horizontal, 4)
-            
+
             // Kapat
             Button(action: dismissPopup) {
                 Image(systemName: "xmark")
@@ -258,7 +300,9 @@ struct ImageSelectionPopup: View {
                     .frame(width: 28, height: 28)
                     .background(Color(.tertiarySystemBackground).opacity(0.8))
                     .clipShape(Circle())
+                    .contentShape(Circle())
             }
+            .accessibilityLabel("Kapat")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -406,20 +450,43 @@ struct ImageSelectionPopup: View {
     }
     
     private func saveImage() {
+        let image = imageInfo.image
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-            if status == .authorized || status == .limited {
-                UIImageWriteToSavedPhotosAlbum(imageInfo.image, nil, nil, nil)
-                
+            guard status == .authorized || status == .limited else {
+                // İzin reddedildi - sessiz başarısızlık yerine kullanıcıyı bilgilendir.
                 DispatchQueue.main.async {
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
-                    showSavedToast = true
-                    
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        showSavedToast = false
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    presentSaveError("Kaydetmek için Fotoğraflar izni gerekli. Ayarlar'dan verebilirsiniz.")
+                }
+                return
+            }
+
+            // performChanges completion handler'ı ile gerçek başarı/hata yakalanır
+            // (eski UIImageWriteToSavedPhotosAlbum çağrısı sonucu hiç dinlemiyordu).
+            PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.creationRequestForAsset(from: image)
+            } completionHandler: { success, _ in
+                DispatchQueue.main.async {
+                    if success {
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        showSavedToast = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            showSavedToast = false
+                        }
+                    } else {
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                        presentSaveError("Görsel kaydedilemedi.")
                     }
                 }
             }
+        }
+    }
+
+    private func presentSaveError(_ message: String) {
+        saveErrorMessage = message
+        showSaveError = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            showSaveError = false
         }
     }
 }

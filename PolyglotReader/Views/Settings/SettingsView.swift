@@ -8,6 +8,16 @@ struct SettingsView: View {
     @State private var showDeleteAccountConfirm = false
     @State private var showDeleteAccountError = false
 
+    /// Debug Logs can leak the full log file, so it's restricted to debug builds
+    /// and admin accounts rather than being reachable from the public About section.
+    private var canViewDebugLogs: Bool {
+        #if DEBUG
+        return true
+        #else
+        return authViewModel.currentUser?.isAdmin == true
+        #endif
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -177,24 +187,26 @@ struct SettingsView: View {
                     .accessibilityLabel("settings.version".localized)
                     .accessibilityValue("1.0.0")
 
-                    NavigationLink {
-                        DebugLogsView()
-                    } label: {
-                        HStack {
-                            Label("settings.debug_logs".localized, systemImage: "ladybug")
-                            Spacer()
-                            if LoggingService.shared.errorCount > 0 {
-                                Text(String(LoggingService.shared.errorCount))
-                                    .font(.caption2.weight(.medium))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.red)
-                                    .cornerRadius(8)
+                    if canViewDebugLogs {
+                        NavigationLink {
+                            DebugLogsView()
+                        } label: {
+                            HStack {
+                                Label("settings.debug_logs".localized, systemImage: "ladybug")
+                                Spacer()
+                                if LoggingService.shared.errorCount > 0 {
+                                    Text(String(LoggingService.shared.errorCount))
+                                        .font(.caption2.weight(.medium))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.red)
+                                        .cornerRadius(8)
+                                }
                             }
                         }
+                        .accessibilityIdentifier("debug_logs_link")
                     }
-                    .accessibilityIdentifier("debug_logs_link")
 
                     if let privacyURL = URL(string: "https://polyglotreader.app/privacy") {
                         Link(destination: privacyURL) {

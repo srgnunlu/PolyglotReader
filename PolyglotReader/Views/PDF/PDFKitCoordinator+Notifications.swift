@@ -16,6 +16,9 @@ extension PDFKitCoordinator {
         lastSelectionTextForReport = nil
 
         DispatchQueue.main.async {
+            // Mark this binding change as scroll-originated so syncCurrentPage
+            // doesn't navigate back to a stale page during fast scrolling.
+            self.suppressNextPageSync = true
             self.parent.currentPage = pageIndex + 1
         }
     }

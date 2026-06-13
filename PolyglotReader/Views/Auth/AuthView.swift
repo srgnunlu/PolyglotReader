@@ -194,7 +194,7 @@ struct AuthView: View {
         VStack(spacing: 14) {
             // Apple Sign In
             SignInWithAppleButton(.signIn) { request in
-                request.requestedScopes = [.fullName, .email]
+                authViewModel.prepareAppleSignInRequest(request)
             } onCompletion: { result in
                 switch result {
                 case .success(let auth):
@@ -202,13 +202,15 @@ struct AuthView: View {
                         await authViewModel.handleAppleSignIn(authorization: auth)
                     }
                 case .failure(let error):
-                    logError("AuthView", "Apple Sign In failed", error: error)
+                    authViewModel.handleAppleSignInFailure(error)
                 }
             }
             .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
             .frame(height: 56)
             .cornerRadius(16)
             .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+            .disabled(authViewModel.isLoading)
+            .opacity(authViewModel.isLoading ? 0.6 : 1)
             .accessibilityIdentifier("apple_sign_in_button")
             .accessibilityLabel("auth.accessibility.apple_button".localized)
             .accessibilityHint("auth.accessibility.apple_button.hint".localized)
@@ -253,6 +255,8 @@ struct AuthView: View {
                 .foregroundStyle(.primary)
             }
             .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+            .disabled(authViewModel.isLoading)
+            .opacity(authViewModel.isLoading ? 0.6 : 1)
             .accessibilityIdentifier("google_sign_in_button")
             .accessibilityLabel("auth.accessibility.google_button".localized)
             .accessibilityHint("auth.accessibility.google_button.hint".localized)
@@ -298,13 +302,35 @@ struct AuthView: View {
 
     // MARK: - Terms Section
     private var termsSection: some View {
-        Text("auth.terms_notice".localized)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 40)
-            .opacity(isAnimating ? 1.0 : 0.0)
-            .animation(.easeOut(duration: 0.6).delay(0.5), value: isAnimating)
+        VStack(spacing: 8) {
+            Text("auth.terms_notice".localized)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            // App Review 5.1.1 expects the agreements to be reachable, not just
+            // mentioned. Surface them as tappable links (same URLs as Settings).
+            HStack(spacing: 12) {
+                if let termsURL = URL(string: "https://polyglotreader.app/terms") {
+                    Link("settings.terms_of_service".localized, destination: termsURL)
+                        .accessibilityHint("auth.accessibility.opens_in_browser".localized)
+                }
+
+                Text("•")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+
+                if let privacyURL = URL(string: "https://polyglotreader.app/privacy") {
+                    Link("settings.privacy_policy".localized, destination: privacyURL)
+                        .accessibilityHint("auth.accessibility.opens_in_browser".localized)
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .tint(.indigo)
+        }
+        .padding(.horizontal, 40)
+        .opacity(isAnimating ? 1.0 : 0.0)
+        .animation(.easeOut(duration: 0.6).delay(0.5), value: isAnimating)
     }
 }
 

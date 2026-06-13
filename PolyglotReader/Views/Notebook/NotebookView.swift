@@ -68,7 +68,11 @@ struct NotebookView: View {
                 } else if viewModel.annotations.isEmpty {
                     EmptyNotebookView(
                         hasFilters: false
-                    ) {}
+                    ) {
+                        // New users have no annotations yet; guide them to the
+                        // Library to open a PDF and start highlighting.
+                        NotificationCenter.default.post(name: .switchToLibraryTab, object: nil)
+                    }
                 } else {
                     // Dashboard view
                     NotebookDashboardView(
@@ -225,7 +229,7 @@ struct NotebookLoadingView: View {
 // MARK: - Premium Empty Notebook View
 struct EmptyNotebookView: View {
     let hasFilters: Bool
-    let onResetFilters: () -> Void
+    let onPrimaryAction: () -> Void
     @State private var isAnimating = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -302,37 +306,41 @@ struct EmptyNotebookView: View {
                     .lineSpacing(2)
             }
 
-            if hasFilters {
-                Button(action: onResetFilters) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
-                        Text("notebook.clear_filters".localized)
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 14)
-                    .frame(minHeight: 44)
-                    .background {
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.purple, .indigo],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .shadow(color: .purple.opacity(0.4), radius: 12, x: 0, y: 6)
-                    }
+            Button(action: onPrimaryAction) {
+                HStack(spacing: 8) {
+                    Image(systemName: hasFilters ? "xmark.circle.fill" : "books.vertical.fill")
+                        .font(.system(size: 14))
+                    Text(hasFilters ? "notebook.clear_filters".localized : "notebook.empty.cta".localized)
+                        .font(.subheadline.weight(.semibold))
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("clear_filters_button")
+                .foregroundStyle(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .frame(minHeight: 44)
+                .background {
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple, .indigo],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .shadow(color: .purple.opacity(0.4), radius: 12, x: 0, y: 6)
+                }
             }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(hasFilters ? "clear_filters_button" : "go_to_library_button")
         }
         .padding()
         .onAppear { isAnimating = true }
     }
+}
+
+// MARK: - Tab Switching
+extension Notification.Name {
+    /// Posted when a view wants the main TabView to switch to the Library tab.
+    static let switchToLibraryTab = Notification.Name("CorioScan.switchToLibraryTab")
 }
 
 // MARK: - Amber Color

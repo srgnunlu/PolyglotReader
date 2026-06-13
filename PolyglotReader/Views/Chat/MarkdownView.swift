@@ -449,55 +449,64 @@ struct MarkdownView: View {
     // MARK: - Table Rendering
 
     private func renderTable(headers: [String], rows: [[String]]) -> some View {
-        VStack(spacing: 0) {
-            // Header row
-            HStack(spacing: 0) {
-                ForEach(headers.indices, id: \.self) { index in
-                    Text(headers[index])
-                        .font(.caption.bold())
-                        .foregroundColor(.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .background(Color.indigo.opacity(0.15))
+        // Fixed-width columns inside a horizontal ScrollView: wide academic tables
+        // (drug/dose grids) scroll instead of clipping, and equal widths keep the
+        // header aligned with every data row.
+        let columnWidth: CGFloat = 130
 
-                    if index < headers.count - 1 {
-                        Divider()
-                    }
-                }
-            }
-            .background(Color.indigo.opacity(0.1))
-
-            Divider()
-
-            // Data rows
-            ForEach(rows.indices, id: \.self) { rowIndex in
+        return ScrollView(.horizontal, showsIndicators: true) {
+            VStack(spacing: 0) {
+                // Header row
                 HStack(spacing: 0) {
-                    ForEach(rows[rowIndex].indices, id: \.self) { colIndex in
-                        Text(rows[rowIndex][colIndex])
-                            .font(.caption)
+                    ForEach(headers.indices, id: \.self) { index in
+                        Text(headers[index])
+                            .font(.caption.bold())
                             .foregroundColor(.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(width: columnWidth, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
+                            .padding(.vertical, 6)
+                            .background(Color.indigo.opacity(0.15))
 
-                        if colIndex < rows[rowIndex].count - 1 {
+                        if index < headers.count - 1 {
                             Divider()
                         }
                     }
                 }
-                .background(rowIndex % 2 == 0 ? Color(.systemBackground) : Color(.secondarySystemBackground).opacity(0.5))
+                .background(Color.indigo.opacity(0.1))
 
-                if rowIndex < rows.count - 1 {
-                    Divider()
+                Divider()
+
+                // Data rows
+                ForEach(rows.indices, id: \.self) { rowIndex in
+                    HStack(spacing: 0) {
+                        ForEach(rows[rowIndex].indices, id: \.self) { colIndex in
+                            Text(rows[rowIndex][colIndex])
+                                .font(.caption)
+                                .foregroundColor(.primary)
+                                .frame(width: columnWidth, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+
+                            if colIndex < rows[rowIndex].count - 1 {
+                                Divider()
+                            }
+                        }
+                    }
+                    .background(rowIndex % 2 == 0 ? Color(.systemBackground) : Color(.secondarySystemBackground).opacity(0.5))
+
+                    if rowIndex < rows.count - 1 {
+                        Divider()
+                    }
                 }
             }
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color(.separator), lineWidth: 1)
+            )
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(.separator), lineWidth: 1)
-        )
     }
 
     private func renderBulletList(_ items: [String]) -> some View {

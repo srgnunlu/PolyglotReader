@@ -190,6 +190,9 @@ struct MainTabView: View {
                 selectedTab: newValue
             )
         }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToLibraryTab)) { _ in
+            selectedTab = 0
+        }
     }
 
     private func tabName(for index: Int) -> String {

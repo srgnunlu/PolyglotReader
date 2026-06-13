@@ -49,6 +49,12 @@ struct TagChipView: View {
         )
         .buttonStyle(.plain)
         .foregroundStyle(isSelected ? tagColor : .primary)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(tag.name)
+        .accessibilityValue(showCount && tag.fileCount > 0 ? "\(tag.fileCount) dosya" : "")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
