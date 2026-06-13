@@ -46,7 +46,7 @@ struct PDFKitView: UIViewRepresentable {
         updateInsetsIfNeeded(for: pdfView)
         updateDocumentIfNeeded(pdfView, context: context)
         restoreStateIfNeeded(pdfView, coordinator: context.coordinator)
-        syncCurrentPage(pdfView)
+        syncCurrentPage(pdfView, coordinator: context.coordinator)
         applyAnnotationsIfNeeded(pdfView, coordinator: context.coordinator)
     }
 
@@ -160,21 +160,25 @@ struct PDFKitView: UIViewRepresentable {
         }
     }
 
-    private func syncCurrentPage(_ pdfView: CustomPDFView) {
+    private func syncCurrentPage(_ pdfView: CustomPDFView, coordinator: PDFKitCoordinator) {
         // PDFView'deki mevcut görüntülenen sayfayı al
         guard let currentDoc = pdfView.document,
               let displayedPage = pdfView.currentPage else { return }
-        
+
+        // Binding güncellemesi kullanıcı scroll'undan geldiyse (pageChanged), gerçek
+        // kaynak görüntülenen sayfadır — programatik navigasyon yapma, yoksa hızlı
+        // scroll'da sayfa geri çekilir ("PDF kayıyor"). Bayrağı bir kez tüket.
+        if coordinator.suppressNextPageSync {
+            coordinator.suppressNextPageSync = false
+            return
+        }
+
         let displayedPageIndex = currentDoc.index(for: displayedPage) + 1
-        
-        // Eğer binding'deki sayfa ile görüntülenen sayfa aynıysa, bir şey yapma
-        // Bu, kullanıcının scroll ile sayfa değiştirmesinden sonra gereksiz navigasyonu engeller
+
+        // Görüntülenen sayfa ile binding aynıysa yapacak bir şey yok.
         if displayedPageIndex == currentPage { return }
-        
-        // Eğer binding'deki sayfa farklıysa VE bu programatik bir değişiklikse (örn. PageSpinner'dan),
-        // o zaman sayfaya git
-        // Bunu anlamak için: binding değişikliği Coordinator'ın pageChanged'inden gelmediyse
-        // (yani kullanıcı scroll yapmadıysa) o zaman programatik bir istektir
+
+        // Binding farklı ve değişiklik programatik (örn. PageSpinner) — sayfaya git.
         guard let targetPage = currentDoc.page(at: currentPage - 1) else { return }
         pdfView.go(to: targetPage)
     }

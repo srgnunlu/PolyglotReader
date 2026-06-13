@@ -149,7 +149,32 @@ struct TextSelectionPopup: View {
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
         .shadow(color: .indigo.opacity(0.1), radius: 40, x: 0, y: 20)
+        .overlay(alignment: .top) {
+            if showCopiedToast {
+                copiedToast
+                    .offset(y: -38)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
+            }
+        }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showTranslation)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCopiedToast)
+    }
+
+    // MARK: - Copied Toast
+
+    private var copiedToast: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "checkmark.circle.fill")
+            Text("Kopyalandı")
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Capsule().fill(Color.green))
+        .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Metin kopyalandı")
     }
     
     // MARK: - Draggable Area (sadece bu alan sürüklenebilir)
@@ -218,31 +243,34 @@ struct TextSelectionPopup: View {
                             Circle()
                                 .stroke(.white.opacity(0.6), lineWidth: 0.5)
                         )
+                        .contentShape(Circle())
                 }
+                .accessibilityLabel("\(colorName(for: colorHex)) ile vurgula")
             }
-            
+
             Divider()
                 .frame(height: 20)
                 .padding(.horizontal, 4)
-            
+
             // Çevir butonu
             CompactActionButton(
                 icon: showTranslation ? "character.bubble.fill" : "character.bubble",
-                isActive: showTranslation
+                isActive: showTranslation,
+                accessibilityLabel: "Çevir"
             ) {
                 toggleTranslation()
             }
-            
+
             // AI butonu
-            CompactActionButton(icon: "sparkles", isActive: false) {
+            CompactActionButton(icon: "sparkles", isActive: false, accessibilityLabel: "Yapay zekaya sor") {
                 onAskAI()
             }
-            
+
             // Kopyala butonu
-            CompactActionButton(icon: "doc.on.doc", isActive: false) {
+            CompactActionButton(icon: "doc.on.doc", isActive: false, accessibilityLabel: "Kopyala") {
                 copySelection()
             }
-            
+
             // Diğer menü
             Menu {
                 if onAddNote != nil {
@@ -261,11 +289,12 @@ struct TextSelectionPopup: View {
             } label: {
                 CompactActionLabel(icon: "ellipsis")
             }
-            
+            .accessibilityLabel("Diğer")
+
             Divider()
                 .frame(height: 20)
                 .padding(.horizontal, 4)
-            
+
             // Kapat butonu
             Button(action: dismissPopup) {
                 Image(systemName: "xmark")
@@ -274,10 +303,23 @@ struct TextSelectionPopup: View {
                     .frame(width: 28, height: 28)
                     .background(Color(.tertiarySystemBackground).opacity(0.8))
                     .clipShape(Circle())
+                    .contentShape(Circle())
             }
+            .accessibilityLabel("Kapat")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
+    }
+
+    /// Maps a highlight hex to a Turkish color name for VoiceOver.
+    private func colorName(for hex: String) -> String {
+        switch hex {
+        case "#fef08a": return "Sarı"
+        case "#bbf7d0": return "Yeşil"
+        case "#fbcfe8": return "Pembe"
+        case "#bae6fd": return "Mavi"
+        default: return "Renk"
+        }
     }
     
     // MARK: - Translation Area

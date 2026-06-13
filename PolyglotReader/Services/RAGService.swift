@@ -139,45 +139,48 @@ class RAGService: ObservableObject {
 
         logInfo("RAGService", "Embedding oluşturma başlıyor", details: "Toplam \(chunks.count) chunk")
 
-        for (index, chunk) in chunks.enumerated() {
-            var success = false
-            var lastError: Error?
+        // Chunk'ları RAGConfig.batchSize'lık paralel gruplara işle. getOrCreateEmbedding
+        // alt katmanda zaten ErrorHandlingService.retry ile sarılı; bu yüzden tek tek
+        // serial retry döngüsü + chunk başına 100ms sleep yerine grup içi paralellikten
+        // faydalanıyoruz (yüzlerce chunk'ta dakikalar yerine saniyeler).
+        let service = embeddingService
+        let batchSize = max(1, RAGConfig.batchSize)
+        let indexedChunks = Array(chunks.enumerated())
+        var processed = 0
 
-            // Retry mekanizması ile embedding oluştur
-            for attempt in 1...RAGConfig.maxRetryAttempts {
-                do {
-                    let embedding = try await embeddingService.getOrCreateEmbedding(for: chunk.content)
-                    chunksWithEmbeddings.append((chunk, embedding))
-                    success = true
-                    break
-                } catch {
-                    lastError = error
-                    if attempt < RAGConfig.maxRetryAttempts {
-                        // Exponential backoff: 500ms, 1s, 2s...
-                        let backoffDelay = RAGConfig.retryDelayBase * UInt64(1 << (attempt - 1))
-                        logWarning("RAGService", "Embedding retry \(attempt)/\(RAGConfig.maxRetryAttempts)",
-                                   details: "Chunk \(index), bekleniyor: \(backoffDelay / 1_000_000)ms")
-                        try? await Task.sleep(nanoseconds: backoffDelay)
+        for start in stride(from: 0, to: indexedChunks.count, by: batchSize) {
+            let batch = Array(indexedChunks[start..<min(start + batchSize, indexedChunks.count)])
+
+            let batchResults: [(index: Int, chunk: DocumentChunk, embedding: [Float]?)] =
+                await withTaskGroup(of: (Int, DocumentChunk, [Float]?).self) { group in
+                    for (index, chunk) in batch {
+                        group.addTask {
+                            let embedding = try? await service.getOrCreateEmbedding(for: chunk.content)
+                            return (index, chunk, embedding)
+                        }
                     }
+                    var collected: [(Int, DocumentChunk, [Float]?)] = []
+                    for await result in group {
+                        collected.append(result)
+                    }
+                    return collected
+                }
+
+            for result in batchResults {
+                if let embedding = result.embedding {
+                    chunksWithEmbeddings.append((result.chunk, embedding))
+                } else {
+                    failedChunks.append((result.index, result.chunk))
+                    handleEmbeddingError(RAGError.embeddingFailed, index: result.index)
                 }
             }
 
-            if !success {
-                failedChunks.append((index, chunk))
-                handleEmbeddingError(lastError!, index: index)
-            }
+            processed += batch.count
+            updateIndexingProgress(currentIndex: processed - 1, total: chunks.count)
 
-            updateIndexingProgress(currentIndex: index, total: chunks.count)
-
-            // Rate limiting: Her chunk arasında bekle
-            if index < chunks.count - 1 {
+            // Rate limiting: Batch'ler arasında bekle (chunk başına değil).
+            if start + batchSize < indexedChunks.count {
                 try? await Task.sleep(nanoseconds: RAGConfig.rateLimitDelay)
-            }
-
-            // Her 20 chunk'ta bir durumu logla
-            if (index + 1) % 20 == 0 {
-                logInfo("RAGService", "Embedding ilerleme",
-                        details: "\(index + 1)/\(chunks.count) (\(failedChunks.count) başarısız)")
             }
         }
 
@@ -185,20 +188,30 @@ class RAGService: ObservableObject {
         logInfo("RAGService", "Embedding tamamlandı",
                 details: "Başarılı: \(chunksWithEmbeddings.count)/\(chunks.count), Başarısız: \(failedChunks.count)")
 
-        // Başarısız chunk'ları tekrar dene (son şans)
+        // Başarısız chunk'ları tekrar dene (son şans, yine paralel)
         if !failedChunks.isEmpty {
             logWarning("RAGService", "Başarısız chunk'lar için son deneme", details: "\(failedChunks.count) chunk")
             try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 saniye bekle
 
-            for (index, chunk) in failedChunks {
-                do {
-                    let embedding = try await embeddingService.getOrCreateEmbedding(for: chunk.content)
-                    chunksWithEmbeddings.append((chunk, embedding))
-                    logInfo("RAGService", "Son denemede başarılı", details: "Chunk \(index)")
-                } catch {
-                    logError("RAGService", "Chunk kalıcı olarak başarısız: \(index)", error: error)
+            let retryResults: [(chunk: DocumentChunk, embedding: [Float]?)] =
+                await withTaskGroup(of: (DocumentChunk, [Float]?).self) { group in
+                    for (_, chunk) in failedChunks {
+                        group.addTask {
+                            let embedding = try? await service.getOrCreateEmbedding(for: chunk.content)
+                            return (chunk, embedding)
+                        }
+                    }
+                    var collected: [(DocumentChunk, [Float]?)] = []
+                    for await result in group {
+                        collected.append(result)
+                    }
+                    return collected
                 }
-                try? await Task.sleep(nanoseconds: RAGConfig.rateLimitDelay * 2)
+
+            for result in retryResults {
+                if let embedding = result.embedding {
+                    chunksWithEmbeddings.append((result.chunk, embedding))
+                }
             }
         }
 

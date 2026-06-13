@@ -90,18 +90,27 @@ class AuthViewModel: ObservableObject {
 
     // MARK: - Apple Sign In
 
-    func signInWithApple() {
-        currentNonce = randomNonceString()
-
-        guard let nonce = currentNonce else { return }
-
-        let request = ASAuthorizationAppleIDProvider().createRequest()
+    /// Configures the Apple ID request with scopes and a hashed nonce.
+    /// Driven by the SwiftUI `SignInWithAppleButton` `onRequest` closure. Storing
+    /// `currentNonce` here is what lets `handleAppleSignIn` verify the returned
+    /// identity token — previously the nonce was never set, so every Apple sign-in
+    /// failed silently at the nonce guard.
+    func prepareAppleSignInRequest(_ request: ASAuthorizationAppleIDRequest) {
+        let nonce = randomNonceString()
+        currentNonce = nonce
         request.requestedScopes = [.fullName, .email]
         request.nonce = sha256(nonce)
+        errorMessage = nil
+    }
 
-        _ = ASAuthorizationController(authorizationRequests: [request])
-        // Note: In a real app, you'd set the delegate and present this controller
-        // This is a simplified version - full implementation requires UIKit integration
+    /// Surfaces an Apple Sign-In failure to the user. A user-initiated cancel is
+    /// not treated as an error.
+    func handleAppleSignInFailure(_ error: Error) {
+        if let authError = error as? ASAuthorizationError, authError.code == .canceled {
+            return
+        }
+        errorMessage = NSLocalizedString("auth.apple_sign_in_failed", comment: "")
+        logError("AuthViewModel", "Apple Sign In error", error: error)
     }
 
     func handleAppleSignIn(authorization: ASAuthorization) async {

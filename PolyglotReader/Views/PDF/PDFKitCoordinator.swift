@@ -35,6 +35,17 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
     // Restoration State
     var hasRestoredInitialPosition = false
 
+    // MARK: - Page Sync / Progress Throttle
+    /// Set when a scroll-driven page-change notification updates the binding, so the
+    /// next `updateUIView` pass skips programmatic navigation. Without this, fast
+    /// scrolling races the binding update and PDFKit gets yanked back a page.
+    var suppressNextPageSync = false
+
+    /// Throttle reading-progress writes: scrolling fires `scrollViewDidScroll` on
+    /// every tick, which otherwise produces a Supabase write storm.
+    private var lastProgressReport: Date = .distantPast
+    private let progressReportInterval: TimeInterval = 0.75
+
     init(_ parent: PDFKitView) {
         self.parent = parent
     }
@@ -391,48 +402,44 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
 // MARK: - UIScrollViewDelegate
 extension PDFKitCoordinator: UIScrollViewDelegate {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        reportProgress()
+        reportProgressThrottled()
     }
-    
+
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        reportProgress()
+        reportProgressThrottled()
     }
-    
-    private func reportProgress() {
+
+    // Scroll/zoom durduğunda son konumu mutlaka yaz (throttle'ı atlayarak),
+    // böylece kullanıcının bıraktığı yer kaybolmaz.
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        emitProgress()
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if !decelerate { emitProgress() }
+    }
+
+    func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+        emitProgress()
+    }
+
+    /// Time-throttled progress emit for the continuous scroll/zoom stream.
+    private func reportProgressThrottled() {
+        let now = Date()
+        guard now.timeIntervalSince(lastProgressReport) >= progressReportInterval else { return }
+        emitProgress()
+    }
+
+    /// `currentDestination` is the robust "current reading position" on PDFView.
+    private func emitProgress() {
+        lastProgressReport = Date()
         guard let pdfView = pdfView, let document = pdfView.document else { return }
-        
-        // Get top-left point of the visible area
-        // Note: contentOffset is in the scrollView's coordinate space. 
-        // PDFView bounds might suffice if we use convert correctly.
-        
-        // Usually, the top-left of the visible content is at contentOffset.
-        // Let's use the layout details.
-        
-        // Get the page at the top-left corner
-        // Using bounds.origin might strictly be (0,0) if bounds tracks viewport?
-        // PDFView is weird. Let's use visiblePages first or page(for:point)
-        
-        // Actually, pdfView.bounds usually represents the visible rect in its own coordinate system.
-        // But let's rely on convert(point: to: page).
-        
-        let visibleOrigin = CGPoint.zero // Top-left of the VIEW
-        // Convert (0,0) in PDFView to Page Point.
-        // Wait, does PDFView coordinate system scroll?
-        // If it is inside a scrollView, the PDFView frame is huge.
-        // If PDFView IS the scrollview (or behaves like one), bounds.origin scrolls.
-        
-        // Safest: Use scrollView.contentOffset and assume it maps to subview?
-        // NO. CustomPDFView wraps PDFView? No, CustomPDFView inherits from PDFView.
-        
-        // Let's try `pdfView.currentDestination`. It IS robust for "current reading position".
-        
+
         if let destination = pdfView.currentDestination,
            let page = destination.page {
-            let point = destination.point // Point on page
+            let point = destination.point
             let pageIndex = document.index(for: page)
             let scale = pdfView.scaleFactor
-            
-            // Call onProgressChange
             parent.onProgressChange?(pageIndex + 1, point, scale)
         }
     }

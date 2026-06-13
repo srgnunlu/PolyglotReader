@@ -110,26 +110,29 @@ extension LibraryViewModel {
     
     /// PDF dokümanını RAG için indexle
     private func indexDocumentForRAG(metadata: PDFDocumentMetadata, pdfData: Data) async {
+        guard let fileId = UUID(uuidString: metadata.id) else {
+            logWarning("LibraryViewModel", "Geçersiz dosya ID'si - RAG indexing atlandı", details: metadata.id)
+            return
+        }
+
+        // Metin çıkarma CPU-yoğun (300+ sayfalık akademik PDF'lerde saniyeler sürebilir).
+        // Sayfa marker'ları dahil (RAGChunker sayfa numaralarını doğru parse etsin diye),
+        // main thread'i bloklamamak için off-main çalıştırıyoruz.
+        let extraction: (text: String, pageCount: Int) = await Task.detached(priority: .utility) {
+            guard let document = PDFDocument(data: pdfData) else { return ("", 0) }
+            return (PDFService.shared.extractText(from: document), document.pageCount)
+        }.value
+
+        guard !extraction.text.isEmpty else {
+            logWarning("LibraryViewModel", "PDF'den metin çıkarılamadı - RAG indexing için")
+            return
+        }
+
+        logInfo("LibraryViewModel", "RAG indexing başlatılıyor",
+                details: "\(extraction.pageCount) sayfa, ~\(extraction.text.count) karakter")
+
         do {
-            guard let document = PDFDocument(data: pdfData) else {
-                logWarning("LibraryViewModel", "PDF oluşturulamadı - RAG indexing için")
-                return
-            }
-
-            // PDFService kullanarak metni çıkar (sayfa marker'ları dahil)
-            // Bu sayede RAGChunker sayfa numaralarını doğru parse edebilir
-            let fullText = PDFService.shared.extractText(from: document)
-
-            guard !fullText.isEmpty else {
-                logWarning("LibraryViewModel", "PDF'den metin çıkarılamadı - RAG indexing için")
-                return
-            }
-
-            logInfo("LibraryViewModel", "RAG indexing başlatılıyor",
-                    details: "\(document.pageCount) sayfa, ~\(fullText.count) karakter")
-
-            try await RAGService.shared.indexDocument(text: fullText, fileId: UUID(uuidString: metadata.id)!)
-            
+            try await RAGService.shared.indexDocument(text: extraction.text, fileId: fileId)
             logInfo("LibraryViewModel", "RAG indexing tamamlandı", details: metadata.name)
         } catch {
             logError("LibraryViewModel", "RAG indexing hatası", error: error)

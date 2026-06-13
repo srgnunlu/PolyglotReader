@@ -4,8 +4,10 @@ import SwiftUI
 struct CompactActionButton: View {
     let icon: String
     var isActive: Bool = false
+    /// VoiceOver label. Without it the screen reader announces the raw SF Symbol name.
+    var accessibilityLabel: String?
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
@@ -25,7 +27,9 @@ struct CompactActionButton: View {
                             .fill(Color(.tertiarySystemBackground).opacity(0.6))
                     }
                 }
+                .contentShape(Circle())
         }
+        .accessibilityLabel(accessibilityLabel ?? "")
         .animation(.easeInOut(duration: 0.2), value: isActive)
     }
 }

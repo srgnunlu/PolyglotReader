@@ -56,6 +56,7 @@
 "auth.accessibility.apple_button.hint" = "Apple hesabınızla giriş yapmak için dokunun";
 "auth.accessibility.google_button" = "Google ile giriş yap";
 "auth.accessibility.google_button.hint" = "Google hesabınızla giriş yapmak için dokunun";
+"auth.accessibility.opens_in_browser" = "Tarayıcıda açar";
 
 /* ===========================================
    MARK: - Library Module
@@ -280,6 +281,11 @@
 /* Result */
 "quiz.complete.title" = "Quiz Tamamlandı!";
 "quiz.score_summary" = "%d sorudan %d tanesini doğru cevapladınız.";
+"quiz.retry" = "Tekrar Dene";
+"quiz.review.button" = "Cevapları İncele";
+"quiz.review.title" = "Cevap İncelemesi";
+"quiz.review.your_answer" = "Senin cevabın";
+"quiz.review.correct_answer" = "Doğru cevap";
 
 /* Accessibility */
 "quiz.accessibility.option" = "Seçenek %d";
@@ -306,6 +312,7 @@
 "notebook.empty.filtered.title" = "Sonuç Bulunamadı";
 "notebook.empty.filtered.subtitle" = "Farklı filtre seçenekleri deneyin";
 "notebook.clear_filters" = "Filtreleri Temizle";
+"notebook.empty.cta" = "Kütüphaneye Git";
 
 /* More Files */
 "notebook.more_files" = "+ %d dosya daha";
