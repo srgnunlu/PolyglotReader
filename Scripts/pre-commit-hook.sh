@@ -42,7 +42,7 @@ echo "Checking ${STAGED_SWIFT_FILES}"
 echo -e "${BLUE}🔧 Running autocorrect on staged files...${NC}"
 for FILE in ${STAGED_SWIFT_FILES}; do
     if [ -f "${FILE}" ]; then
-        "${SWIFTLINT_PATH}" --fix --path "${FILE}" > /dev/null 2>&1 || true
+        "${SWIFTLINT_PATH}" --fix "${FILE}" > /dev/null 2>&1 || true
         # Re-add the file if it was modified by autocorrect
         git add "${FILE}"
     fi
@@ -56,7 +56,7 @@ WARNING_COUNT=0
 
 for FILE in ${STAGED_SWIFT_FILES}; do
     if [ -f "${FILE}" ]; then
-        LINT_OUTPUT=$("${SWIFTLINT_PATH}" lint --path "${FILE}" 2>&1) || true
+        LINT_OUTPUT=$("${SWIFTLINT_PATH}" lint "${FILE}" 2>&1) || true
         
         FILE_ERRORS=$(echo "${LINT_OUTPUT}" | grep -c "error:" || echo "0")
         FILE_WARNINGS=$(echo "${LINT_OUTPUT}" | grep -c "warning:" || echo "0")
