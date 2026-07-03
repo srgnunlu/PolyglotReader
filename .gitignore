@@ -76,3 +76,6 @@ PolyglotReader/Config.plist
 /*.png
 /*.txt
 /web/*.txt
+
+## MCP config — contains the Supabase access token, must stay local
+.mcp.json
