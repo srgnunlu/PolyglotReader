@@ -27,11 +27,15 @@ xcodebuild -scheme PolyglotReader clean
 
 ```bash
 cd web
-npm install
-npm run dev    # Development server
-npm run build  # Production build
-npm run lint   # ESLint
+pnpm install
+pnpm dev        # Development server
+pnpm build      # Production build
+pnpm lint       # ESLint
+pnpm typecheck  # tsc --noEmit
+pnpm test       # Vitest
 ```
+
+Use pnpm only — npm/yarn are not used in this repo (`pnpm-lock.yaml` is the lockfile).
 
 ## Configuration
 
@@ -45,7 +49,7 @@ The app requires a `Config.plist` file with API keys. This file is gitignored an
     <key>GeminiAPIKey</key>
     <string>YOUR_GEMINI_API_KEY_HERE</string>
     <key>GeminiModelName</key>
-    <string>gemini-1.5-pro</string>
+    <string>gemini-3-flash-preview</string>
     <key>SupabaseURL</key>
     <string>YOUR_SUPABASE_PROJECT_URL</string>
     <key>SupabaseAnonKey</key>
@@ -56,7 +60,7 @@ The app requires a `Config.plist` file with API keys. This file is gitignored an
 
 Configuration is accessed via the `Config` enum in `Services/Config.swift`.
 
-The web app requires environment variables: `GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+The web app requires environment variables: `GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Optional: `GEMINI_MODEL` (defaults to `gemini-3-flash-preview`, see `web/src/lib/server/gemini.ts`).
 
 ## Architecture
 
@@ -80,14 +84,14 @@ PolyglotReader/
 │   └── Components/         # Shared UI components
 ├── ViewModels/             # Business logic and state management
 ├── Services/               # Backend integrations (modular sub-services)
-│   ├── Supabase/           # 15 files - auth, database, storage, files, annotations, RAG, tags/folders
-│   ├── Gemini/             # 4 files - chat, analysis, RAG operations
-│   ├── RAG/                # 6 files - chunker, embeddings, search, context builder
-│   ├── PDF/                # 8 files - text extraction, rendering, images, caching, metadata
+│   ├── Supabase/           # Auth, database, storage, files, annotations, RAG, tags/folders
+│   ├── Gemini/             # Chat, analysis, RAG operations
+│   ├── RAG/                # Chunker, embeddings, search, context builder
+│   ├── PDF/                # Text extraction, rendering, images, caching, metadata
 │   └── (core services)     # Config, Logging, Cache, Network, Security, Keychain, etc.
 ├── Extensions/             # View, String, Color, Image extensions
 ├── Debug/                  # Memory debugger (debug builds only)
-└── Resources/              # Localizable.strings (300+ Turkish strings)
+└── Resources/              # Localizable.strings (Turkish UI strings)
 ```
 
 ### App Entry Point
@@ -101,7 +105,7 @@ PolyglotReader/
 
 All services are singletons (`*.shared`) and `@MainActor`. They are organized into modular sub-files:
 
-**1. SupabaseService** (`Services/Supabase/` - 15 files)
+**1. SupabaseService** (`Services/Supabase/`)
 - `SupabaseService.swift` - Main facade
 - `SupabaseAuthService.swift` - Authentication (Apple, Google, OAuth)
 - `SupabaseDatabaseService.swift` - Database operations
@@ -111,14 +115,14 @@ All services are singletons (`*.shared`) and `@MainActor`. They are organized in
 - Extension files: `+Auth`, `+Files`, `+Chat`, `+Annotations`, `+RAG`, `+TagsFolders`, `+ImageMetadata`
 - `SupabaseConfig.swift`, `SupabaseTypes.swift`
 
-**2. GeminiService** (`Services/GeminiService.swift` + `Services/Gemini/` - 5 files)
+**2. GeminiService** (`Services/GeminiService.swift` + `Services/Gemini/`)
 - `GeminiService.swift` - Main facade, chat sessions, multimodal inputs
 - `GeminiChatService.swift` - Chat operations with conversation history
 - `GeminiAnalysisService.swift` - Translation, summarization, auto-tagging, quiz generation
 - `GeminiRAGService.swift` - RAG-specific operations with reranking
 - `GeminiConfig.swift` - Model configuration
 
-**3. RAGService** (`Services/RAGService.swift` + `Services/RAG/` - 7 files)
+**3. RAGService** (`Services/RAGService.swift` + `Services/RAG/`)
 - Professional hybrid search: Vector (cosine similarity) + BM25 (full-text) with RRF fusion
 - `RAGChunker.swift` - Text chunking with overlap (400 words/chunk, 100 word overlap)
 - `RAGEmbeddingService.swift` - Gemini `text-embedding-004` (768-dim vectors)
@@ -126,7 +130,7 @@ All services are singletons (`*.shared`) and `@MainActor`. They are organized in
 - `RAGContextBuilder.swift` - Context assembly for Gemini prompts
 - `RAGConfig.swift`, `RAGModels.swift`
 
-**4. PDFService** (`Services/PDFService.swift` + `Services/PDF/` - 9 files)
+**4. PDFService** (`Services/PDFService.swift` + `Services/PDF/`)
 - `PDFTextExtractor.swift` - Text extraction with page markers (`"--- Sayfa X ---"`)
 - `PDFPageRenderer.swift` - Page rendering with pre-rendering (1 page ahead/behind)
 - `PDFImageService.swift` - Image extraction from PDFs
@@ -147,21 +151,21 @@ All services are singletons (`*.shared`) and `@MainActor`. They are organized in
 - `NetworkMonitor.swift` - NWPathMonitor-based connectivity monitoring
 - `KeychainService.swift` - Secure keychain operations
 - `SecurityManager.swift` + `+Pinning`, `+Supabase` - Certificate pinning, ATS configuration
-- `KeepAliveService.swift` - Supabase free tier keep-alive pings
+- `KeepAliveService.swift` - Periodic Supabase keep-alive pings
 - `SmartSuggestionService.swift` - Context-aware chat suggestions
 - `SyncQueue.swift` - Offline operation queuing for later sync
 - `AppLocalization.swift` - Localization support
 - `ErrorRetryPolicy.swift` - Retry policies for different error scenarios
 
-### Models (5 files)
+### Models
 - `Models.swift` - Core types: `User`, `Folder`, `Tag`, `PDFDocumentMetadata`, `ChatMessage`, `Annotation`, `AnnotationWithFile`, `AnnotationStats`, `UserPreferences`
 - `AppError.swift` - App error types
 - `ChatSuggestion.swift` - Smart chat suggestion model
 - `PDFImageInfo.swift` / `PDFImageMetadata.swift` - PDF image data structures
 
-### ViewModels (18 files)
+### ViewModels
 - `AuthViewModel.swift` - Authentication state, OAuth flow
-- `LibraryViewModel.swift` + 7 extensions (`+Loading`, `+Upload`, `+FileAccess`, `+Deletion`, `+Folders`, `+Tags`, `+Sorting`, `+Thumbnails`, `+Summary`)
+- `LibraryViewModel.swift` + extensions (`+Loading`, `+Upload`, `+FileAccess`, `+Deletion`, `+Folders`, `+Tags`, `+Selection`, `+Sorting`, `+Thumbnails`, `+Summary`)
 - `PDFReaderViewModel.swift` - PDF reading state, page navigation, annotations
 - `ChatViewModel.swift` + `+ImageHandling`, `+Messaging` - AI chat with RAG
 - `QuizViewModel.swift` - AI quiz generation and management
@@ -210,9 +214,9 @@ All services are singletons (`*.shared`) and `@MainActor`. They are organized in
 .package(url: "https://github.com/google/generative-ai-swift.git", from: "0.5.6")
 ```
 
-**Web (npm):**
+**Web (pnpm):**
 - Next.js 16, React 19, TypeScript
-- `@supabase/supabase-js`, `@supabase/ssr`, `@supabase/auth-helpers-nextjs`
+- `@supabase/supabase-js`, `@supabase/ssr`
 - `@google/generative-ai` (server-side only)
 - `pdfjs-dist`, `react-pdf` for PDF rendering
 - `zustand` for state management
@@ -220,9 +224,9 @@ All services are singletons (`*.shared`) and `@MainActor`. They are organized in
 
 ## Web Application (`web/`)
 
-Companion Next.js app with the following structure:
+Companion Next.js app using the `src/` layout — all paths below are relative to `web/src/`:
 
-- `app/(auth)/` and `app/login/` - Authentication pages
+- `app/(auth)/` - Authentication pages
 - `app/auth/callback/` - OAuth callback handler
 - `app/(app)/library/` - PDF library browser
 - `app/(app)/reader/[id]/` - PDF reader with annotations
@@ -233,6 +237,8 @@ Companion Next.js app with the following structure:
 - `app/api/gemini/embed/` - Server-side embedding generation
 - `components/` - React components (PDFViewer, ChatPanel, AnnotationLayer, etc.)
 - `hooks/` - Custom hooks (useAuth, useDocuments, useFileUpload, usePDFRenderer, usePDFNavigation)
+- `lib/` - Client/server helpers (`lib/server/gemini.ts` holds the Gemini model config)
+- `stores/` - Zustand stores
 
 All Gemini API operations are server-side to protect API keys. Authentication is required for all API routes.
 
@@ -345,15 +351,7 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('user_files', 'user_files
 
 ### SQL Migrations
 
-Migration files are in the project root:
-- `folders_and_tags_migration.sql` - Folders, tags, file_tags tables and RLS
-- `create_reading_progress.sql` - Reading progress tracking
-- `professional_rag_migration.sql` - BM25 search, hybrid search, vector indexes
-- `fix_folder_tag_rls.sql` - RLS policy fixes
-- `fix_database_issues.sql` - General database fixes
-- `fix_rpc_permissions.sql` - RPC function permissions
-- `fix_log_issues.sql` - Logging-related fixes
-- `PolyglotReader/Services/rag_migration.sql` - Initial RAG migration
+Timestamped migration files live in `supabase/migrations/` and are applied with the Supabase CLI (`supabase db push`).
 
 All tables have RLS (Row Level Security) enabled with `auth.uid() = user_id` policies.
 
@@ -395,7 +393,7 @@ SwiftLint is configured via `.swiftlint.yml` (Airbnb Swift Style Guide based):
 - iOS 17.0+ / macOS 14.0+
 - Swift 5.9+
 - Xcode 15.0+
-- Web: Node.js 18+, Next.js 16
+- Web: Node.js 20.9+, Next.js 16
 
 ## Important Notes
 
