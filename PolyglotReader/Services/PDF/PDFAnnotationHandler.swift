@@ -66,41 +66,8 @@ class PDFAnnotationHandler {
     }
 
     private func applyUsingRects(_ annotation: Annotation, page: PDFPage, color: UIColor) -> Bool {
-        let pageBounds = page.bounds(for: .mediaBox)
-
-        // Step 1: Convert all rects to PDF coordinates
-        var convertedRects: [CGRect] = []
-        for annotationRect in annotation.rects {
-            var rect = CGRect(
-                x: annotationRect.x,
-                y: annotationRect.y,
-                width: annotationRect.width,
-                height: annotationRect.height
-            )
-
-            guard !rect.isNull && !rect.isInfinite && rect.width > 0 && rect.height > 0 else { continue }
-
-            // Detect web percentage coordinates (values typically 0-100)
-            // Web saves as percentage with top-left origin
-            // iOS PDFKit needs point coordinates with bottom-left origin
-            let isWebPercentage = rect.origin.x <= 100 &&
-                                  rect.origin.y <= 100 &&
-                                  rect.width <= 100 &&
-                                  rect.height <= 100
-
-            if isWebPercentage {
-                // Convert percentage (0-100) to PDF points
-                let pdfX = (rect.origin.x / 100) * pageBounds.width
-                let pdfWidth = (rect.width / 100) * pageBounds.width
-                let pdfHeight = (rect.height / 100) * pageBounds.height
-                // Flip Y axis: web top-left origin → PDF bottom-left origin
-                let pdfY = pageBounds.height - ((rect.origin.y + rect.height) / 100) * pageBounds.height
-
-                rect = CGRect(x: pdfX, y: pdfY, width: pdfWidth, height: pdfHeight)
-            }
-
-            convertedRects.append(rect)
-        }
+        // Step 1: Convert all stored rects to PDF page-space coordinates
+        let convertedRects = pageSpaceRects(for: annotation.rects, page: page)
 
         guard !convertedRects.isEmpty else { return false }
 
@@ -117,6 +84,43 @@ class PDFAnnotationHandler {
         }
 
         return true
+    }
+
+    /// Converts stored annotation rects into PDFKit page-space rects.
+    ///
+    /// Two storage formats coexist (distinguished by the <=100 heuristic,
+    /// kept for backward compatibility with existing rows):
+    /// - Canonical (web + new iOS): percentages 0-100 of the displayed page
+    ///   (cropBox with rotation applied), top-left origin. Inverted through
+    ///   AnnotationCoordinateConverter so cropBox offset and page rotation
+    ///   land the highlight exactly where it was made on either platform.
+    /// - Legacy iOS: raw PDFKit page-space points — used as-is so existing
+    ///   user annotations do not move.
+    private func pageSpaceRects(for annotationRects: [AnnotationRect], page: PDFPage) -> [CGRect] {
+        let converter = AnnotationCoordinateConverter(page: page)
+
+        var result: [CGRect] = []
+        for annotationRect in annotationRects {
+            let rect = CGRect(
+                x: annotationRect.x,
+                y: annotationRect.y,
+                width: annotationRect.width,
+                height: annotationRect.height
+            )
+
+            guard !rect.isNull && !rect.isInfinite && rect.width > 0 && rect.height > 0 else { continue }
+
+            if AnnotationCoordinateConverter.isCanonicalPercent(rect) {
+                // Converter only fails on a degenerate cropBox; skipping lets
+                // applySingleAnnotation fall back to text search.
+                if let pageRect = converter?.toPageSpace(canonicalPercent: rect) {
+                    result.append(pageRect)
+                }
+            } else {
+                result.append(rect)
+            }
+        }
+        return result
     }
 
     /// Aynı satırdaki overlapping rect'leri birleştirir

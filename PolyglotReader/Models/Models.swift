@@ -191,8 +191,20 @@ enum AnnotationType: String, Codable {
     case strikethrough
 }
 
+/// One annotation rectangle as stored in Supabase (`annotations.data.rects`).
+///
+/// Canonical format — all NEW annotations from both iOS and web:
+/// - Percentages (0-100) of the page as displayed, i.e. the cropBox with the
+///   page rotation applied (what pdf.js renders), top-left origin.
+///
+/// Legacy format — old iOS annotations (values typically > 100):
+/// - Raw PDFKit page-space points, bottom-left origin.
+///
+/// Read paths on both platforms distinguish the formats via the
+/// "all values <= 100 → percentage" heuristic; conversion math lives in
+/// `AnnotationCoordinateConverter`.
 struct AnnotationRect: Codable {
-    var x: CGFloat  // Percentage (0-100)
+    var x: CGFloat
     var y: CGFloat
     var width: CGFloat
     var height: CGFloat

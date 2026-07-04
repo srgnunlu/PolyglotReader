@@ -263,8 +263,8 @@ class PDFReaderViewModel: ObservableObject {
             return
         }
 
-        // Metin çıkar (from ISOLATED document)
-        let text = PDFService.shared.extractText(from: backgroundDoc)
+        // Metin çıkar (from ISOLATED document) — async path OCR's scanned pages
+        let text = await PDFService.shared.extractText(from: backgroundDoc)
 
         await MainActor.run {
             self.extractedText = text
@@ -493,17 +493,11 @@ class PDFReaderViewModel: ObservableObject {
         guard let text = selectedText,
               let page = selectionPage else { return }
 
-        // PDF koordinatlarını kullan (doğru pozisyonlama için)
+        // Store rects in the canonical cross-platform format (percentages of
+        // the displayed page, top-left origin) so web renders them identically.
         let annotationRects: [AnnotationRect]
         if let pdfRects = selectionPDFRects, !pdfRects.isEmpty {
-            annotationRects = pdfRects.map { rect in
-                AnnotationRect(
-                    x: rect.origin.x,
-                    y: rect.origin.y,
-                    width: rect.width,
-                    height: rect.height
-                )
-            }
+            annotationRects = canonicalAnnotationRects(from: pdfRects, pageNumber: page)
         } else {
             // Fallback: boş array - text search ile bulunacak
             annotationRects = []
@@ -539,6 +533,19 @@ class PDFReaderViewModel: ObservableObject {
         }
 
         clearSelection()
+    }
+
+    /// Converts PDFKit page-space selection rects to the canonical percentage
+    /// format shared with web (see AnnotationCoordinateConverter). Falls back
+    /// to raw page-space points — the legacy format every read path still
+    /// understands — if the page or its crop box is unavailable.
+    private func canonicalAnnotationRects(from pdfRects: [CGRect], pageNumber: Int) -> [AnnotationRect] {
+        let pdfPage = document?.page(at: pageNumber - 1)
+        if let rects = AnnotationCoordinateConverter.canonicalAnnotationRects(from: pdfRects, page: pdfPage) {
+            return rects
+        }
+        logWarning("PDFReaderVM", "Canonical rect conversion unavailable, storing legacy point rects")
+        return pdfRects.map { AnnotationRect(x: $0.minX, y: $0.minY, width: $0.width, height: $0.height) }
     }
 
     func annotationsForCurrentPage() -> [Annotation] {
