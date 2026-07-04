@@ -78,12 +78,13 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
     func reportSelectionImmediately() {
         guard let customPdfView = pdfView as? CustomPDFView,
               let selection = customPdfView.managedSelection ?? customPdfView.currentSelection,
-              var selectedText = selection.string,
-              !selectedText.isEmpty,
               let page = selection.pages.first,
               let document = customPdfView.document else { return }
 
-        selectedText = selectedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Rebuild the reported text in reading order (multi-column + hyphen-aware)
+        // instead of the raw `selection.string`. Rects below are untouched.
+        let selectedText = readingOrderText(for: selection, on: page)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard selectedText.count >= 2 else { return }
 
         lastSelectionTextForReport = selectedText

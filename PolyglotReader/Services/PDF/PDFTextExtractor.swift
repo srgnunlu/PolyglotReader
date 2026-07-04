@@ -72,35 +72,84 @@ class PDFTextExtractor {
 
             // Sayfa metnini çıkar ve işle
             if let rawText = page.string {
-                var processedText = rawText
-
-                // P2.2: Tablo yapısını koru
-                if options.preserveTableStructure {
-                    processedText = preserveTableStructure(in: processedText)
-                }
-
-                // P2.3: Metin normalleştirme
-                if options.normalizeWhitespace {
-                    processedText = normalizeWhitespace(in: processedText)
-                }
-
-                // P2.3: Tireleme düzeltme
-                if options.removeHyphenation {
-                    processedText = removeHyphenation(from: processedText)
-                }
-
-                // P2.2: Paragraf algılama
-                if options.detectParagraphs {
-                    processedText = detectAndMarkParagraphs(in: processedText)
-                }
-
-                fullText += processedText
+                fullText += processPageText(rawText, options: options)
             }
 
             fullText += "\n\n"
         }
 
         return fullText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// P3: Async extraction with OCR fallback for scanned pages.
+    ///
+    /// When a page has no embedded text layer (image-only/scanned), its text is
+    /// silently missing from the sync path — killing chat/RAG/search and the
+    /// select→translate feature on that page. Here we recover it via
+    /// `PDFOCRService` and emit it under the same page marker so downstream
+    /// consumers cover scanned pages too.
+    func extractText(from document: PDFDocument, options: PDFExtractionOptions) async -> String {
+        var fullText = ""
+        var ocrPageCount = 0
+
+        for pageIndex in 0..<document.pageCount {
+            guard let page = document.page(at: pageIndex) else { continue }
+
+            if options.includePageMarkers {
+                fullText += buildPageMarker(pageNumber: pageIndex + 1, totalPages: document.pageCount)
+            }
+
+            let rawText = page.string ?? ""
+            if rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                // Scanned page: fall back to OCR so this page is not lost.
+                if let ocrText = await PDFOCRService.shared.recognizeText(on: page) {
+                    fullText += processPageText(ocrText, options: options)
+                    ocrPageCount += 1
+                }
+            } else {
+                fullText += processPageText(rawText, options: options)
+            }
+
+            fullText += "\n\n"
+        }
+
+        if ocrPageCount > 0 {
+            // Privacy: log only page counts, never the recognized text itself.
+            logInfo(
+                "PDFTextExtractor",
+                "OCR ile \(ocrPageCount) sayfa kurtarıldı",
+                details: "Toplam sayfa: \(document.pageCount)"
+            )
+        }
+
+        return fullText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Shared per-page processing pipeline used by both sync and async paths.
+    private func processPageText(_ rawText: String, options: PDFExtractionOptions) -> String {
+        var processedText = rawText
+
+        // P2.2: Tablo yapısını koru
+        if options.preserveTableStructure {
+            processedText = preserveTableStructure(in: processedText)
+        }
+
+        // P2.3: Metin normalleştirme
+        if options.normalizeWhitespace {
+            processedText = normalizeWhitespace(in: processedText)
+        }
+
+        // P2.3: Tireleme düzeltme
+        if options.removeHyphenation {
+            processedText = removeHyphenation(from: processedText)
+        }
+
+        // P2.2: Paragraf algılama
+        if options.detectParagraphs {
+            processedText = detectAndMarkParagraphs(in: processedText)
+        }
+
+        return processedText
     }
 
     func extractText(from page: PDFPage) -> String {
