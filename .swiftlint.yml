@@ -15,10 +15,8 @@ excluded:
   - Package.swift
   - "*.generated.swift"
   # TECH-DEBT: Large view/utility files pending cleanup (Phase 2)
-  - PolyglotReader/Views/Reader/PDFReaderView.swift
   - PolyglotReader/Views/Chat/MarkdownView.swift
   - PolyglotReader/Services/LoggingService.swift
-  - PolyglotReader/Views/Reader/QuickTranslationPopup.swift
   - PolyglotReader/Views/Library/FlippablePDFCardView.swift
 
 # ============================================

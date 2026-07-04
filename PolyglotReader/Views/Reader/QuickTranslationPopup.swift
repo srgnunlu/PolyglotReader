@@ -4,16 +4,19 @@ import SwiftUI
 /// Liquid Glass tasarımlı, sürüklenebilir ve ölçeklenebilir
 struct QuickTranslationPopup: View {
     // MARK: - Session Memory (PDF oturumu boyunca hatırlanır)
-    /// PDF kapatılınca sıfırlanır, aynı oturumda hatırlanır
+    /// PDF kapatılınca sıfırlanır, aynı oturumda hatırlanır.
+    /// TECH-DEBT: static state is shared across popup instances. Safe today because
+    /// only one popup exists at a time and access is main-thread only; scoping it
+    /// per instance would require changing the frozen public API.
     private static var sessionScale: CGFloat = 1.0
+
     let selectedText: String
     let selectionRect: CGRect
     let context: String? // PDF özeti
     let onDismiss: () -> Void
 
     // MARK: - State
-    @State private var translatedText: String?
-    @State private var isLoading = true
+    @State private var translationPhase: TranslationPopupPhase = .loading
     @State private var isVisible = false
 
     // Drag (Sürükleme)
@@ -23,7 +26,6 @@ struct QuickTranslationPopup: View {
 
     // Scale (Büyütme/Küçültme)
     @State private var scale: CGFloat = QuickTranslationPopup.sessionScale
-
     @State private var lastScale: CGFloat = QuickTranslationPopup.sessionScale
 
     // Translation Task Management
@@ -34,39 +36,25 @@ struct QuickTranslationPopup: View {
     private let maxScale: CGFloat = 2.0
     private let cornerRadius: CGFloat = 24
 
-    // Orientation-based dimensions
-    private var baseContentHeight: CGFloat {
-        isLandscape ? 120 : 180
-    }
-
-    private var popupWidth: CGFloat {
-        let screenWidth = UIScreen.main.bounds.width
-        let screenHeight = UIScreen.main.bounds.height
-
-        if isLandscape {
-            // Yatay modda ekranın %70'i, max 600
-            return min(max(screenWidth, screenHeight) * 0.7, 600)
-        } else {
-            // Dikey modda ekranın genişliği - 40, max 340
-            return min(min(screenWidth, screenHeight) - 40, 340)
-        }
-    }
-
-    private var isLandscape: Bool {
-        UIScreen.main.bounds.width > UIScreen.main.bounds.height
-    }
-
     var body: some View {
-        ZStack {
-            // Popup içeriği
-            popupContent
+        GeometryReader { geometry in
+            // selectionRect arrives in screen coordinates; convert it to this
+            // container's local space so clamping respects the safe area.
+            let containerGlobal = geometry.frame(in: .global)
+            let layout = TranslationPopupLayoutContext(
+                containerSize: geometry.size,
+                selectionRect: selectionRect.offsetBy(
+                    dx: -containerGlobal.minX,
+                    dy: -containerGlobal.minY
+                ),
+                scale: scale
+            )
+
+            popupContent(layout: layout)
                 .scaleEffect(scale)
                 .offset(offset)
-                .gesture(combinedGestures)
-                .position(
-                    x: selectionRect.midX,
-                    y: selectionRect.maxY + 80
-                )
+                .gesture(combinedGestures(layout: layout))
+                .position(layout.basePosition)
                 .opacity(isVisible ? 1 : 0)
                 .offset(y: isVisible ? 0 : -20)
         }
@@ -88,203 +76,46 @@ struct QuickTranslationPopup: View {
     }
 
     // MARK: - Popup Content
-    private var popupContent: some View {
-        VStack(spacing: 0) {
-            // Drag Handle
-            dragHandle
 
-            // İçerik Alanı - doğrudan çeviri
-            contentArea
+    private func popupContent(layout: TranslationPopupLayoutContext) -> some View {
+        VStack(spacing: 0) {
+            TranslationPopupDragHandle()
+            TranslationPopupContentArea(phase: translationPhase, maxHeight: layout.contentMaxHeight)
         }
-        .frame(width: popupWidth)
-        .background { liquidGlassBackground }
+        .frame(width: layout.popupWidth)
+        .background { TranslationPopupBackground(cornerRadius: cornerRadius) }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
         .shadow(color: .indigo.opacity(0.1), radius: 40, x: 0, y: 20)
     }
 
-    // MARK: - Drag Handle
-    private var dragHandle: some View {
-        VStack(spacing: 0) {
-            // Ana tutamacı - daha görünür tasarım
-            ZStack {
-                // Arka plan pill şekli
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(.systemGray3),
-                                Color(.systemGray4)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 48, height: 6)
-
-                // Üst parlama
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [.white.opacity(0.8), .clear],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 46, height: 3)
-                    .offset(y: -0.5)
-
-                // Kenar çizgisi
-                Capsule()
-                    .stroke(
-                        LinearGradient(
-                            colors: [.white.opacity(0.5), Color(.systemGray2)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 0.5
-                    )
-                    .frame(width: 48, height: 6)
-            }
-            .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
-        }
-        .frame(height: 28)
-        .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
-    }
-
-    // MARK: - Content Area
-    private var contentArea: some View {
-        Group {
-            if isLoading {
-                loadingView
-            } else if let translated = translatedText {
-                translatedContentView(translated)
-            } else {
-                errorView
-            }
-        }
-        .frame(maxHeight: baseContentHeight * scale)
-    }
-
-    // MARK: - Loading View
-    private var loadingView: some View {
-        HStack(spacing: 12) {
-            ProgressView()
-                .scaleEffect(0.9)
-                .tint(.indigo)
-
-            Text("Çevriliyor...")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
-    }
-
-    // MARK: - Translated Content View
-    private func translatedContentView(_ text: String) -> some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            Text(text)
-                .font(.system(size: 16, weight: .regular, design: .rounded))
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.leading)
-                .lineSpacing(4)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .scrollIndicators(.visible)
-    }
-
-    // MARK: - Error View
-    private var errorView: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.title2)
-                .foregroundStyle(.orange)
-
-            Text("Çeviri yapılamadı")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
-    }
-
-    // MARK: - Liquid Glass Background
-    private var liquidGlassBackground: some View {
-        ZStack {
-            // Ana blur katmanı
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(.ultraThinMaterial)
-
-            // Gradient overlay - üst parlama
-            LinearGradient(
-                colors: [
-                    .white.opacity(0.35),
-                    .white.opacity(0.1),
-                    .clear
-                ],
-                startPoint: .top,
-                endPoint: .center
-            )
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-
-            // Renkli cam efekti
-            RadialGradient(
-                colors: [
-                    .indigo.opacity(0.08),
-                    .purple.opacity(0.05),
-                    .clear
-                ],
-                center: .topLeading,
-                startRadius: 0,
-                endRadius: 200
-            )
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-
-            // İç glow
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            .white.opacity(0.7),
-                            .white.opacity(0.3),
-                            .white.opacity(0.1),
-                            .white.opacity(0.3)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.5
-                )
-
-            // Dış ince kenar
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(.white.opacity(0.2), lineWidth: 0.5)
-                .blur(radius: 0.5)
-        }
-    }
-
     // MARK: - Gestures
-    private var combinedGestures: some Gesture {
+
+    private func combinedGestures(layout: TranslationPopupLayoutContext) -> some Gesture {
         // Drag ve magnification'u aynı anda tanı ama öncelik magnification'da
-        magnificationGesture
-            .simultaneously(with: dragGesture)
+        magnificationGesture(layout: layout)
+            .simultaneously(with: dragGesture(layout: layout))
     }
 
-    private var dragGesture: some Gesture {
+    private func dragGesture(layout: TranslationPopupLayoutContext) -> some Gesture {
         DragGesture()
             .updating($isDragging) { _, state, _ in
                 state = true
             }
             .onChanged { value in
+                let proposed = CGSize(
+                    width: lastOffset.width + value.translation.width,
+                    height: lastOffset.height + value.translation.height
+                )
+                // Clamp so the popup can never be dragged off-screen.
+                let clamped = TranslationPopupLayout.clampedOffset(
+                    proposed,
+                    base: layout.basePosition,
+                    popupSize: layout.scaledSize,
+                    container: layout.container
+                )
                 withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.8)) {
-                    offset = CGSize(
-                        width: lastOffset.width + value.translation.width,
-                        height: lastOffset.height + value.translation.height
-                    )
+                    offset = clamped
                 }
             }
             .onEnded { _ in
@@ -292,39 +123,39 @@ struct QuickTranslationPopup: View {
             }
     }
 
-    private var magnificationGesture: some Gesture {
+    private func magnificationGesture(layout: TranslationPopupLayoutContext) -> some Gesture {
         MagnificationGesture(minimumScaleDelta: 0.005) // Daha hassas algılama
             .onChanged { value in
-                // Daha hassas ve akıcı ölçekleme
-                let sensitivity: CGFloat = 1.0 // 1.0 = normal, >1 = daha hassas
-                let delta = (value - 1.0) * sensitivity
-                let newScale = lastScale + delta
-
-                // Sınırlar içinde tut
+                let newScale = lastScale + (value - 1.0)
                 let clampedScale = min(max(newScale, minScale), maxScale)
 
-                // Akıcı animasyon
                 withAnimation(.interactiveSpring(response: 0.1, dampingFraction: 0.85)) {
                     scale = clampedScale
                 }
             }
             .onEnded { value in
-                // Final değeri hesapla
-                let sensitivity: CGFloat = 1.0
-                let delta = (value - 1.0) * sensitivity
-                var finalScale = lastScale + delta
+                var finalScale = lastScale + (value - 1.0)
 
                 // Minimum snap
                 if finalScale < 0.7 {
                     finalScale = 0.7
                 }
-
-                // Sınırla
                 finalScale = min(max(finalScale, minScale), maxScale)
+
+                // Re-clamp the offset for the new size so zooming can't push it off-screen.
+                let rescaled = layout.rescaled(to: finalScale)
+                let clampedOffset = TranslationPopupLayout.clampedOffset(
+                    offset,
+                    base: rescaled.basePosition,
+                    popupSize: rescaled.scaledSize,
+                    container: rescaled.container
+                )
 
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
                     scale = finalScale
                     lastScale = finalScale
+                    offset = clampedOffset
+                    lastOffset = clampedOffset
                     // Session memory'ı güncelle
                     QuickTranslationPopup.sessionScale = finalScale
                 }
@@ -338,6 +169,7 @@ struct QuickTranslationPopup: View {
     }
 
     // MARK: - Actions
+
     private func dismiss() {
         withAnimation(.easeOut(duration: 0.2)) {
             isVisible = false
@@ -368,27 +200,23 @@ struct QuickTranslationPopup: View {
         // Eğer metin çok kısaysa çevirme
         guard selectedText.count > 1 else { return }
 
-        // UI güncellemesi
         await MainActor.run {
-            isLoading = true
+            translationPhase = .loading
         }
 
         do {
             let result = try await GeminiService.shared.translateText(selectedText, context: context)
 
             if !Task.isCancelled {
-                // Sonuç geldiğinde göster
                 await MainActor.run {
-                    translatedText = result.translated
-                    isLoading = false
+                    translationPhase = .translated(result.translated)
                     logInfo("QuickTranslation", "Çeviri tamamlandı")
                 }
             }
         } catch {
             if !Task.isCancelled {
                 await MainActor.run {
-                    translatedText = nil
-                    isLoading = false
+                    translationPhase = .failed
                     logError("QuickTranslation", "Çeviri hatası", error: error)
                 }
             }
@@ -409,7 +237,7 @@ struct QuickTranslationPopup: View {
 
         // Örnek metin
         VStack {
-            Text("Bu bir örnek metin paragrafıdır.")
+            Text("Bu bir örnek paragraf.")
                 .padding()
                 .background(.white)
                 .cornerRadius(8)
@@ -419,9 +247,10 @@ struct QuickTranslationPopup: View {
         .padding(.top, 100)
 
         QuickTranslationPopup(
-            selectedText: "The integration of artificial intelligence (AI) in dermatology presents a promising frontier for enhancing diagnostic accuracy and treatment planning.",
+            selectedText: "The integration of artificial intelligence (AI) in dermatology presents"
+                + " a promising frontier for enhancing diagnostic accuracy and treatment planning.",
             selectionRect: CGRect(x: 200, y: 150, width: 100, height: 20),
             context: "Dermatolojide yapay zeka kullanımı ve tanı doğruluğu üzerine akademik bir çalışma."
-        )            {}
+        ) {}
     }
 }
