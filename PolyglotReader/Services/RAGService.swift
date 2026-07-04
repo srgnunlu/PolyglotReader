@@ -340,6 +340,10 @@ class RAGService: ObservableObject {
             let shouldRerank = enableRerank ?? RAGConfig.enableDefaultReranking
             let shouldExpandQuery = enableQueryExpansion ?? shouldAutoExpandQuery(query)
 
+            // Deliberately sequential: expansion consumes the translated query,
+            // search consumes the final query, rerank consumes search results.
+            // Independent work (image-caption search) is parallelized by the
+            // caller (ChatViewModel) instead.
             let searchQuery = await resolveSearchQuery(query, enableQueryExpansion: shouldExpandQuery)
 
             var scoredChunks = try await searchService.hybridSearch(
@@ -448,11 +452,9 @@ class RAGService: ObservableObject {
     private func expandQueryIfNeeded(_ query: String, originalQuery: String) async -> String {
         do {
             let expanded = try await GeminiService.shared.expandQuery(query)
-
-            if let hydeAnswer = expanded.hypotheticalAnswer {
-                _ = try await embeddingService.getOrCreateEmbedding(for: hydeAnswer)
-                logDebug("RAGService", "HyDE embedding oluşturuldu (Kullanım dışı)")
-            }
+            // NOTE: The HyDE hypothetical-answer embedding was removed here: its
+            // result was never consumed, yet it added a serial embedding API
+            // call to every expanded query (first-message latency).
 
             logDebug(
                 "RAGService",
@@ -472,7 +474,29 @@ class RAGService: ObservableObject {
         query: String,
         enableRerank: Bool
     ) async -> [ScoredChunk] {
-        guard enableRerank, chunks.count > RAGConfig.rerankTopK else { return chunks }
+        guard enableRerank else { return chunks }
+
+        // Skip the extra Gemini call when it cannot change the outcome:
+        // with <= rerankTopK candidates, every chunk already enters the context.
+        guard chunks.count > RAGConfig.rerankTopK else {
+            logInfo(
+                "RAGService",
+                "Rerank atlandı",
+                details: "Aday sayısı (\(chunks.count)) <= rerankTopK (\(RAGConfig.rerankTopK))"
+            )
+            return chunks
+        }
+
+        // A thin candidate pool means hybrid search found little to reorder;
+        // the rerank call would add ~1-2s latency for marginal gain.
+        guard chunks.count >= RAGConfig.rerankMinCandidates else {
+            logInfo(
+                "RAGService",
+                "Rerank atlandı",
+                details: "Aday sayısı (\(chunks.count)) < minimum (\(RAGConfig.rerankMinCandidates))"
+            )
+            return chunks
+        }
 
         do {
             return try await rerankChunksHelper(chunks, query: query)

@@ -70,4 +70,32 @@ extension PDFKitCoordinator {
             removeEditMenuInteractions(from: subview)
         }
     }
+
+    // MARK: - Reading-Order Selection Text
+
+    /// Rebuilds selection text in reading order from per-line selections.
+    /// Raw `selection.string` on multi-column academic PDFs yields wrong-order
+    /// text and passes hyphenated line breaks through; this clusters lines into
+    /// columns (left-to-right) and orders them top-to-bottom with hyphen merge.
+    /// Falls back to the raw string if per-line data is missing or the rebuild
+    /// comes out empty, so behavior never regresses on single-column text.
+    func readingOrderText(for selection: PDFSelection, on page: PDFPage) -> String {
+        let raw = selection.string ?? ""
+        let pageBounds = page.bounds(for: .mediaBox)
+        guard pageBounds.width > 0, pageBounds.height > 0 else { return raw }
+
+        let lines: [OCRTextLine] = selection.selectionsByLine().compactMap { lineSelection in
+            guard let text = lineSelection.string, !text.isEmpty else { return nil }
+            let bounds = lineSelection.bounds(for: page)
+            guard !bounds.isNull, !bounds.isInfinite else { return nil }
+            // Normalize to 0...1; PDF y-origin is bottom-left so higher midY = higher on page.
+            let midX = Double((bounds.midX - pageBounds.minX) / pageBounds.width)
+            let top = Double((bounds.midY - pageBounds.minY) / pageBounds.height)
+            return OCRTextLine(text: text, midX: midX, top: top)
+        }
+
+        guard !lines.isEmpty else { return raw }
+        let assembled = OCRTextAssembler.assemble(lines)
+        return assembled.isEmpty ? raw : assembled
+    }
 }

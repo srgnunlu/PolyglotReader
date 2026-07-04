@@ -40,15 +40,17 @@
     opacity: 0.8;
 }
 
+/* Position (incl. horizontal centering) is fully computed in JS now, so the
+   entry animation must not translate on X — it would fight the clamped left. */
 @keyframes popupIn {
     from {
         opacity: 0;
-        transform: translateX(-50%) translateY(-10px) scale(0.95);
+        transform: translateY(-10px) scale(0.95);
     }
 
     to {
         opacity: 1;
-        transform: translateX(-50%) translateY(0) scale(1);
+        transform: translateY(0) scale(1);
     }
 }
 

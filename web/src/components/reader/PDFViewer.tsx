@@ -10,7 +10,8 @@ import { DocumentOutline } from './DocumentOutline';
 import { DocumentSearchPanel } from './DocumentSearchPanel';
 import { CitationDialog } from './CitationDialog';
 import { QuizDialog } from './QuizDialog';
-import { usePDFRenderer } from '@/hooks/usePDFRenderer';
+import { OCRPanel } from './OCRPanel';
+import { usePDFRenderer, usePinchZoom, MIN_SCALE, MAX_SCALE, DEFAULT_SCALE } from '@/hooks/usePDFRenderer';
 import { usePDFNavigation } from '@/hooks/usePDFNavigation';
 import { useTextSelection } from '@/hooks/useTextSelection';
 import { usePDFImageSelection } from '@/hooks/usePDFImageSelection';
@@ -188,9 +189,12 @@ export function PDFViewer({
         onImageSelect,
     });
 
-    const zoomIn = () => handleZoom(Math.min(displayScale + 0.2, 3), containerRef.current);
-    const zoomOut = () => handleZoom(Math.max(displayScale - 0.2, 0.5), containerRef.current);
-    const resetZoom = () => handleZoom(1.2, containerRef.current);
+    // Trackpad (ctrl+wheel) and touch two-finger pinch zoom on the container
+    usePinchZoom({ containerRef, displayScale, handleZoom });
+
+    const zoomIn = () => handleZoom(Math.min(displayScale + 0.2, MAX_SCALE), containerRef.current);
+    const zoomOut = () => handleZoom(Math.max(displayScale - 0.2, MIN_SCALE), containerRef.current);
+    const resetZoom = () => handleZoom(DEFAULT_SCALE, containerRef.current);
 
     // Render persistent highlight
     const renderPersistentHighlight = (pageNum: number) => {
@@ -337,7 +341,10 @@ export function PDFViewer({
                                             <Page
                                                 pageNumber={pageNum}
                                                 scale={renderScale}
-                                                renderTextLayer={!isZooming}
+                                                // Text layer stays mounted during zoom so an active
+                                                // selection survives pinch/zoom; it lives inside the
+                                                // CSS-transformed wrapper and scales with the canvas.
+                                                renderTextLayer={true}
                                                 renderAnnotationLayer={!isZooming}
                                                 onLoadSuccess={handlePageLoadSuccess}
                                             />
@@ -361,6 +368,13 @@ export function PDFViewer({
                     })}
                 </Document>
                 </div>
+                {/* OCR affordance for scanned pages (floating button + side panel) */}
+                <OCRPanel
+                    pdf={pdfDocument}
+                    currentPage={currentPage}
+                    containerRef={containerRef}
+                    documentKey={storagePath ?? pdfUrl}
+                />
             </div>
 
             <CitationDialog
@@ -389,6 +403,8 @@ export function PDFViewer({
           flex: 1;
           min-height: 0;
           overflow: hidden;
+          /* Anchor for the floating OCR button (absolute, non-scrolling) */
+          position: relative;
         }
 
         .pdf-container {
@@ -397,6 +413,9 @@ export function PDFViewer({
           overflow: auto;
           padding: 24px;
           position: relative;
+          /* Allow scroll panning but keep two-finger pinch for our own
+             pointer-event zoom instead of the browser's page zoom */
+          touch-action: pan-x pan-y;
         }
 
         .pdf-page {

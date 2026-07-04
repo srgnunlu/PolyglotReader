@@ -120,7 +120,8 @@ extension LibraryViewModel {
         // main thread'i bloklamamak için off-main çalıştırıyoruz.
         let extraction: (text: String, pageCount: Int) = await Task.detached(priority: .utility) {
             guard let document = PDFDocument(data: pdfData) else { return ("", 0) }
-            return (PDFService.shared.extractText(from: document), document.pageCount)
+            // Async path includes OCR fallback so scanned pages get indexed too.
+            return (await PDFService.shared.extractText(from: document), document.pageCount)
         }.value
 
         guard !extraction.text.isEmpty else {

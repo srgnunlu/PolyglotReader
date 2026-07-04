@@ -9,6 +9,10 @@ enum GeminiConfig {
     static let maxRetries = 3
     static let retryDelay: TimeInterval = 1.0
     static let maxRetryDelay: TimeInterval = 8.0
+    /// Rough cap on the chat-session history sent with each turn. Without it,
+    /// long sessions grow token usage without bound and can hit model limits.
+    /// Estimated with the same wordCount * tokenMultiplier idiom as RAGConfig.
+    static let maxHistoryTokens = 20_000
     private static let systemInstructionText = """
     Sen uzman düzeyinde bir akademik PDF doküman analizcisisin.
     Metni, tabloları, grafikleri ve görselleri derinlemesine analiz edebilirsin.

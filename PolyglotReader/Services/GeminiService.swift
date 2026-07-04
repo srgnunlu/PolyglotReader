@@ -104,27 +104,7 @@ class GeminiService: ObservableObject {
         lastError = nil
 
         let stream = chatService.sendMessageStream(message, fileId: fileId)
-
-        // Wrap stream to handle isProcessing state completion?
-        // It's tricky with async stream return.
-        // We can just return the stream and let caller handle.
-        // But we want to set isProcessing = false when done.
-
-        return AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    for try await chunk in stream {
-                        continuation.yield(chunk)
-                    }
-                    continuation.finish()
-                    self.isProcessing = false
-                } catch {
-                    let appError = handleGeminiFailure(error)
-                    continuation.finish(throwing: appError)
-                    self.isProcessing = false
-                }
-            }
-        }
+        return wrapStream(stream)
     }
 
     func sendMessageStreamWithContext(
@@ -136,9 +116,15 @@ class GeminiService: ObservableObject {
         lastError = nil
 
         let stream = chatService.sendMessageStreamWithContext(message, context: context, fileId: fileId)
+        return wrapStream(stream)
+    }
 
-        return AsyncThrowingStream { continuation in
-            Task {
+    /// Re-emits a chat stream while mapping failures to AppError and keeping
+    /// `isProcessing` accurate. Consumer cancellation is forwarded to the
+    /// underlying stream so the network request is torn down promptly.
+    private func wrapStream(_ stream: AsyncThrowingStream<String, Error>) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
                 do {
                     for try await chunk in stream {
                         continuation.yield(chunk)
@@ -146,11 +132,12 @@ class GeminiService: ObservableObject {
                     continuation.finish()
                     self.isProcessing = false
                 } catch {
-                    let appError = handleGeminiFailure(error)
+                    let appError = self.handleGeminiFailure(error)
                     continuation.finish(throwing: appError)
                     self.isProcessing = false
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 

@@ -115,6 +115,24 @@ export async function translateText(
     return generateViaApi(prompt);
 }
 
+// OCR for scanned pages: sends a rendered page image (data URL) to the
+// server-side OCR route and returns the recognized text.
+export async function recognizePageText(imageDataUrl: string): Promise<string> {
+    const response = await fetch('/api/gemini/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageDataUrl }),
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || `OCR request failed (${response.status})`);
+    }
+
+    const data = await response.json();
+    return data.text;
+}
+
 /**
  * Sorgunun İngilizce'ye çevrilmesi gerekip gerekmediğini akıllıca belirler.
  * Yapısal referansları (Tablo, Şekil, Bölüm + rakamlar) korur.

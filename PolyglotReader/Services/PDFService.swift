@@ -73,6 +73,12 @@ class PDFService {
         textExtractor.extractText(from: document)
     }
 
+    /// Async variant with OCR fallback: scanned (image-only) pages are recovered
+    /// via Vision so chat/RAG/search also cover them.
+    func extractText(from document: PDFDocument) async -> String {
+        await textExtractor.extractText(from: document, options: .default)
+    }
+
     func extractText(from page: PDFPage) -> String {
         textExtractor.extractText(from: page)
     }

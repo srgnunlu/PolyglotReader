@@ -5,7 +5,6 @@
 - SwiftLint kurallarına uy (Airbnb Swift Style Guide bazlı)
 - Tüm public API'lerde documentation comments zorunlu
 - Force unwrap (!) yasak - guard let veya nil coalescing kullan
-- implicitlyUnwrappedOptional sadece @IBOutlet'lerde izinli
 
 ## Architecture Rules
 - MVVM pattern'den sapma yok
@@ -13,13 +12,6 @@
 - Tüm network çağrıları Service katmanından geçer
 - @MainActor tüm ViewModel'lerde zorunlu
 - Singleton service'ler thread-safe olmalı
-
-## Naming Conventions
-- **Types/Classes**: PascalCase (AuthViewModel, PDFService)
-- **Functions/Variables**: camelCase (loadDocument, currentUser)
-- **Files**: TypeName.swift (PascalCase)
-- **Constants**: camelCase veya SCREAMING_SNAKE_CASE for globals
-- **Protocols**: -able, -ible, -ing suffix (Loadable, Cacheable)
 
 ## Forbidden Practices
 - ❌ Force unwrapping (!) - crash riski
@@ -42,7 +34,6 @@
 - API keys only in Config.plist (gitignored)
 - Keychain for sensitive user data
 - Certificate pinning for API calls
-- Biometric authentication option
 - Secure session token storage
 
 ## Performance Requirements
@@ -55,7 +46,6 @@
 ## Testing Requirements
 - Unit tests for all Service methods
 - UI tests for critical user flows
-- Minimum 60% code coverage target
 - Mock all external dependencies in tests
 
 ## Accessibility Requirements
@@ -66,7 +56,6 @@
 
 ## Documentation Requirements
 - README.md güncel tutulmalı
-- CHANGELOG.md her release için
 - Inline documentation for complex logic
 - API documentation for all public interfaces
 

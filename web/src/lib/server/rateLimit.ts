@@ -121,3 +121,6 @@ export function enforceRateLimit(
 export const AI_GENERATE_LIMIT: RateLimitConfig = { limit: 30, windowMs: 60_000 };
 export const AI_STREAM_LIMIT: RateLimitConfig = { limit: 30, windowMs: 60_000 };
 export const AI_EMBED_LIMIT: RateLimitConfig = { limit: 60, windowMs: 60_000 };
+// OCR sends full-page images to Gemini — far heavier per request than text
+// prompts, and results are cached client-side, so keep this conservative.
+export const AI_OCR_LIMIT: RateLimitConfig = { limit: 10, windowMs: 60_000 };

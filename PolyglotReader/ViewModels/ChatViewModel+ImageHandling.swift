@@ -13,6 +13,9 @@ extension ChatViewModel {
             return
         }
 
+        // An image question supersedes any response still streaming in.
+        cancelActiveStream()
+
         clearImageInput(after: text)
         appendImageUserMessage(textToSend)
         isLoading = true

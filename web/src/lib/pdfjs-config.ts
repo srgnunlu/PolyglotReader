@@ -24,54 +24,50 @@ if (typeof window !== 'undefined' && !isInitialized) {
     // unreachable, and the version always matches the installed package.
     pdfjs.GlobalWorkerOptions.workerSrc = SELF_HOSTED_WORKER_SRC;
 
-    // Store original console.error to filter PDF.js worker termination errors
-    const originalConsoleError = console.error;
-    console.error = (...args: unknown[]) => {
-        // Filter out worker termination errors
-        const message = args[0]?.toString() || '';
-        if (
-            message.includes('Worker was terminated') ||
-            message.includes('ensureNotTerminated') ||
-            message.includes('pdf.worker.min.mjs')
-        ) {
-            // Silently ignore these errors in development
-            if (process.env.NODE_ENV === 'development') {
+    // "Worker was terminated" noise only happens when Fast Refresh tears down
+    // the worker mid-flight, so the suppression is development-only: in
+    // production a terminated worker is a real failure that must surface.
+    if (process.env.NODE_ENV === 'development') {
+        // Store original console.error to filter PDF.js worker termination errors
+        const originalConsoleError = console.error;
+        console.error = (...args: unknown[]) => {
+            const message = args[0]?.toString() || '';
+            if (
+                message.includes('Worker was terminated') ||
+                message.includes('ensureNotTerminated') ||
+                message.includes('pdf.worker.min.mjs')
+            ) {
                 return;
             }
-        }
-        // Call original console.error for other errors
-        originalConsoleError.apply(console, args);
-    };
+            // Call original console.error for other errors
+            originalConsoleError.apply(console, args);
+        };
 
-    // Suppress unhandled promise rejections from worker termination during Fast Refresh
-    // These are expected during HMR and don't affect functionality
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-        const reason = event.reason;
-        if (
-            reason &&
-            typeof reason === 'object' &&
-            'message' in reason &&
-            typeof reason.message === 'string' &&
-            (reason.message.includes('Worker was terminated') ||
-                reason.message.includes('ensureNotTerminated') ||
-                reason.message.includes('pdf.worker'))
-        ) {
-            // Prevent the error from showing in console
-            event.preventDefault();
-            // Optionally log to a custom error handler
-            if (process.env.NODE_ENV !== 'development') {
-                console.log('[PDF.js] Worker termination (expected during navigation/HMR)');
+        // Suppress unhandled promise rejections from worker termination during
+        // Fast Refresh — expected during HMR and don't affect functionality
+        const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+            const reason = event.reason;
+            if (
+                reason &&
+                typeof reason === 'object' &&
+                'message' in reason &&
+                typeof reason.message === 'string' &&
+                (reason.message.includes('Worker was terminated') ||
+                    reason.message.includes('ensureNotTerminated') ||
+                    reason.message.includes('pdf.worker'))
+            ) {
+                event.preventDefault();
             }
-        }
-    };
+        };
 
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+        window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
-    // Cleanup on page unload
-    window.addEventListener('beforeunload', () => {
-        // Restore original console.error
-        console.error = originalConsoleError;
-    });
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            // Restore original console.error
+            console.error = originalConsoleError;
+        });
+    }
 }
 
 // Export worker source for direct use if needed

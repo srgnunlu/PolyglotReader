@@ -81,6 +81,53 @@ class GeminiChatService {
         return chat
     }
 
+    // MARK: - History Budgeting
+
+    /// Word-count based token estimate (same idiom as RAGConfig.tokenMultiplier).
+    static func estimatedTokens(of content: ModelContent) -> Int {
+        let words = content.parts.reduce(0) { count, part in
+            if case .text(let text) = part {
+                return count + text.split(separator: " ").count
+            }
+            return count
+        }
+        return Int(Float(words) * RAGConfig.tokenMultiplier)
+    }
+
+    /// Returns history trimmed to roughly `maxTokens` by dropping the oldest
+    /// user/model turn pairs. The initial context pair (created in
+    /// `initChatSession`) is always preserved, and pairs are removed whole so
+    /// the alternating role structure the SDK expects is never broken.
+    static func trimmedHistory(_ history: [ModelContent], maxTokens: Int) -> [ModelContent] {
+        let preservedCount = 2 // Initial context user/model pair at the start.
+        // Always keep the preserved pair plus at least the most recent pair.
+        guard history.count > preservedCount + 2 else { return history }
+
+        var totalTokens = history.reduce(0) { $0 + estimatedTokens(of: $1) }
+        guard totalTokens > maxTokens else { return history }
+
+        var trimmed = history
+        while totalTokens > maxTokens, trimmed.count > preservedCount + 2 {
+            let pairRange = preservedCount...(preservedCount + 1)
+            totalTokens -= trimmed[pairRange].reduce(0) { $0 + Self.estimatedTokens(of: $1) }
+            trimmed.removeSubrange(pairRange)
+        }
+        return trimmed
+    }
+
+    /// Applies the history budget to a live session before sending a new turn.
+    private func trimHistoryIfNeeded(_ chat: Chat) {
+        let originalCount = chat.history.count
+        let trimmed = Self.trimmedHistory(chat.history, maxTokens: GeminiConfig.maxHistoryTokens)
+        guard trimmed.count < originalCount else { return }
+        chat.history = trimmed
+        logInfo(
+            "GeminiChatService",
+            "Chat geçmişi token bütçesi için kırpıldı",
+            details: "\(originalCount - trimmed.count) mesaj düşürüldü, \(trimmed.count) mesaj kaldı"
+        )
+    }
+
     // MARK: - Messaging
 
     /// Stateless one-shot generation (no conversation history).
@@ -96,6 +143,7 @@ class GeminiChatService {
     func sendMessageWithContext(_ message: String, context: String, fileId: String) async throws -> String {
         try await GeminiConfig.executeWithRetry(serviceName: "GeminiChat") {
             let chat = self.session(for: fileId)
+            self.trimHistoryIfNeeded(chat)
 
             let fullMessage = self.buildEnhancedPrompt(message: message, context: context)
 
@@ -146,9 +194,10 @@ class GeminiChatService {
 
     func sendMessageStream(_ message: String, fileId: String) -> AsyncThrowingStream<String, Error> {
         let chat = session(for: fileId)
+        trimHistoryIfNeeded(chat)
 
         return AsyncThrowingStream { continuation in
-            Task {
+            let task = Task {
                 do {
                     let streamSource = chat.sendMessageStream(message)
                     for try await chunk in streamSource {
@@ -161,6 +210,9 @@ class GeminiChatService {
                     continuation.finish(throwing: error)
                 }
             }
+            // Stop the underlying network stream when the consumer cancels,
+            // otherwise the SDK keeps generating into a dead continuation.
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -178,6 +230,7 @@ class GeminiChatService {
     func askAboutImage(_ imageData: Data, question: String, fileId: String) async throws -> String {
         try await GeminiConfig.executeWithRetry(serviceName: "GeminiChat") {
             let chat = self.session(for: fileId)
+            self.trimHistoryIfNeeded(chat)
 
             let prompt = """
             Kullanıcı dokümanın bir bölümünü (görsel/tablo/grafik) seçti ve şu soruyu soruyor:
@@ -209,6 +262,7 @@ class GeminiChatService {
     ) async throws -> String {
         try await GeminiConfig.executeWithRetry(serviceName: "GeminiChat") {
             let chat = self.session(for: fileId)
+            self.trimHistoryIfNeeded(chat)
 
             var prompt = """
             Kullanıcı Sayfa \(pageNumber) hakkında şunu soruyor: "\(question)"
