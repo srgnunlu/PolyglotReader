@@ -1,3 +1,4 @@
+import AuthenticationServices
 import XCTest
 import Combine
 @testable import PolyglotReader
@@ -157,17 +158,15 @@ final class AuthViewModelTests: XCTestCase {
     
     // MARK: - Nonce Generation Tests
     
-    func testRandomNonceStringHasCorrectLength() {
-        // Use reflection or create a testable subclass
-        // For now, we test the public interface indirectly
-        
-        // Given - Sign in with Apple implementation creates nonce internally
-        // We can't directly test private methods, but we verify the public flow works
-        
+    func testPrepareAppleSignInRequestSetsHashedNonce() {
+        // Given - the SwiftUI SignInWithAppleButton onRequest flow
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+
         // When
-        sut.signInWithApple()
-        
-        // Then - No crash means nonce was generated successfully
-        XCTAssertTrue(true, "Nonce generation should not crash")
+        sut.prepareAppleSignInRequest(request)
+
+        // Then - a hashed nonce must be attached, otherwise token verification fails
+        XCTAssertNotNil(request.nonce, "Apple sign-in request should carry a hashed nonce")
+        XCTAssertEqual(request.requestedScopes, [.fullName, .email])
     }
 }
