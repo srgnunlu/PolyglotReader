@@ -3,8 +3,61 @@
 "use client";
 
 import { useCallback, type RefObject } from "react";
+import { assembleReadingOrderText, type PositionedText } from "@/lib/textGeometry";
 
 export type SelectionRect = { x: number; y: number; width: number; height: number };
+
+/**
+ * Reconstructs the selected text from the pdf.js text-layer spans that the
+ * selection Range intersects, in geometric reading order. On 2-column PDFs
+ * `selection.toString()` follows DOM (content-stream) order and interleaves
+ * the columns; here spans are clustered into columns by x, ordered by line,
+ * and hyphenated line breaks are merged so translation gets natural text.
+ * Returns "" when nothing usable is found — callers must fall back.
+ */
+function extractSelectionTextGeometryAware(
+  range: Range,
+  pageElement: HTMLElement,
+  pageRect: DOMRect
+): string {
+  const spans = pageElement.querySelectorAll<HTMLElement>(
+    ".react-pdf__Page__textContent span, .textLayer span"
+  );
+  const items: PositionedText[] = [];
+
+  for (const span of Array.from(spans)) {
+    if (!range.intersectsNode(span)) continue;
+
+    // Clamp a copy of the span's contents to the selection so boundary spans
+    // contribute only their selected portion.
+    const spanRange = document.createRange();
+    spanRange.selectNodeContents(span);
+    if (spanRange.compareBoundaryPoints(Range.START_TO_START, range) < 0) {
+      spanRange.setStart(range.startContainer, range.startOffset);
+    }
+    if (spanRange.compareBoundaryPoints(Range.END_TO_END, range) > 0) {
+      spanRange.setEnd(range.endContainer, range.endOffset);
+    }
+    const text = spanRange.toString();
+    if (!text.trim()) continue;
+
+    // The span's own rect (not the clamped range's) keeps partial boundary
+    // runs anchored to their line/column for ordering purposes.
+    const rect = span.getBoundingClientRect();
+    if (!rect.width || !rect.height) continue;
+
+    items.push({
+      text,
+      left: rect.left - pageRect.left,
+      top: rect.top - pageRect.top,
+      height: rect.height,
+      right: rect.right - pageRect.left,
+    });
+  }
+
+  if (items.length === 0) return "";
+  return assembleReadingOrderText(items, pageRect.width);
+}
 
 interface UseTextSelectionOptions {
   wrapperRef: RefObject<HTMLDivElement | null>;
@@ -34,8 +87,7 @@ export function useTextSelection({
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) return;
 
-    const text = selection.toString().trim();
-    if (!text) return;
+    if (!selection.toString().trim()) return;
 
     const range = selection.getRangeAt(0);
     if (!containerRef.current?.contains(range.commonAncestorContainer)) {
@@ -62,6 +114,17 @@ export function useTextSelection({
     const pageRect = (canvas ?? pageElement).getBoundingClientRect();
 
     if (!pageRect.width || !pageRect.height) return;
+
+    // Geometry-aware reconstruction with a hard fallback: any failure or empty
+    // result must never break selection, so we degrade to DOM order.
+    let text = "";
+    try {
+      text = extractSelectionTextGeometryAware(range, pageElement, pageRect);
+    } catch {
+      text = "";
+    }
+    if (!text) text = selection.toString().trim();
+    if (!text) return;
 
     const selectionRects = Array.from(range.getClientRects())
       .filter(r => r.width > 0 && r.height > 0)

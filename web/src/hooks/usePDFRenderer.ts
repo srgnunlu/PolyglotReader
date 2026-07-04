@@ -1,14 +1,14 @@
 // PDF document loading, caching, zoom/scale management
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, type RefObject } from "react";
 import { pdfjs } from "react-pdf";
 import { pdfCache } from "@/lib/pdfCache";
 import { getSupabase } from "@/lib/supabase";
 
-const DEFAULT_SCALE = 1.2;
-const MIN_SCALE = 0.5;
-const MAX_SCALE = 3;
+export const DEFAULT_SCALE = 1.2;
+export const MIN_SCALE = 0.5;
+export const MAX_SCALE = 3;
 const FALLBACK_PAGE_SIZE = { width: 595, height: 842 };
 
 interface UsePDFRendererOptions {
@@ -181,4 +181,96 @@ export function usePDFRenderer({ pdfUrl, storagePath, initialScale }: UsePDFRend
     resetZoom,
     setScaleImmediate,
   };
+}
+
+interface UsePinchZoomOptions {
+  containerRef: RefObject<HTMLElement | null>;
+  displayScale: number;
+  handleZoom: (newScale: number, containerEl?: HTMLElement | null) => void;
+}
+
+/**
+ * Pinch-to-zoom on the scroll container:
+ * - trackpad pinch arrives as wheel events with ctrlKey set (browser
+ *   convention); preventDefault stops the browser's page zoom,
+ * - touch pinch is tracked via two-pointer distance with pointer events
+ *   (the container needs `touch-action: pan-x pan-y` so the browser doesn't
+ *   claim the gesture first).
+ * Both feed the existing debounced handleZoom, clamped to MIN/MAX_SCALE.
+ */
+export function usePinchZoom({ containerRef, displayScale, handleZoom }: UsePinchZoomOptions) {
+  // Ref mirror so the native listeners (attached once) always see the latest
+  // scale without re-subscribing on every zoom step.
+  const scaleRef = useRef(displayScale);
+  useEffect(() => {
+    scaleRef.current = displayScale;
+  }, [displayScale]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const applyScale = (next: number) => {
+      const clamped = Math.min(Math.max(next, MIN_SCALE), MAX_SCALE);
+      if (clamped === scaleRef.current) return;
+      // Update the mirror immediately: continuous gestures fire faster than
+      // React re-renders and would otherwise compound against a stale scale.
+      scaleRef.current = clamped;
+      handleZoom(clamped, container);
+    };
+
+    const handleWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      // Exponential mapping keeps zoom speed proportional at any scale.
+      applyScale(scaleRef.current * Math.exp(-event.deltaY * 0.0022));
+    };
+
+    const pointers = new Map<number, { x: number; y: number }>();
+    let pinchStartDistance = 0;
+    let pinchStartScale = 1;
+
+    const pointerDistance = () => {
+      const [a, b] = [...pointers.values()];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.pointerType !== "touch") return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size === 2) {
+        pinchStartDistance = pointerDistance();
+        pinchStartScale = scaleRef.current;
+      }
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!pointers.has(event.pointerId)) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size === 2 && pinchStartDistance > 0) {
+        applyScale(pinchStartScale * (pointerDistance() / pinchStartDistance));
+      }
+    };
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      pointers.delete(event.pointerId);
+      if (pointers.size < 2) pinchStartDistance = 0;
+    };
+
+    // Non-passive: React delegates wheel as passive, which would ignore
+    // preventDefault and let the browser zoom the whole page.
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    container.addEventListener("pointerdown", handlePointerDown);
+    container.addEventListener("pointermove", handlePointerMove);
+    container.addEventListener("pointerup", handlePointerEnd);
+    container.addEventListener("pointercancel", handlePointerEnd);
+
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+      container.removeEventListener("pointerdown", handlePointerDown);
+      container.removeEventListener("pointermove", handlePointerMove);
+      container.removeEventListener("pointerup", handlePointerEnd);
+      container.removeEventListener("pointercancel", handlePointerEnd);
+    };
+  }, [containerRef, handleZoom]);
 }
