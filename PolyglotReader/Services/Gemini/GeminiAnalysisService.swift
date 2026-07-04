@@ -17,7 +17,27 @@ class GeminiAnalysisService {
             return TranslationResult(original: text, translated: "", detectedLanguage: "Unknown")
         }
 
-        return try await GeminiConfig.executeWithRetry(serviceName: "GeminiAnalysis") {
+        // Prompt below only sees the first 2000 chars, so cache on the same slice.
+        let cappedText = String(text.prefix(2000))
+
+        // Cache first: repeated selections resolve instantly instead of a ~2s Gemini round trip.
+        if let cached = await TranslationCacheService.shared.cachedTranslation(for: cappedText) {
+            return TranslationResult(original: cappedText, translated: cached, detectedLanguage: "cached")
+        }
+
+        let result = try await requestGeminiTranslation(cappedText, context: context)
+
+        // Write-through fire-and-forget: translation never waits on (or fails because of) the cache.
+        let translated = result.translated
+        Task {
+            await TranslationCacheService.shared.store(sourceText: cappedText, translatedText: translated)
+        }
+
+        return result
+    }
+
+    private func requestGeminiTranslation(_ text: String, context: String?) async throws -> TranslationResult {
+        try await GeminiConfig.executeWithRetry(serviceName: "GeminiAnalysis") {
             var contextPrompt = ""
             if let context = context, !context.isEmpty {
                 contextPrompt = "\nDoküman Bağlamı (Özet): \(context)\n"
@@ -25,7 +45,7 @@ class GeminiAnalysisService {
 
             let prompt = """
             Aşağıdaki metni analiz et:\(contextPrompt)
-            "\(text.prefix(2000))"
+            "\(text)"
 
             Görev:
             1. Kaynak dili tespit et.\(context != nil ? "\n2. Doküman bağlamını dikkate alarak terminolojiyi en doğru şekilde çevir." : "")
@@ -48,7 +68,7 @@ class GeminiAnalysisService {
             let result = try JSONDecoder().decode(TranslationResponse.self, from: data)
 
             return TranslationResult(
-                original: String(text.prefix(2000)),
+                original: text,
                 translated: result.translatedText,
                 detectedLanguage: result.detectedLanguage
             )
