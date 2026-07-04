@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { translateText } from "./gemini";
+import { recognizePageText, translateText } from "./gemini";
 
 // The client facade talks to /api/gemini/* — stub fetch to test the contract.
 function mockFetchOnce(response: Partial<Response> & { json?: () => Promise<unknown> }) {
@@ -53,5 +53,35 @@ describe("translateText", () => {
     });
 
     await expect(translateText("Hello", "tr")).rejects.toThrow("AI request failed (502)");
+  });
+});
+
+describe("recognizePageText", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("posts the page image to the server-side OCR route and returns the text", async () => {
+    const fetchMock = mockFetchOnce({ json: async () => ({ text: "Tanınan metin" }) });
+
+    const result = await recognizePageText("data:image/jpeg;base64,abc123");
+
+    expect(result).toBe("Tanınan metin");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/gemini/ocr");
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.image).toBe("data:image/jpeg;base64,abc123");
+  });
+
+  it("surfaces the server error message on failure", async () => {
+    mockFetchOnce({
+      ok: false,
+      status: 413,
+      json: async () => ({ error: "image too large (max ~4MB base64)" }),
+    });
+
+    await expect(recognizePageText("data:image/jpeg;base64,xyz")).rejects.toThrow(
+      "image too large"
+    );
   });
 });

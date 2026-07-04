@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Languages, Sparkles, Highlighter, Copy } from 'lucide-react';
-import { translateText } from '@/lib/gemini';
+import { translateTextCached } from '@/lib/translationCache';
 import styles from './SelectionPopup.module.css';
 
 interface SelectionPopupProps {
@@ -12,6 +12,23 @@ interface SelectionPopupProps {
     onAskAI: (text: string) => void;
     onHighlight?: (color: string) => void;
     selectionRange?: Range;
+}
+
+// Anchor points (offsetParent-relative) the popup positions itself against:
+// centered on x, sitting above yAbove, or below yBelow when flipped.
+interface Anchor {
+    x: number;
+    yAbove: number;
+    yBelow: number;
+}
+
+const VIEWPORT_MARGIN = 8; // min gap between popup and viewport edges
+const DRAG_KEEP_VISIBLE = 40; // px of popup that must stay on-screen while dragged
+const ANCHOR_GAP = 12; // gap between the selection and the popup
+
+function clamp(value: number, min: number, max: number): number {
+    if (max < min) return min; // degenerate viewport smaller than the popup
+    return Math.min(Math.max(value, min), max);
 }
 
 export function SelectionPopup({
@@ -27,11 +44,22 @@ export function SelectionPopup({
     const [showColors, setShowColors] = useState(false);
     const popupRef = useRef<HTMLDivElement>(null);
 
-    // Initial positioning state
-    const [currentPosition, setCurrentPosition] = useState(position);
+    // Anchor derived from the selection (sticky-follow) or the initial prop.
+    // Without a Range we don't know the selection height, so approximate the
+    // below-anchor from the point the parent gave us.
+    const [anchor, setAnchor] = useState<Anchor>(() => ({
+        x: position.x,
+        yAbove: position.y,
+        yBelow: position.y + 40,
+    }));
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
     const isDragging = useRef(false);
     const dragStart = useRef({ x: 0, y: 0 });
+    // Mirrors for the document-level drag listeners and the layout pass.
+    const anchorRef = useRef(anchor);
+    anchorRef.current = anchor;
+    const placementRef = useRef<'above' | 'below'>('above');
 
     const highlightColors = [
         { name: 'Sarı', color: '#fef08a' },
@@ -45,7 +73,9 @@ export function SelectionPopup({
 
         setIsTranslating(true);
         try {
-            const result = await translateText(text, 'tr');
+            // Two-layer cache (memory + Supabase) — repeated selections
+            // resolve instantly without re-billing Gemini.
+            const result = await translateTextCached(text, 'tr');
             setTranslation(result);
         } catch (err) {
             console.error('Translation error:', err);
@@ -65,7 +95,7 @@ export function SelectionPopup({
         onClose();
     };
 
-    // Sticky positioning effect
+    // Sticky positioning effect — follow the live selection rect every frame.
     useEffect(() => {
         if (!selectionRange) return;
 
@@ -79,18 +109,20 @@ export function SelectionPopup({
 
                     if (viewerElement) {
                         const viewerRect = viewerElement.getBoundingClientRect();
-
-                        // Center horizontally, position above by default
                         const x = params.left - viewerRect.left + params.width / 2;
-                        const y = params.top - viewerRect.top - 12; // 12px padding above
+                        const yAbove = params.top - viewerRect.top - ANCHOR_GAP;
+                        const yBelow = params.bottom - viewerRect.top + ANCHOR_GAP;
 
-                        // Check limits if we can get popup dimensions
-                        // For now just basic tracking
-
-                        setCurrentPosition({ x, y });
+                        // Only commit real movement — a fresh object every
+                        // frame would re-render the popup at 60fps for nothing.
+                        setAnchor(prev =>
+                            prev.x === x && prev.yAbove === yAbove && prev.yBelow === yBelow
+                                ? prev
+                                : { x, yAbove, yBelow }
+                        );
                     }
                 }
-            } catch (e) {
+            } catch {
                 // Range detached
             }
             animationFrameId = requestAnimationFrame(updatePosition);
@@ -100,6 +132,53 @@ export function SelectionPopup({
         return () => cancelAnimationFrame(animationFrameId);
     }, [selectionRange]);
 
+    // Clamp the popup into the viewport after every render: content changes
+    // (translation result, color row) change its size, so measure each time.
+    // Position is written straight to the DOM node — no state, so re-renders
+    // can't cascade — and starts hidden so the first paint is already clamped.
+    useLayoutEffect(() => {
+        const popup = popupRef.current;
+        const viewer = popup?.offsetParent as HTMLElement | null;
+        if (!popup || !viewer) return;
+
+        const width = popup.offsetWidth;
+        const height = popup.offsetHeight;
+        const viewerRect = viewer.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        const dragged = dragOffset.x !== 0 || dragOffset.y !== 0;
+
+        // Ideal viewport coordinates: centered on the anchor, above by default.
+        let leftV = viewerRect.left + anchor.x + dragOffset.x - width / 2;
+        let topV;
+
+        if (!dragged) {
+            topV = viewerRect.top + anchor.yAbove + dragOffset.y - height;
+            // Flip below the selection when the popup would poke past the top.
+            if (topV < VIEWPORT_MARGIN) {
+                topV = viewerRect.top + anchor.yBelow + dragOffset.y;
+                placementRef.current = 'below';
+            } else {
+                placementRef.current = 'above';
+            }
+            leftV = clamp(leftV, VIEWPORT_MARGIN, viewportWidth - width - VIEWPORT_MARGIN);
+            topV = clamp(topV, VIEWPORT_MARGIN, viewportHeight - height - VIEWPORT_MARGIN);
+        } else {
+            // While dragged, respect the user's placement but keep enough of
+            // the popup (and its top drag handle) reachable on-screen.
+            topV =
+                placementRef.current === 'below'
+                    ? viewerRect.top + anchor.yBelow + dragOffset.y
+                    : viewerRect.top + anchor.yAbove + dragOffset.y - height;
+            leftV = clamp(leftV, DRAG_KEEP_VISIBLE - width, viewportWidth - DRAG_KEEP_VISIBLE);
+            topV = clamp(topV, 0, viewportHeight - DRAG_KEEP_VISIBLE);
+        }
+
+        popup.style.left = `${leftV - viewerRect.left}px`;
+        popup.style.top = `${topV - viewerRect.top}px`;
+        popup.style.visibility = 'visible';
+    });
 
     // Cleanup click interactions
     useEffect(() => {
@@ -160,10 +239,32 @@ export function SelectionPopup({
         const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
-        setDragOffset({
-            x: clientX - dragStart.current.x,
-            y: clientY - dragStart.current.y
-        });
+        let offsetX = clientX - dragStart.current.x;
+        let offsetY = clientY - dragStart.current.y;
+
+        // Clamp the offset itself (not just the rendered position) so there is
+        // no dead zone when dragging back from an edge.
+        const popup = popupRef.current;
+        const viewer = popup?.offsetParent as HTMLElement | null;
+        if (popup && viewer) {
+            const width = popup.offsetWidth;
+            const height = popup.offsetHeight;
+            const viewerRect = viewer.getBoundingClientRect();
+            const currentAnchor = anchorRef.current;
+
+            const baseLeft = viewerRect.left + currentAnchor.x - width / 2;
+            const baseTop =
+                placementRef.current === 'below'
+                    ? viewerRect.top + currentAnchor.yBelow
+                    : viewerRect.top + currentAnchor.yAbove - height;
+
+            offsetX =
+                clamp(baseLeft + offsetX, DRAG_KEEP_VISIBLE - width, window.innerWidth - DRAG_KEEP_VISIBLE) -
+                baseLeft;
+            offsetY = clamp(baseTop + offsetY, 0, window.innerHeight - DRAG_KEEP_VISIBLE) - baseTop;
+        }
+
+        setDragOffset({ x: offsetX, y: offsetY });
     };
 
     const handleDragEnd = () => {
@@ -174,18 +275,13 @@ export function SelectionPopup({
         document.removeEventListener('touchend', handleDragEnd);
     };
 
-    const finalLeft = currentPosition.x + dragOffset.x;
-    const finalTop = currentPosition.y + dragOffset.y;
-
     return (
         <div
             ref={popupRef}
             className={styles.popup}
-            style={{
-                left: finalLeft,
-                top: finalTop,
-                transform: 'translateX(-50%) translateY(-100%)', // Centered and above
-            }}
+            // Hidden until the layout effect measures and writes the clamped
+            // left/top directly on the node (before the browser paints).
+            style={{ visibility: 'hidden' }}
         >
             <div
                 className={styles.dragHandle}
