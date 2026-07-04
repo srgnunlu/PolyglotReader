@@ -42,6 +42,10 @@ enum RAGConfig {
     static let enableQueryExpansionForShortQueries = true  // < 5 kelime için otomatik
     static let enableDefaultReranking = true               // Her zaman rerank yap
     static let shortQueryThreshold = 5                     // Kısa sorgu kelime limiti
+    /// Minimum candidate count for the extra Gemini rerank call. Below this
+    /// (hybrid search returned fewer than the requested pool) reranking adds
+    /// latency without changing which chunks make it into the context.
+    static let rerankMinCandidates = topK
 }
 
 // MARK: - RAG Errors

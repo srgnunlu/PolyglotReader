@@ -113,6 +113,33 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertEqual(sut.inputText, testInput)
     }
     
+    // MARK: - Streaming Lifecycle Tests
+
+    func testCancelActiveStreamWithoutTaskIsNoOp() {
+        // When
+        sut.cancelActiveStream()
+
+        // Then
+        XCTAssertNil(sut.activeStreamTask)
+        XCTAssertFalse(sut.isLoading)
+    }
+
+    func testCancelActiveStreamCancelsAndClearsTask() async {
+        // Given - a long-running task standing in for an in-flight stream
+        let task = Task<Void, Never> {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+        }
+        sut.activeStreamTask = task
+
+        // When
+        sut.cancelActiveStream()
+
+        // Then
+        XCTAssertNil(sut.activeStreamTask)
+        await task.value
+        XCTAssertTrue(task.isCancelled)
+    }
+
     // MARK: - Memory Leak Tests
     
     func testChatViewModelDoesNotLeakMemory() async {

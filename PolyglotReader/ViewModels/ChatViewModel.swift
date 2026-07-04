@@ -133,6 +133,19 @@ class ChatViewModel: ObservableObject {
     private var progressObserver: AnyCancellable?
     private var networkObserver: AnyCancellable?
 
+    // MARK: - Streaming Lifecycle
+    /// In-flight streamed response task. Tracked so a new message or closing
+    /// the chat can cancel it — two streams must never write into the message
+    /// list at the same time. Internal for the +Messaging extension and tests.
+    var activeStreamTask: Task<Void, Never>?
+
+    /// Cancels the in-flight streamed response, if any. Partial text already
+    /// rendered stays in the bubble; only completed responses are persisted.
+    func cancelActiveStream() {
+        activeStreamTask?.cancel()
+        activeStreamTask = nil
+    }
+
     init(fileId: String) {
         self.fileId = fileId
         self.fileUUID = UUID(uuidString: fileId)

@@ -7,6 +7,9 @@ extension ChatViewModel {
     func sendMessage(_ text: String? = nil) async {
         guard let textToSend = validatedUserInput(text) else { return }
 
+        // A new message supersedes any response still streaming in.
+        cancelActiveStream()
+
         let userText = prepareUserText(textToSend, context: selectedText)
         clearInput(after: text)
 
@@ -43,10 +46,34 @@ extension ChatViewModel {
         enqueueUserMessage(userText)
         isLoading = true
 
+        // Run the stream inside a tracked task so cancelActiveStream() can
+        // tear it down (new message sent, or the chat sheet is dismissed).
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.streamAndPersistResponse(for: userText)
+        }
+        activeStreamTask = task
+        await task.value
+        if activeStreamTask == task {
+            activeStreamTask = nil
+        }
+    }
+
+    private func streamAndPersistResponse(for userText: String) async {
         do {
             let response = try await streamModelResponse(for: userText)
+            try Task.checkCancellation()
+            // Persist only the complete final response — never partial chunks.
             saveChatMessage(role: "model", content: response)
+        } catch is CancellationError {
+            // Cancelled mid-stream: partial text stays visible in the bubble,
+            // but a cancelled response is not final, so nothing is persisted.
+            isLoading = false
         } catch {
+            guard !Task.isCancelled else {
+                isLoading = false
+                return
+            }
             let retryAction = { [weak self] in
                 Task { await self?.handleStandardMessage(userText) }
                 return
@@ -60,29 +87,47 @@ extension ChatViewModel {
         saveChatMessage(role: "user", content: userText)
     }
 
-    private func streamModelResponse(for userText: String) async throws -> String {
-        let aiMessageId = startModelMessage()
-        let stream = try await getResponseStream(for: userText)
-        var fullResponse = ""
-        var lastUpdateTime = Date()
-        let updateInterval: TimeInterval = 0.05 // 50ms - UI update throttle
+    /// UI update throttle for streaming: ~12 updates/sec keeps the markdown
+    /// renderer responsive without visible chunk lag.
+    private static let streamUIUpdateInterval: TimeInterval = 0.08
 
-        defer { isLoading = false }
+    /// Streams the model response into a single assistant bubble. The bubble
+    /// is created on the first chunk, so a request that fails before any text
+    /// arrives never leaves an empty bubble behind.
+    private func streamModelResponse(for userText: String) async throws -> String {
+        let stream = try await getResponseStream(for: userText)
+
+        var fullResponse = ""
+        var messageId: String?
+        var lastUpdateTime = Date.distantPast
+
+        defer {
+            isLoading = false
+            // Flush whatever arrived: the full text on success, or the partial
+            // text when the stream errored or was cancelled mid-way.
+            if let id = messageId {
+                updateModelMessage(id: id, text: fullResponse)
+            }
+        }
 
         for try await chunk in stream {
+            try Task.checkCancellation()
             fullResponse += chunk
-            
-            // Throttle UI updates to prevent lag during fast streaming
+
+            if messageId == nil {
+                messageId = startModelMessage()
+            }
+
             let now = Date()
-            if now.timeIntervalSince(lastUpdateTime) >= updateInterval {
-                updateModelMessage(id: aiMessageId, text: fullResponse)
+            if let id = messageId, now.timeIntervalSince(lastUpdateTime) >= Self.streamUIUpdateInterval {
+                updateModelMessage(id: id, text: fullResponse)
                 lastUpdateTime = now
             }
         }
-        
-        // Final update to ensure complete response is shown
-        updateModelMessage(id: aiMessageId, text: fullResponse)
 
+        // A cancelled consumer ends the stream without throwing; surface it
+        // explicitly so the caller skips persistence.
+        try Task.checkCancellation()
         return fullResponse
     }
 
@@ -153,10 +198,9 @@ extension ChatViewModel {
 
             // Indexleme devam ediyorsa, kullanıcıya bilgi ver
             if isIndexing {
-                return legacyModeWithWarning(
-                    userText: userText,
-                    warning: "⏳ Doküman hazırlanıyor. Şu an genel yanıt alıyorsunuz, hazırlık bitince daha doğru yanıtlar alacaksınız."
-                )
+                let warning = "⏳ Doküman hazırlanıyor. Şu an genel yanıt alıyorsunuz, " +
+                    "hazırlık bitince daha doğru yanıtlar alacaksınız."
+                return legacyModeWithWarning(userText: userText, warning: warning)
             }
 
             // Indexleme yapılmamış - legacy mod
@@ -165,6 +209,10 @@ extension ChatViewModel {
 
         logRagQuery(fileUUID: fileUUID, userText: userText)
 
+        // Image-caption search is independent of the RAG pipeline, so both
+        // run concurrently instead of paying their latencies back to back.
+        async let imageMatchesTask = fetchImageMatches(for: userText)
+
         let (ragContext, chunks) = try await ragService.performRAGQuery(
             query: userText,
             fileId: fileUUID,
@@ -172,7 +220,7 @@ extension ChatViewModel {
             enableQueryExpansion: isDeepSearchEnabled
         )
 
-        let imageMatches = await fetchImageMatches(for: userText)
+        let imageMatches = await imageMatchesTask
         if let context = buildContext(ragContext: ragContext, imageMatches: imageMatches) {
             return try await sendStreamWithContext(
                 userText: userText,
@@ -191,8 +239,8 @@ extension ChatViewModel {
         userText: String,
         warning: String
     ) -> AsyncThrowingStream<String, Error> {
-        return AsyncThrowingStream { continuation in
-            Task {
+        AsyncThrowingStream { continuation in
+            let task = Task {
                 // Önce uyarı mesajı
                 continuation.yield(warning + "\n\n")
 
@@ -207,15 +255,17 @@ extension ChatViewModel {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
     /// RAG chunk bulunamadığında fallback yanıt
     private func fallbackResponseStream(for userText: String) -> AsyncThrowingStream<String, Error> {
-        return AsyncThrowingStream { continuation in
-            Task {
+        AsyncThrowingStream { continuation in
+            let task = Task {
                 // Önce bilgi mesajı
-                let info = "📝 Bu soru için dokümanda doğrudan bir bilgi bulamadım, genel bilgilerimle yanıtlıyorum:\n\n"
+                let info = "📝 Bu soru için dokümanda doğrudan bir bilgi bulamadım, " +
+                    "genel bilgilerimle yanıtlıyorum:\n\n"
                 continuation.yield(info)
 
                 // Sonra genel yanıt
@@ -229,6 +279,7 @@ extension ChatViewModel {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 

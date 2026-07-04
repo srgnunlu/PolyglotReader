@@ -323,6 +323,11 @@ struct ChatView: View {
                     .accessibilityIdentifier("close_chat_button")
                 }
             }
+            // Leaving the chat must tear down the in-flight stream so it
+            // doesn't keep mutating the message list in the background.
+            .onDisappear {
+                viewModel.cancelActiveStream()
+            }
             }
         }
     }
