@@ -12,6 +12,9 @@ struct LibraryView: View {
     @State private var searchInput = ""  // Local state for immediate input
     @State private var showBulkDeleteConfirm = false
     @State private var showBulkMoveDialog = false
+    // İlk PDF yüklemesi kazanılmış bir an — kutlama bir kez, checkmark anında.
+    @AppStorage("hasCelebratedFirstUpload") private var hasCelebratedFirstUpload = false
+    @State private var showFirstUploadConfetti = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var readerZoomNamespace
 
@@ -52,6 +55,36 @@ struct LibraryView: View {
                         UploadingOverlay(progress: viewModel.uploadProgress)
                     }
                 }
+                .overlay {
+                    // Overlay'in kapanışından bağımsız yaşar: finalize hızlı
+                    // bitse bile konfeti 1.6 saniyesini tamamlar.
+                    if showFirstUploadConfetti {
+                        ConfettiBurstView()
+                            .ignoresSafeArea()
+                    }
+                }
+                .onChange(of: viewModel.uploadProgress) { progress in
+                    celebrateFirstUploadIfNeeded(progress: progress)
+                }
+        }
+    }
+
+    // MARK: - First Upload Celebration
+    /// Checkmark anında (progress %100'e sabitlenince) tetiklenir. `files` bu
+    /// anda henüz yeni dosyayı içermez — boş kütüphane = gerçek ilk yükleme.
+    private func celebrateFirstUploadIfNeeded(progress: Double) {
+        guard progress >= 1.0,
+              viewModel.isUploading,
+              !hasCelebratedFirstUpload,
+              viewModel.files.isEmpty else { return }
+
+        hasCelebratedFirstUpload = true
+        showFirstUploadConfetti = true
+
+        Task {
+            // ConfettiBurstView ~1.6 sn'de boşalır; sonra view'ı kaldır.
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            showFirstUploadConfetti = false
         }
     }
 
