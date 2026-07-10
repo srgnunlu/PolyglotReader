@@ -56,12 +56,20 @@ struct QuickTranslationPopup: View {
     @State private var scale: CGFloat
     @State private var lastScale: CGFloat
 
+    // Fling-to-dismiss: çıkış animasyonu sürerken yeni drag girişini kilitler.
+    @State private var isFlingDismissing = false
+
     // Translation Task Management
     @State private var translationTask: Task<Void, Never>?
 
     // MARK: - Constants
     private let minScale: CGFloat = 0.6
     private let maxScale: CGFloat = 2.0
+    /// Aşağı fırlatma eşiği: bu hızın (pt/sn) üzerindeki aşağı yönlü bırakma
+    /// popup'ı kapatır. Yavaş sürüklemeler normal taşıma olarak kalır.
+    private let flingVelocityThreshold: CGFloat = 1100
+    /// Parmak titremesini fırlatma saymamak için asgari aşağı yönlü mesafe.
+    private let flingTranslationMinimum: CGFloat = 24
 
     var body: some View {
         GeometryReader { geometry in
@@ -223,6 +231,7 @@ struct QuickTranslationPopup: View {
                 state = true
             }
             .onChanged { value in
+                guard !isFlingDismissing else { return }
                 let proposed = CGSize(
                     width: lastOffset.width + value.translation.width,
                     height: lastOffset.height + value.translation.height
@@ -239,8 +248,15 @@ struct QuickTranslationPopup: View {
                     offset = clamped
                 }
             }
-            .onEnded { _ in
-                lastOffset = offset
+            .onEnded { value in
+                guard !isFlingDismissing else { return }
+                // Aşağı fırlatma → zarif dismiss; hızlı ama net bir jest ister.
+                if value.velocity.height > flingVelocityThreshold,
+                   value.translation.height > flingTranslationMinimum {
+                    flingDismiss()
+                } else {
+                    lastOffset = offset
+                }
             }
     }
 
@@ -284,6 +300,23 @@ struct QuickTranslationPopup: View {
     }
 
     // MARK: - Actions
+
+    /// Fırlatma yönünde kısa bir kayış + küçülüp solma; animasyon bitince
+    /// gerçek dismiss çalışır. Reduce Motion'da hareketsiz, anında kapanır.
+    private func flingDismiss() {
+        isFlingDismissing = true
+        DSHaptics.softImpact()
+
+        withAnimation(
+            DSMotion.resolved(DSMotion.snappy, reduceMotion: reduceMotion),
+            completionCriteria: .logicallyComplete
+        ) {
+            offset.height += 360
+            isVisible = false
+        } completion: {
+            onDismiss()
+        }
+    }
 
     private func startTranslation(delay: TimeInterval) {
         // Varsa önceki task'ı iptal et
