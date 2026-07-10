@@ -1,11 +1,14 @@
 import SwiftUI
 
 // MARK: - Reader Bottom Bar
+/// Yüzen cam dock: sayfa navigasyonu, hızlı çeviri ve TTS/sohbet aksiyonları.
 struct ReaderBottomBar: View {
     @ObservedObject var viewModel: PDFReaderViewModel
     @ObservedObject var speech: SpeechService
     @Binding var showChat: Bool
     let onToggleTTS: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 0) {
@@ -22,45 +25,24 @@ struct ReaderBottomBar: View {
             // Sağ: Sesli Okuma + Chat Butonları
             trailingActionButtons
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background {
-            LiquidGlassBackground(cornerRadius: 28, intensity: .medium, accentColor: .indigo)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 28))
-        .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
-        .padding(.bottom, 16)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, DSSpacing.md)
+        .padding(.vertical, DSSpacing.sm)
+        .dsGlass(.bar, shape: .rounded(DSRadius.dock))
+        .dsShadow(.floating)
+        .padding(.bottom, DSSpacing.md)
+        .padding(.horizontal, DSSpacing.md)
     }
 
     // MARK: - Page Navigation
 
     private var pageNavigationControls: some View {
-        HStack(spacing: 8) {
-            Button {
+        HStack(spacing: DSSpacing.xs) {
+            pageStepButton(systemName: "chevron.left", disabled: viewModel.currentPage <= 1) {
                 viewModel.previousPage()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(
-                        viewModel.currentPage <= 1
-                            ? Color.secondary.opacity(0.4)
-                            : Color.primary
-                    )
-                    .frame(width: 36, height: 36)
-                    .background {
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                Circle()
-                                    .stroke(.white.opacity(0.2), lineWidth: 0.5)
-                            }
-                    }
             }
-            .disabled(viewModel.currentPage <= 1)
             .accessibilityLabel("Önceki sayfa")
 
-            // Inline Page Spinner - yukarı/aşağı sürükleyerek sayfa değiştir
+            // Inline Page Spinner - popover ile sayfa seçimi
             PageSpinner(
                 currentPage: viewModel.currentPage,
                 totalPages: viewModel.totalPages
@@ -68,29 +50,23 @@ struct ReaderBottomBar: View {
                 viewModel.goToPage(page)
             }
 
-            Button {
+            pageStepButton(systemName: "chevron.right", disabled: viewModel.currentPage >= viewModel.totalPages) {
                 viewModel.nextPage()
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(
-                        viewModel.currentPage >= viewModel.totalPages
-                            ? Color.secondary.opacity(0.4)
-                            : Color.primary
-                    )
-                    .frame(width: 36, height: 36)
-                    .background {
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                Circle()
-                                    .stroke(.white.opacity(0.2), lineWidth: 0.5)
-                            }
-                    }
             }
-            .disabled(viewModel.currentPage >= viewModel.totalPages)
             .accessibilityLabel("Sonraki sayfa")
         }
+    }
+
+    private func pageStepButton(systemName: String, disabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(DSFont.controlIcon)
+                .foregroundStyle(disabled ? Color.secondary.opacity(0.4) : Color.primary)
+                .frame(width: 36, height: 36)
+                .dsGlass(.control, shape: .circle)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
     }
 
     // MARK: - Quick Translation Toggle
@@ -99,59 +75,46 @@ struct ReaderBottomBar: View {
         Button {
             viewModel.toggleQuickTranslationMode()
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: viewModel.isQuickTranslationMode ? "character.bubble.fill" : "character.bubble")
-                    .font(.system(size: 16, weight: .medium))
-
-                if viewModel.isQuickTranslationMode {
-                    Text("Çeviri Açık")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-            }
-            .foregroundStyle(viewModel.isQuickTranslationMode ? .white : .primary)
-            .padding(.horizontal, viewModel.isQuickTranslationMode ? 14 : 12)
-            .padding(.vertical, 10)
-            .background {
-                Capsule()
-                    .fill(viewModel.isQuickTranslationMode ? Color.indigo : Color.clear)
-
-                if !viewModel.isQuickTranslationMode {
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            Capsule()
-                                .stroke(.white.opacity(0.2), lineWidth: 0.5)
-                        }
-                }
-            }
+            quickTranslationLabel
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: viewModel.isQuickTranslationMode)
+        .dsAnimation(DSMotion.snappy, value: viewModel.isQuickTranslationMode)
+        .dsHaptic(.selection, trigger: viewModel.isQuickTranslationMode)
         .accessibilityLabel("Hızlı çeviri")
         .accessibilityValue(viewModel.isQuickTranslationMode ? "Açık" : "Kapalı")
         .accessibilityAddTraits(.isButton)
     }
 
+    /// Aktifken düz marka kapsülü, pasifken cam kontrol — cam camın (veya
+    /// dolgunun) üzerine binmez.
+    @ViewBuilder
+    private var quickTranslationLabel: some View {
+        let content = HStack(spacing: DSSpacing.xxs + 2) {
+            Image(systemName: viewModel.isQuickTranslationMode ? "character.bubble.fill" : "character.bubble")
+                .font(DSFont.controlIconProminent)
+
+            if viewModel.isQuickTranslationMode {
+                Text("Çeviri Açık")
+                    .font(DSFont.meta.weight(.semibold))
+            }
+        }
+        .foregroundStyle(viewModel.isQuickTranslationMode ? .white : .primary)
+        .padding(.horizontal, viewModel.isQuickTranslationMode ? 14 : 12)
+        .padding(.vertical, 10)
+
+        if viewModel.isQuickTranslationMode {
+            content.background(Capsule().fill(DSColor.brand))
+        } else {
+            content.dsGlass(.control, shape: .capsule)
+        }
+    }
+
     // MARK: - TTS + Chat Buttons
 
     private var trailingActionButtons: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: DSSpacing.xs + 2) {
             Button(action: onToggleTTS) {
-                Image(systemName: speech.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(speech.isSpeaking ? .white : .primary)
-                    .frame(width: 44, height: 44)
-                    .background {
-                        Circle()
-                            .fill(speech.isSpeaking ? Color.indigo : Color.clear)
-                        if !speech.isSpeaking {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                                .overlay {
-                                    Circle().stroke(.white.opacity(0.2), lineWidth: 0.5)
-                                }
-                        }
-                    }
+                ttsButtonLabel
             }
             .buttonStyle(.plain)
             .accessibilityLabel("reader.tts.toggle".localized)
@@ -165,25 +128,43 @@ struct ReaderBottomBar: View {
                 Button {
                     showChat = true
                 } label: {
-                    Image(systemName: "message.fill")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.indigo, Color.indigo.opacity(0.8)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .shadow(color: .indigo.opacity(0.4), radius: 8, x: 0, y: 4)
-                        }
+                    chatButtonLabel
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Sohbet")
             }
         }
+    }
+
+    /// Okuma aktifken düz marka dairesi + hoparlör dalgalarında iterative
+    /// nabız (TTS'in "canlı" göstergesi); pasifken cam kontrol.
+    @ViewBuilder
+    private var ttsButtonLabel: some View {
+        let icon = Image(systemName: speech.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
+            .font(DSFont.controlIconProminent)
+            .symbolEffect(
+                .variableColor.iterative,
+                options: .repeating,
+                isActive: speech.isSpeaking && !reduceMotion
+            )
+            .foregroundStyle(speech.isSpeaking ? Color.white : Color.primary)
+            .frame(width: 44, height: 44)
+
+        if speech.isSpeaking {
+            icon.background(Circle().fill(DSColor.brand))
+        } else {
+            icon.dsGlass(.control, shape: .circle)
+        }
+    }
+
+    private var chatButtonLabel: some View {
+        Image(systemName: "message.fill")
+            .font(DSFont.controlIconProminent)
+            .foregroundStyle(.white)
+            .frame(width: 44, height: 44)
+            .background {
+                Circle().fill(DSColor.brandGradient)
+            }
+            .dsShadow(.subtle, tint: DSColor.brand)
     }
 }

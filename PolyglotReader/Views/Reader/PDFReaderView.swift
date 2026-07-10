@@ -5,6 +5,7 @@ struct PDFReaderView: View {
     @StateObject private var viewModel: PDFReaderViewModel
     @StateObject private var chatViewModel: ChatViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @StateObject private var speech = SpeechService()
     @State private var showChat = false
@@ -18,7 +19,8 @@ struct PDFReaderView: View {
     @State private var selectedAnnotation: Annotation?
 
     private let bottomDockInset: CGFloat = 90
-    private let autoHideDelay: TimeInterval = 10.0
+    // İçerik-öncelikli okuyucu: chrome 6 saniyede kenara çekilir.
+    private let autoHideDelay: TimeInterval = 6.0
     private let initialPage: Int?
 
     init(file: PDFDocumentMetadata, initialPage: Int? = nil) {
@@ -181,7 +183,7 @@ struct PDFReaderView: View {
                 speech.stop()
                 autoHideTimer?.invalidate()
             }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: speech.isSpeaking)
+            .dsAnimation(DSMotion.smooth, value: speech.isSpeaking)
             .onChange(of: showChat) { isOpen in
                 if isOpen {
                     autoHideTimer?.invalidate()
@@ -221,7 +223,7 @@ struct PDFReaderView: View {
 
     // MARK: - Bar Toggle & Auto-Hide
     private func toggleBars() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+        withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
             barsVisible.toggle()
         }
 
@@ -235,7 +237,7 @@ struct PDFReaderView: View {
     private func startAutoHideTimer() {
         autoHideTimer?.invalidate()
         autoHideTimer = Timer.scheduledTimer(withTimeInterval: autoHideDelay, repeats: false) { _ in
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
                 barsVisible = false
             }
         }
