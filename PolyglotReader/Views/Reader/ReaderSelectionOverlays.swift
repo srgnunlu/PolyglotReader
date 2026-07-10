@@ -63,6 +63,9 @@ struct ReaderSelectionOverlays: View {
                     viewModel.showQuickTranslation = false
                     viewModel.clearSelection()
                     showChat = true
+                },
+                onPersistTranslation: { source, translated in
+                    viewModel.persistTranslation(source: source, translated: translated)
                 }
             ) {
                 viewModel.showQuickTranslation = false

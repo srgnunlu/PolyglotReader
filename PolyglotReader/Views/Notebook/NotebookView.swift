@@ -5,6 +5,7 @@ enum NotebookRoute: Hashable {
     case allFiles
     case category(NotebookCategory)
     case file(String)
+    case translations
 }
 
 struct NotebookView: View {
@@ -98,7 +99,8 @@ struct NotebookView: View {
 
             if viewModel.isLoading && viewModel.annotations.isEmpty {
                 NotebookLoadingView()
-            } else if viewModel.annotations.isEmpty {
+            } else if viewModel.annotations.isEmpty && viewModel.translationHistory.isEmpty {
+                // Neither annotations nor saved translations yet.
                 EmptyNotebookView(
                     hasFilters: false
                 ) {
@@ -112,7 +114,8 @@ struct NotebookView: View {
                     onSelectCategory: { path.append(.category($0)) },
                     onSelectFile: { path.append(.file($0)) },
                     onSelectAnnotation: { navigateToFile(annotation: $0) },
-                    onShowAllFiles: { path.append(.allFiles) }
+                    onShowAllFiles: { path.append(.allFiles) },
+                    onSelectTranslations: { path.append(.translations) }
                 )
                 .transition(.opacity)
             }
@@ -151,6 +154,9 @@ struct NotebookView: View {
                 onDismiss: popPath
             )
             .toolbar(.hidden, for: .navigationBar)
+
+        case .translations:
+            TranslationHistoryView(viewModel: viewModel)
         }
     }
 

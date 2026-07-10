@@ -310,6 +310,12 @@
 /* Loading */
 "notebook.loading" = "Notlar yükleniyor...";
 
+/* Translation History (Çeviriler) */
+"notebook.category.translations" = "Çeviriler";
+"notebook.translations.empty.title" = "Henüz çeviri yok";
+"notebook.translations.empty.subtitle" = "Okurken bir metni seçip anında çevir; tamamlanan çeviriler burada birikir.";
+"notebook.translations.delete_failed" = "Çeviri silinemedi";
+
 /* Empty State */
 "notebook.empty.title" = "Henüz Not Yok";
 "notebook.empty.subtitle" = "PDF'lerinizde metin seçerek\nnot almaya başlayın";

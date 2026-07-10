@@ -72,6 +72,8 @@ class NotebookViewModel: ObservableObject {
     @Published var stats = AnnotationStats()
     @Published var fileAnnotationCounts: [FileAnnotationInfo] = []
     @Published var recentFavorites: [AnnotationWithFile] = []
+    // Çeviri geçmişi (Defterim > Çeviriler)
+    @Published var translationHistory: [TranslationHistoryEntry] = []
 
     // MARK: - Network Status (Phase 6)
     @Published private(set) var isOffline = false
@@ -291,10 +293,35 @@ class NotebookViewModel: ObservableObject {
         async let annotationsTask: () = loadAnnotations()
         async let statsTask: () = loadStats()
         async let fileCountsTask: () = loadFileAnnotationCounts()
+        async let translationsTask: () = loadTranslationHistory()
 
         await annotationsTask
         await statsTask
         await fileCountsTask
+        await translationsTask
+    }
+
+    // MARK: - Translation History
+
+    func loadTranslationHistory() async {
+        do {
+            translationHistory = try await supabaseService.getTranslationHistory()
+            logInfo("NotebookVM", "Çeviri geçmişi yüklendi", details: "\(translationHistory.count) adet")
+        } catch {
+            // Geçmiş yüklenemezse dashboard'ın kalanı etkilenmez.
+            logError("NotebookVM", "Çeviri geçmişi yükleme hatası", error: error)
+        }
+    }
+
+    func deleteTranslation(_ id: String) async {
+        do {
+            try await supabaseService.deleteTranslationHistory(id: id)
+            translationHistory.removeAll { $0.id == id }
+            logInfo("NotebookVM", "Çeviri geçmişinden silindi", details: "ID: \(id)")
+        } catch {
+            errorMessage = "notebook.translations.delete_failed".localized
+            logError("NotebookVM", "Çeviri silme hatası", error: error)
+        }
     }
 
     func toggleFavorite(_ id: String) async {

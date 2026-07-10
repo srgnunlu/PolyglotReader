@@ -6,6 +6,7 @@ struct NotebookDashboardView: View {
     let onSelectFile: (String) -> Void
     let onSelectAnnotation: (AnnotationWithFile) -> Void
     let onShowAllFiles: () -> Void
+    let onSelectTranslations: () -> Void
 
     var body: some View {
         ScrollView {
@@ -24,7 +25,8 @@ struct NotebookDashboardView: View {
                 // MARK: - Kategoriler
                 CategoriesSection(
                     viewModel: viewModel,
-                    onSelectCategory: onSelectCategory
+                    onSelectCategory: onSelectCategory,
+                    onSelectTranslations: onSelectTranslations
                 )
 
                 // MARK: - Dosyalar
@@ -183,6 +185,7 @@ private struct FavoriteAnnotationRow: View {
 private struct CategoriesSection: View {
     @ObservedObject var viewModel: NotebookViewModel
     let onSelectCategory: (NotebookCategory) -> Void
+    let onSelectTranslations: () -> Void
 
     // Gösterilecek ana kategoriler (files hariç)
     private let mainCategories: [NotebookCategory] = [
@@ -199,7 +202,7 @@ private struct CategoriesSection: View {
                 .font(.headline)
                 .foregroundStyle(.primary)
 
-            // Ana kategoriler (büyük kartlar)
+            // Ana kategoriler (büyük kartlar) + Çeviriler
             LazyVGrid(columns: [
                 GridItem(.flexible()),
                 GridItem(.flexible()),
@@ -207,10 +210,21 @@ private struct CategoriesSection: View {
             ], spacing: 12) {
                 ForEach(mainCategories) { category in
                     CategoryCard(
-                        category: category,
+                        icon: category.icon,
+                        colorHex: category.color,
+                        title: category.rawValue,
                         count: viewModel.countForCategory(category)
                     ) { onSelectCategory(category) }
                 }
+
+                // Çeviri geçmişi — annotation değil, kendi listesine gider.
+                CategoryCard(
+                    icon: "character.bubble.fill",
+                    colorHex: "#14B8A6",
+                    title: "notebook.category.translations".localized,
+                    count: viewModel.translationHistory.count,
+                    onTap: onSelectTranslations
+                )
             }
 
             // Renk kategorileri (küçük kartlar)
@@ -232,7 +246,9 @@ private struct CategoriesSection: View {
 }
 
 private struct CategoryCard: View {
-    let category: NotebookCategory
+    let icon: String
+    let colorHex: String
+    let title: String
     let count: Int
     let onTap: () -> Void
 
@@ -241,19 +257,19 @@ private struct CategoryCard: View {
             VStack(spacing: 8) {
                 ZStack {
                     Circle()
-                        .fill(Color(hex: category.color)?.opacity(0.2) ?? Color.gray.opacity(0.2))
+                        .fill(Color(hex: colorHex)?.opacity(0.2) ?? Color.gray.opacity(0.2))
                         .frame(width: 44, height: 44)
 
-                    Image(systemName: category.icon)
+                    Image(systemName: icon)
                         .font(.title3)
-                        .foregroundStyle(Color(hex: category.color) ?? .gray)
+                        .foregroundStyle(Color(hex: colorHex) ?? .gray)
                 }
 
                 Text("\(count)")
                     .font(.headline)
                     .foregroundStyle(.primary)
 
-                Text(category.rawValue)
+                Text(title)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -407,6 +423,7 @@ private struct FileAnnotationRow: View {
         onSelectCategory: { _ in },
         onSelectFile: { _ in },
         onSelectAnnotation: { _ in },
-        onShowAllFiles: {}
+        onShowAllFiles: {},
+        onSelectTranslations: {}
     )
 }

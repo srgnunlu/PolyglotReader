@@ -12,6 +12,9 @@ struct QuickTranslationPopup: View {
     /// Depth layer CTA: hands the selection off to the AI chat. Optional so
     /// contexts without a chat (previews) simply hide the button.
     let onAskAI: (() -> Void)?
+    /// Called once per completed translation with (source, translated) —
+    /// feeds the Notebook's Çeviriler history. Fire-and-forget upstream.
+    let onPersistTranslation: ((String, String) -> Void)?
     let onDismiss: () -> Void
 
     init(
@@ -20,6 +23,7 @@ struct QuickTranslationPopup: View {
         context: String?,
         persistedScale: Binding<CGFloat>,
         onAskAI: (() -> Void)? = nil,
+        onPersistTranslation: ((String, String) -> Void)? = nil,
         onDismiss: @escaping () -> Void
     ) {
         self.selectedText = selectedText
@@ -27,6 +31,7 @@ struct QuickTranslationPopup: View {
         self.context = context
         self._persistedScale = persistedScale
         self.onAskAI = onAskAI
+        self.onPersistTranslation = onPersistTranslation
         self.onDismiss = onDismiss
         self._scale = State(initialValue: persistedScale.wrappedValue)
         self._lastScale = State(initialValue: persistedScale.wrappedValue)
@@ -313,6 +318,8 @@ struct QuickTranslationPopup: View {
                     withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
                         translationPhase = .translated(result.translated)
                     }
+                    // Her tamamlanan çeviri geçmişe akar (Defterim > Çeviriler).
+                    onPersistTranslation?(selectedText, result.translated)
                     logInfo("QuickTranslation", "Çeviri tamamlandı")
                 }
             }

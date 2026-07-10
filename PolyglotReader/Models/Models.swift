@@ -407,6 +407,25 @@ struct DetailedTranslationResult: Codable, Equatable {
     var alternatives: [String]
 }
 
+// MARK: - Translation History Entry
+/// A completed quick-translation persisted for spaced review
+/// (Notebook > Çeviriler category).
+struct TranslationHistoryEntry: Identifiable, Equatable {
+    let id: String
+    let fileId: String
+    let fileName: String
+    let sourceText: String
+    let translatedText: String
+    let createdAt: Date
+
+    var shortDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd MMM"
+        formatter.locale = Locale(identifier: "tr_TR")
+        return formatter.string(from: createdAt)
+    }
+}
+
 // MARK: - Selection Data
 struct SelectionData {
     var text: String

@@ -46,7 +46,8 @@ class PDFReaderViewModel: ObservableObject {
     let fileMetadata: PDFDocumentMetadata
     private let pdfService = PDFService.shared
     private let geminiService = GeminiService.shared
-    private let supabaseService = SupabaseService.shared
+    // Internal: +Translation extension'ı da kullanır.
+    let supabaseService = SupabaseService.shared
     private var pdfData: Data?
 
     // MARK: - Page Pre-rendering
@@ -482,12 +483,6 @@ class PDFReaderViewModel: ObservableObject {
     func clearImageSelection() {
         selectedImage = nil
         showImagePopup = false
-    }
-
-    func toggleQuickTranslationMode() {
-        isQuickTranslationMode.toggle()
-        clearSelection()
-        logInfo("PDFReaderVM", isQuickTranslationMode ? "Hızlı Çeviri Modu açıldı" : "Normal mod")
     }
 
     // MARK: - Annotations
