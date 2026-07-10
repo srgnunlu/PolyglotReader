@@ -14,11 +14,14 @@ struct ReaderDocumentContent: View {
     @Binding var showSearch: Bool
     @Binding var showNavigator: Bool
     let barsVisible: Bool
+    /// Odak modu: tüm chrome (pill'ler, banner, TTS şeridi dahil) gizlenir.
+    let isFocusMode: Bool
     let bottomDockInset: CGFloat
 
     let onSelection: (String, CGRect, Int, [CGRect]) -> Void
     let onAnnotationTap: (Annotation) -> Void
     let onToggleBars: () -> Void
+    let onToggleFocusMode: () -> Void
     let onToggleTTS: () -> Void
     let onClose: () -> Void
 
@@ -63,7 +66,8 @@ struct ReaderDocumentContent: View {
                 // PDF'e tıklandığında barları toggle et
                 onToggleBars()
             },
-            onAnnotationTap: onAnnotationTap
+            onAnnotationTap: onAnnotationTap,
+            onTwoFingerDoubleTap: onToggleFocusMode
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white)
@@ -88,7 +92,7 @@ struct ReaderDocumentContent: View {
                     insertion: .move(edge: .top).combined(with: .opacity),
                     removal: .move(edge: .top).combined(with: .opacity)
                 ))
-            } else if !isPDFRendering {
+            } else if !isPDFRendering && !isFocusMode {
                 // Collapsed top indicator
                 CollapsedBarIndicator(position: .top)
                     .transition(.opacity)
@@ -97,12 +101,12 @@ struct ReaderDocumentContent: View {
             Spacer()
 
             // Taranmış (metin katmanı olmayan) sayfalarda OCR pili
-            if !isPDFRendering {
+            if !isPDFRendering && !isFocusMode {
                 ScannedPageOCRBanner(viewModel: viewModel)
             }
 
             // Sesli okuma kontrol şeridi (okuma aktifken görünür)
-            if speech.isSpeaking && !isPDFRendering {
+            if speech.isSpeaking && !isPDFRendering && !isFocusMode {
                 TTSControlStrip(speech: speech, viewModel: viewModel)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -119,7 +123,7 @@ struct ReaderDocumentContent: View {
                     insertion: .move(edge: .bottom).combined(with: .opacity),
                     removal: .move(edge: .bottom).combined(with: .opacity)
                 ))
-            } else if !isPDFRendering {
+            } else if !isPDFRendering && !isFocusMode {
                 // Collapsed bottom indicator
                 CollapsedBarIndicator(position: .bottom)
                     .transition(.opacity)
