@@ -25,7 +25,7 @@ struct TranslationPopupDetailToggle: View {
                     .font(.caption2.weight(.bold))
                     .rotationEffect(.degrees(isExpanded ? 180 : 0))
 
-                Text(isExpanded ? "Detayı gizle" : "Detay")
+                Text(isExpanded ? "translation.detail.hide".localized : "translation.detail.show".localized)
                     .font(.caption.weight(.semibold))
             }
             .foregroundStyle(DSColor.brand)
@@ -34,7 +34,7 @@ struct TranslationPopupDetailToggle: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isExpanded ? "Çeviri detayını gizle" : "Çeviri detayını göster")
+        .accessibilityLabel(isExpanded ? "translation.detail.hide_a11y".localized : "translation.detail.show_a11y".localized)
     }
 }
 
@@ -69,7 +69,7 @@ struct TranslationPopupDetailPanel: View {
         VStack(spacing: DSSpacing.xs) {
             TranslationWaveIndicator()
 
-            Text("Ayrıntılar getiriliyor...")
+            Text("translation.detail.loading".localized)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -83,7 +83,7 @@ struct TranslationPopupDetailPanel: View {
         VStack(spacing: DSSpacing.sm) {
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: DSSpacing.sm) {
-                    sectionLabel("Bağlam çevirisi")
+                    sectionLabel("translation.detail.contextual".localized)
 
                     Text(detail.contextualTranslation)
                         .font(DSFont.translation)
@@ -92,7 +92,7 @@ struct TranslationPopupDetailPanel: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     if !detail.alternatives.isEmpty {
-                        sectionLabel("Alternatif anlamlar")
+                        sectionLabel("translation.detail.alternatives".localized)
                         alternativeChips(detail.alternatives)
                     }
                 }
@@ -141,7 +141,7 @@ struct TranslationPopupDetailPanel: View {
                 Image(systemName: "message.fill")
                     .font(.caption.weight(.semibold))
 
-                Text("Sohbete taşı")
+                Text("translation.detail.take_to_chat".localized)
                     .font(.subheadline.weight(.semibold))
             }
             .foregroundStyle(.white)
@@ -151,7 +151,7 @@ struct TranslationPopupDetailPanel: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, DSSpacing.md)
-        .accessibilityLabel("Seçimi sohbete taşı")
+        .accessibilityLabel("translation.detail.take_to_chat_a11y".localized)
     }
 
     // MARK: - Failed
@@ -162,13 +162,13 @@ struct TranslationPopupDetailPanel: View {
                 .font(.subheadline)
                 .foregroundStyle(DSColor.warning)
 
-            Text("Detay alınamadı")
+            Text("translation.detail.failed".localized)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
             Spacer()
 
-            Button("Tekrar Dene", action: onRetry)
+            Button("common.retry".localized, action: onRetry)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(DSColor.brand)
         }

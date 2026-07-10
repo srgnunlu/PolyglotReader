@@ -70,11 +70,11 @@ struct ScannedPageOCRBanner: View {
     private var bannerTitle: String {
         switch phase {
         case .idle:
-            return "Taranmış sayfa — metni tanı"
+            return "reader.ocr.idle".localized
         case .recognizing:
-            return "Metin tanınıyor..."
+            return "reader.ocr.recognizing".localized
         case .textNotFound:
-            return "Bu sayfada metin bulunamadı"
+            return "reader.ocr.not_found".localized
         }
     }
 

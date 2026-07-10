@@ -62,14 +62,14 @@ struct NoteDetailSheet: View {
         }
         .animation(.easeInOut(duration: 0.2), value: isEditing)
         .confirmationDialog(
-            "Notu silmek istediğinize emin misiniz?",
+            "notedetail.delete_confirm".localized,
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Sil", role: .destructive) {
+            Button("common.delete".localized, role: .destructive) {
                 deleteWithAnimation()
             }
-            Button("İptal", role: .cancel) { }
+            Button("common.cancel".localized, role: .cancel) { }
         }
         .onAppear {
             noteText = annotation.note ?? ""

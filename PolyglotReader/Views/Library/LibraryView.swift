@@ -204,14 +204,19 @@ struct LibraryView: View {
 
                 // Dosya listesi/grid
                 if viewModel.filteredFiles.isEmpty {
-                    // Boş klasör durumu
+                    // Boş durumlar ayrışır: filtre sonucu boş ≠ klasör boş.
                     VStack(spacing: 12) {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 40))
+                        Image(systemName: viewModel.selectedTags.isEmpty ? "doc.text" : "tag.slash")
+                            .font(.largeTitle)
+                            .imageScale(.large)
                             .foregroundStyle(.secondary)
                             .accessibilityHidden(true)
-                        Text("library.no_files_in_folder".localized)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            viewModel.selectedTags.isEmpty
+                                ? "library.no_files_in_folder".localized
+                                : "library.no_files_filtered".localized
+                        )
+                        .foregroundStyle(.secondary)
                     }
                     .padding(.top, 40)
                     .accessibilityElement(children: .combine)

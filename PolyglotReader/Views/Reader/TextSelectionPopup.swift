@@ -165,7 +165,7 @@ struct TextSelectionPopup: View {
     private var copiedToast: some View {
         HStack(spacing: 6) {
             Image(systemName: "checkmark.circle.fill")
-            Text("Kopyalandı")
+            Text("selection.copied".localized)
         }
         .font(.caption.weight(.semibold))
         .foregroundStyle(.white)
@@ -174,7 +174,7 @@ struct TextSelectionPopup: View {
         .background(Capsule().fill(DSColor.success))
         .dsShadow(.subtle)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Metin kopyalandı")
+        .accessibilityLabel("selection.copied_a11y".localized)
     }
 
     // MARK: - Draggable Area (sadece bu alan sürüklenebilir)
@@ -246,7 +246,7 @@ struct TextSelectionPopup: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(HighlightDotButtonStyle())
-                .accessibilityLabel("\(highlight.localizedName) ile vurgula")
+                .accessibilityLabel("selection.highlight_with".localized(with: highlight.localizedName))
             }
 
             Divider()
@@ -257,18 +257,18 @@ struct TextSelectionPopup: View {
             CompactActionButton(
                 icon: showTranslation ? "character.bubble.fill" : "character.bubble",
                 isActive: showTranslation,
-                accessibilityLabel: "Çevir"
+                accessibilityLabel: "selection.translate".localized
             ) {
                 toggleTranslation()
             }
 
             // AI butonu
-            CompactActionButton(icon: "sparkles", isActive: false, accessibilityLabel: "Yapay zekaya sor") {
+            CompactActionButton(icon: "sparkles", isActive: false, accessibilityLabel: "selection.ask_ai".localized) {
                 onAskAI()
             }
 
             // Kopyala butonu
-            CompactActionButton(icon: "doc.on.doc", isActive: false, accessibilityLabel: "Kopyala") {
+            CompactActionButton(icon: "doc.on.doc", isActive: false, accessibilityLabel: "selection.copy".localized) {
                 copySelection()
             }
 
@@ -276,7 +276,7 @@ struct TextSelectionPopup: View {
             CompactActionButton(
                 icon: "ellipsis",
                 isActive: showMoreActions,
-                accessibilityLabel: showMoreActions ? "Diğer aksiyonları gizle" : "Diğer aksiyonlar"
+                accessibilityLabel: showMoreActions ? "selection.more_hide".localized : "selection.more_show".localized
             ) {
                 showMoreActions.toggle()
             }
@@ -295,7 +295,7 @@ struct TextSelectionPopup: View {
                     .clipShape(Circle())
                     .contentShape(Circle())
             }
-            .accessibilityLabel("Kapat")
+            .accessibilityLabel("common.close".localized)
         }
         .padding(.horizontal, DSSpacing.sm)
         .padding(.vertical, 10)
@@ -307,12 +307,12 @@ struct TextSelectionPopup: View {
     private var expandedActionRow: some View {
         HStack(spacing: DSSpacing.xs) {
             if onAddNote != nil {
-                expandedActionButton(icon: "note.text", title: "Not Ekle") {
+                expandedActionButton(icon: "note.text", title: "selection.add_note".localized) {
                     showNoteSheet = true
                 }
             }
 
-            expandedActionButton(icon: "square.and.arrow.up", title: "Paylaş") {
+            expandedActionButton(icon: "square.and.arrow.up", title: "selection.share".localized) {
                 shareText()
             }
 
@@ -350,7 +350,7 @@ struct TextSelectionPopup: View {
                 VStack(spacing: DSSpacing.xs) {
                     TranslationWaveIndicator()
 
-                    Text("Çevriliyor...")
+                    Text("translation.loading".localized)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -378,7 +378,7 @@ struct TextSelectionPopup: View {
                         .foregroundStyle(DSColor.warning)
                         .font(.subheadline)
 
-                    Text("Çeviri yapılamadı")
+                    Text("translation.failed".localized)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
@@ -387,7 +387,7 @@ struct TextSelectionPopup: View {
                     Button {
                         startTranslation()
                     } label: {
-                        Text("Tekrar Dene")
+                        Text("common.retry".localized)
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundStyle(DSColor.brand)

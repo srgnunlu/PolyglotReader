@@ -16,7 +16,7 @@ struct ReaderTopBar: View {
     var body: some View {
         HStack(spacing: DSSpacing.sm) {
             ReaderIconButton(systemName: "xmark", action: onClose)
-                .accessibilityLabel("Kapat")
+                .accessibilityLabel("common.close".localized)
 
             titleMorphLabel
 
@@ -30,7 +30,7 @@ struct ReaderTopBar: View {
             ReaderIconButton(systemName: "magnifyingglass") {
                 showSearch = true
             }
-            .accessibilityLabel("Ara")
+            .accessibilityLabel("reader.search".localized)
         }
         .padding(.horizontal, DSSpacing.sm)
         .padding(.vertical, DSSpacing.xs)
@@ -72,7 +72,7 @@ struct ReaderTopBar: View {
     }
 
     private var pageCounterText: String {
-        "Sayfa \(viewModel.currentPage) / \(viewModel.totalPages)"
+        "reader.page_counter".localized(with: viewModel.currentPage, viewModel.totalPages)
     }
 
     private var accessibilityTitle: String {

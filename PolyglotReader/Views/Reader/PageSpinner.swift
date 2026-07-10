@@ -34,7 +34,7 @@ struct PageSpinner: View {
             .padding(.vertical, 6)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Sayfa \(currentPage) / \(max(totalPages, 1)), sayfa seç")
+        .accessibilityLabel("reader.page_picker.accessibility".localized(with: currentPage, max(totalPages, 1)))
         .popover(isPresented: $showPicker, arrowEdge: .bottom) {
             PagePickerPopover(
                 selectedPage: $selectedPage,
@@ -67,7 +67,7 @@ struct PagePickerPopover: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Button("İptal") {
+                Button("common.cancel".localized) {
                     onCancel()
                 }
                 .font(.subheadline)
@@ -75,12 +75,12 @@ struct PagePickerPopover: View {
 
                 Spacer()
 
-                Text("Sayfa Seç")
+                Text("reader.page_picker.title".localized)
                     .font(.subheadline.weight(.semibold))
 
                 Spacer()
 
-                Button("Git") {
+                Button("reader.page_picker.go".localized) {
                     onConfirm(selectedPage)
                 }
                 .font(.subheadline.weight(.semibold))

@@ -40,7 +40,7 @@ struct ReaderBottomBar: View {
             pageStepButton(systemName: "chevron.left", disabled: viewModel.currentPage <= 1) {
                 viewModel.previousPage()
             }
-            .accessibilityLabel("Önceki sayfa")
+            .accessibilityLabel("reader.previous_page".localized)
 
             // Inline Page Spinner - popover ile sayfa seçimi
             PageSpinner(
@@ -53,7 +53,7 @@ struct ReaderBottomBar: View {
             pageStepButton(systemName: "chevron.right", disabled: viewModel.currentPage >= viewModel.totalPages) {
                 viewModel.nextPage()
             }
-            .accessibilityLabel("Sonraki sayfa")
+            .accessibilityLabel("reader.next_page".localized)
         }
     }
 
@@ -80,8 +80,8 @@ struct ReaderBottomBar: View {
         .buttonStyle(.plain)
         .dsAnimation(DSMotion.snappy, value: viewModel.isQuickTranslationMode)
         .dsHaptic(.selection, trigger: viewModel.isQuickTranslationMode)
-        .accessibilityLabel("Hızlı çeviri")
-        .accessibilityValue(viewModel.isQuickTranslationMode ? "Açık" : "Kapalı")
+        .accessibilityLabel("reader.quick_translation".localized)
+        .accessibilityValue(viewModel.isQuickTranslationMode ? "common.on".localized : "common.off".localized)
         .accessibilityAddTraits(.isButton)
     }
 
@@ -94,7 +94,7 @@ struct ReaderBottomBar: View {
                 .font(DSFont.controlIconProminent)
 
             if viewModel.isQuickTranslationMode {
-                Text("Çeviri Açık")
+                Text("reader.translation_on".localized)
                     .font(DSFont.meta.weight(.semibold))
             }
         }
@@ -131,7 +131,7 @@ struct ReaderBottomBar: View {
                     chatButtonLabel
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Sohbet")
+                .accessibilityLabel("reader.chat".localized)
             }
         }
     }

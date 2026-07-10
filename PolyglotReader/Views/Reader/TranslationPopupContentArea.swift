@@ -40,7 +40,7 @@ struct TranslationPopupContentArea: View {
         VStack(spacing: DSSpacing.sm) {
             TranslationWaveIndicator()
 
-            Text("Çevriliyor...")
+            Text("translation.loading".localized)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -73,7 +73,7 @@ struct TranslationPopupContentArea: View {
                 .font(.title2)
                 .foregroundStyle(DSColor.warning)
 
-            Text("Çeviri yapılamadı")
+            Text("translation.failed".localized)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

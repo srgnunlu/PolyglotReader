@@ -41,7 +41,7 @@ struct PDFReaderView: View {
                     VStack(spacing: 16) {
                         ProgressView()
                             .scaleEffect(1.2)
-                        Text("Doküman yükleniyor...")
+                        Text("reader.loading_document".localized)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

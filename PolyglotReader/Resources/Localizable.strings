@@ -545,3 +545,62 @@
 "onboarding.page3.chat" = "Sohbet";
 "onboarding.page3.quiz" = "Quiz";
 "onboarding.page3.notebook" = "Defter";
+
+/* ===========================================
+   MARK: - Reader Family (Faz 4.6 sweep)
+   =========================================== */
+
+"common.on" = "Açık";
+"common.off" = "Kapalı";
+
+"reader.loading_document" = "Doküman yükleniyor...";
+"reader.page_counter" = "Sayfa %d / %d";
+"reader.previous_page" = "Önceki sayfa";
+"reader.next_page" = "Sonraki sayfa";
+"reader.translation_on" = "Çeviri Açık";
+"reader.quick_translation" = "Hızlı çeviri";
+"reader.chat" = "Sohbet";
+"reader.search" = "Ara";
+"reader.page_picker.title" = "Sayfa Seç";
+"reader.page_picker.go" = "Git";
+"reader.page_picker.accessibility" = "Sayfa %d / %d, sayfa seç";
+"reader.ocr.idle" = "Taranmış sayfa — metni tanı";
+"reader.ocr.recognizing" = "Metin tanınıyor...";
+"reader.ocr.not_found" = "Bu sayfada metin bulunamadı";
+
+"reader.search.title" = "Dokümanda Ara";
+"reader.search.placeholder" = "Ara...";
+"reader.search.prompt" = "Dokümanda aramak için bir kelime yazın";
+"reader.search.no_results" = "Sonuç bulunamadı";
+"reader.search.clear" = "Aramayı temizle";
+"reader.search.result_count" = "%d sonuç";
+"reader.search.previous" = "Önceki sonuç";
+"reader.search.next" = "Sonraki sonuç";
+
+"translation.loading" = "Çevriliyor...";
+"translation.failed" = "Çeviri yapılamadı";
+"translation.detail.show" = "Detay";
+"translation.detail.hide" = "Detayı gizle";
+"translation.detail.show_a11y" = "Çeviri detayını göster";
+"translation.detail.hide_a11y" = "Çeviri detayını gizle";
+"translation.detail.loading" = "Ayrıntılar getiriliyor...";
+"translation.detail.contextual" = "Bağlam çevirisi";
+"translation.detail.alternatives" = "Alternatif anlamlar";
+"translation.detail.take_to_chat" = "Sohbete taşı";
+"translation.detail.take_to_chat_a11y" = "Seçimi sohbete taşı";
+"translation.detail.failed" = "Detay alınamadı";
+
+"selection.copied" = "Kopyalandı";
+"selection.copied_a11y" = "Metin kopyalandı";
+"selection.highlight_with" = "%@ ile vurgula";
+"selection.translate" = "Çevir";
+"selection.ask_ai" = "Yapay zekaya sor";
+"selection.copy" = "Kopyala";
+"selection.more_show" = "Diğer aksiyonlar";
+"selection.more_hide" = "Diğer aksiyonları gizle";
+"selection.add_note" = "Not Ekle";
+"selection.share" = "Paylaş";
+
+"library.no_files_filtered" = "Bu filtreyle eşleşen dosya yok";
+"notedetail.delete_confirm" = "Notu silmek istediğinize emin misiniz?";
+"navigator.outline_entry" = "%@, Sayfa %d";
