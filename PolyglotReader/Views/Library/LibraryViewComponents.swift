@@ -111,34 +111,6 @@ struct EmptyLibraryView: View {
     }
 }
 
-// MARK: - Sort Controls
-struct SortControlsView: View {
-    @ObservedObject var viewModel: LibraryViewModel
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(LibraryViewModel.SortOption.allCases, id: \.self) { option in
-                    LiquidGlassPillButton(
-                        title: option.rawValue,
-                        icon: viewModel.sortBy == option ?
-                            (viewModel.sortOrder == .ascending ? "chevron.up" : "chevron.down") : nil,
-                        isSelected: viewModel.sortBy == option
-                    ) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            viewModel.toggleSort(option)
-                        }
-                    }
-                    .accessibilityLabel(option.rawValue)
-                    .accessibilityAddTraits(viewModel.sortBy == option ? .isSelected : [])
-                }
-
-                Spacer()
-            }
-        }
-    }
-}
-
 // MARK: - Uploading Overlay
 struct UploadingOverlay: View {
     let progress: Double

@@ -95,51 +95,6 @@ enum LiquidGlassIntensity {
     }
 }
 
-// MARK: - Liquid Glass Button Style
-struct LiquidGlassButtonStyle: ButtonStyle {
-    var isSelected: Bool = false
-    var accentColor: Color = .indigo
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background {
-                ZStack {
-                    Capsule()
-                        .fill(isSelected ? .ultraThinMaterial : .ultraThinMaterial)
-
-                    if isSelected {
-                        // Seçili durum için glow
-                        Capsule()
-                            .fill(accentColor.opacity(0.15))
-
-                        Capsule()
-                            .stroke(accentColor.opacity(0.4), lineWidth: 1)
-                    } else {
-                        // Normal durum için subtle border
-                        Capsule()
-                            .stroke(.white.opacity(0.3), lineWidth: 0.5)
-                    }
-
-                    // Üst parlama
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [.white.opacity(0.3), .clear],
-                                startPoint: .top,
-                                endPoint: .center
-                            )
-                        )
-                        .padding(1)
-                }
-            }
-            .foregroundStyle(isSelected ? accentColor : .secondary)
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
-    }
-}
-
 // MARK: - Liquid Glass Search Bar
 struct LiquidGlassSearchBar: View {
     @Binding var text: String
@@ -177,29 +132,6 @@ struct LiquidGlassSearchBar: View {
     }
 }
 
-// MARK: - Liquid Glass Pill Button
-struct LiquidGlassPillButton: View {
-    let title: String
-    let icon: String?
-    var isSelected: Bool = false
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                if let icon = icon {
-                    Image(systemName: icon)
-                        .font(.caption)
-                }
-                Text(title)
-                    .font(.caption)
-                    .fontWeight(isSelected ? .semibold : .medium)
-            }
-        }
-        .buttonStyle(LiquidGlassButtonStyle(isSelected: isSelected))
-    }
-}
-
 // MARK: - Preview
 #Preview {
     ZStack {
@@ -214,13 +146,6 @@ struct LiquidGlassPillButton: View {
             // Search Bar
             LiquidGlassSearchBar(text: .constant(""), placeholder: "Dosya ara...")
                 .padding(.horizontal)
-
-            // Pills
-            HStack(spacing: 8) {
-                LiquidGlassPillButton(title: "Tarih", icon: "chevron.down", isSelected: true) {}
-                LiquidGlassPillButton(title: "İsim", icon: nil, isSelected: false) {}
-                LiquidGlassPillButton(title: "Boyut", icon: nil, isSelected: false) {}
-            }
 
             Spacer()
         }

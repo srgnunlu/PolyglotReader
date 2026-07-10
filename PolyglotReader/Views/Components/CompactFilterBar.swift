@@ -7,6 +7,7 @@ import SwiftUI
 struct CompactFilterBar: View {
     @ObservedObject var viewModel: LibraryViewModel
     @State private var showTagPopover = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 8) {
@@ -32,7 +33,8 @@ struct CompactFilterBar: View {
                     isSelected: viewModel.sortBy == option,
                     sortOrder: viewModel.sortBy == option ? viewModel.sortOrder : nil
                 ) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    DSHaptics.selection()
+                    withAnimation(DSMotion.resolved(DSMotion.snappy, reduceMotion: reduceMotion)) {
                         viewModel.toggleSort(option)
                     }
                 }
@@ -47,7 +49,7 @@ struct CompactFilterBar: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "tag.fill")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.caption.weight(.medium))
 
                 if !viewModel.selectedTags.isEmpty {
                     Text(String(viewModel.selectedTags.count))
@@ -55,7 +57,7 @@ struct CompactFilterBar: View {
                         .fontWeight(.bold)
                         .foregroundStyle(.white)
                         .frame(minWidth: 16, minHeight: 16)
-                        .background(Circle().fill(Color.indigo))
+                        .background(Circle().fill(DSColor.brand))
                 }
             }
             .padding(.horizontal, 10)
@@ -64,17 +66,17 @@ struct CompactFilterBar: View {
                 Capsule()
                     .fill(viewModel.selectedTags.isEmpty ?
                           Color(.tertiarySystemBackground) :
-                          Color.indigo.opacity(0.15))
+                          DSColor.brand.opacity(0.15))
                     .overlay {
                         Capsule()
                             .stroke(viewModel.selectedTags.isEmpty ?
                                    Color.clear :
-                                   Color.indigo.opacity(0.3), lineWidth: 1)
+                                   DSColor.brand.opacity(0.3), lineWidth: 1)
                     }
             }
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(viewModel.selectedTags.isEmpty ? Color.secondary : Color.indigo)
+        .buttonStyle(DSPressableButtonStyle())
+        .foregroundStyle(viewModel.selectedTags.isEmpty ? Color.secondary : DSColor.brand)
         .popover(isPresented: $showTagPopover, arrowEdge: .bottom) {
             TagSelectionPopover(viewModel: viewModel)
         }
@@ -98,7 +100,8 @@ struct CompactSortPill: View {
 
                 if let order = sortOrder {
                     Image(systemName: order == .ascending ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.caption2.weight(.bold))
+                        .imageScale(.small)
                 }
             }
             .padding(.horizontal, 10)
@@ -106,16 +109,16 @@ struct CompactSortPill: View {
             .background {
                 Capsule()
                     .fill(isSelected ?
-                          Color.indigo.opacity(0.15) :
+                          DSColor.brand.opacity(0.15) :
                           Color(.tertiarySystemBackground))
             }
             .overlay {
                 Capsule()
-                    .stroke(isSelected ? Color.indigo.opacity(0.3) : Color.clear, lineWidth: 1)
+                    .stroke(isSelected ? DSColor.brand.opacity(0.3) : Color.clear, lineWidth: 1)
             }
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(isSelected ? .indigo : .secondary)
+        .buttonStyle(DSPressableButtonStyle())
+        .foregroundStyle(isSelected ? DSColor.brand : .secondary)
     }
 }
 
@@ -148,7 +151,8 @@ struct TagSelectionPopover: View {
                                 tag: tag,
                                 isSelected: viewModel.selectedTags.contains(tag.id)
                             ) {
-                                withAnimation(.spring(response: 0.25)) {
+                                DSHaptics.selection()
+                                withAnimation(DSMotion.snappy) {
                                     viewModel.toggleTagFilter(tag.id)
                                 }
                             }
@@ -167,7 +171,7 @@ struct TagSelectionPopover: View {
                                 viewModel.clearTagFilters()
                             }
                         }
-                        .foregroundStyle(.indigo)
+                        .foregroundStyle(DSColor.brand)
                     }
                 }
 
@@ -225,7 +229,7 @@ struct TagSelectionRow: View {
                 // Seçim işareti
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(isSelected ? .indigo : .secondary)
+                    .foregroundStyle(isSelected ? DSColor.brand : .secondary)
             }
             .contentShape(Rectangle())
         }

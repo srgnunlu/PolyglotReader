@@ -57,6 +57,8 @@ struct NotebookView: View {
                 .refreshable {
                     await viewModel.refreshAnnotations()
                 }
+                // Pull-to-refresh spinner picks up the brand hue.
+                .tint(DSColor.brand)
                 .alert("common.error".localized, isPresented: .init(
                     get: { viewModel.errorMessage != nil },
                     set: { if !$0 { viewModel.errorMessage = nil } }

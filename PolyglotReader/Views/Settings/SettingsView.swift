@@ -83,7 +83,8 @@ struct SettingsView: View {
                     Toggle(isOn: $settingsViewModel.preferences.autoSummary) {
                         Label("settings.auto_summary".localized, systemImage: "doc.text.magnifyingglass")
                     }
-                    .tint(.indigo)
+                    .tint(DSColor.brand)
+                    .dsHaptic(.selection, trigger: settingsViewModel.preferences.autoSummary)
                     .accessibilityLabel("settings.accessibility.auto_summary".localized)
                     .accessibilityHint("settings.accessibility.auto_summary.hint".localized)
                     .accessibilityIdentifier("auto_summary_toggle")
@@ -91,7 +92,8 @@ struct SettingsView: View {
                     Toggle(isOn: $settingsViewModel.preferences.enableNotifications) {
                         Label("settings.notifications".localized, systemImage: "bell")
                     }
-                    .tint(.indigo)
+                    .tint(DSColor.brand)
+                    .dsHaptic(.selection, trigger: settingsViewModel.preferences.enableNotifications)
                     .accessibilityLabel("settings.accessibility.notifications".localized)
                     .accessibilityHint("settings.accessibility.notifications.hint".localized)
                     .accessibilityIdentifier("notifications_toggle")
@@ -123,7 +125,8 @@ struct SettingsView: View {
                         Toggle(isOn: $keepAliveService.isEnabled) {
                             Label("Supabase Keep-Alive", systemImage: "cloud")
                         }
-                        .tint(.indigo)
+                        .tint(DSColor.brand)
+                        .dsHaptic(.selection, trigger: keepAliveService.isEnabled)
 
                         if keepAliveService.isEnabled {
                             VStack(alignment: .leading, spacing: 8) {

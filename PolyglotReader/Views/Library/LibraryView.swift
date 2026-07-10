@@ -44,6 +44,8 @@ struct LibraryView: View {
                     await viewModel.loadFiles()
                     await viewModel.loadFoldersAndTags()
                 }
+                // Pull-to-refresh spinner picks up the brand hue.
+                .tint(DSColor.brand)
                 .overlay {
                     if viewModel.isUploading {
                         UploadingOverlay(progress: viewModel.uploadProgress)

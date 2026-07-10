@@ -97,7 +97,7 @@ struct PDFCardView: View {
             }
             .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
         }
-        .buttonStyle(PDFCardButtonStyle())
+        .buttonStyle(DSPressableButtonStyle())
         .accessibilityAddTraits(isSelectionMode && isSelected ? [.isSelected] : [])
     }
 
@@ -230,15 +230,6 @@ struct PDFCardView: View {
     }
 }
 
-// MARK: - PDF Card Button Style
-struct PDFCardButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
-    }
-}
-
 // MARK: - PDF List Row View
 struct PDFListRowView: View {
     let file: PDFDocumentMetadata
@@ -331,7 +322,7 @@ struct PDFListRowView: View {
                 }
             }
         }
-        .buttonStyle(PDFCardButtonStyle())
+        .buttonStyle(DSPressableButtonStyle())
         .accessibilityAddTraits(isSelectionMode && isSelected ? [.isSelected] : [])
     }
 
