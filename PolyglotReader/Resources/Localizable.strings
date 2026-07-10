@@ -512,3 +512,26 @@
 "highlight.color.pink" = "Pembe";
 "highlight.color.blue" = "Mavi";
 "highlight.color.other" = "Diğer";
+
+/* ===========================================
+   MARK: - Onboarding
+   =========================================== */
+
+"onboarding.skip" = "Atla";
+"onboarding.continue" = "Devam Et";
+"onboarding.start" = "Başla";
+"onboarding.accessibility.page" = "Sayfa %d / %d";
+
+"onboarding.page1.title" = "Oku";
+"onboarding.page1.subtitle" = "PDF'lerini yükle; notların ve kaldığın sayfa her cihazda seninle.";
+
+"onboarding.page2.title" = "Seç, anında anla";
+"onboarding.page2.subtitle" = "Bir cümleyi seçmen yeter — çeviri anında yanında belirir.";
+"onboarding.page2.sample" = "The heart pumps blood through the circulatory system.";
+"onboarding.page2.sample_translation" = "Kalp, kanı dolaşım sistemi boyunca pompalar.";
+
+"onboarding.page3.title" = "Sor, sına, hatırla";
+"onboarding.page3.subtitle" = "Dokümanına soru sor, quizle kendini sına, notların hep elinin altında.";
+"onboarding.page3.chat" = "Sohbet";
+"onboarding.page3.quiz" = "Quiz";
+"onboarding.page3.notebook" = "Defter";

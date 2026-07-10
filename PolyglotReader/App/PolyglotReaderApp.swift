@@ -72,16 +72,20 @@ struct PolyglotReaderApp: App {
 struct ContentView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var errorHandlingService: ErrorHandlingService
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
 
     var body: some View {
         Group {
             if authViewModel.isAuthenticated {
                 MainTabView()
+            } else if !hasSeenOnboarding {
+                OnboardingView()
             } else {
                 AuthView()
             }
         }
         .animation(.easeInOut, value: authViewModel.isAuthenticated)
+        .animation(.easeInOut, value: hasSeenOnboarding)
         .overlay(alignment: .top) {
             if let banner = errorHandlingService.banner {
                 ErrorBannerView(banner: banner) {
@@ -101,7 +105,7 @@ struct ContentView: View {
         }
         .onAppear {
             errorHandlingService.recordAppState(
-                currentScreen: authViewModel.isAuthenticated ? "MainTab" : "Auth",
+                currentScreen: initialScreenName,
                 isAuthenticated: authViewModel.isAuthenticated
             )
 
@@ -116,6 +120,11 @@ struct ContentView: View {
                 isAuthenticated: newValue
             )
         }
+    }
+
+    private var initialScreenName: String {
+        if authViewModel.isAuthenticated { return "MainTab" }
+        return hasSeenOnboarding ? "Auth" : "Onboarding"
     }
 
     private func buildAlert(for alert: ErrorHandlingService.ErrorAlert) -> Alert {
