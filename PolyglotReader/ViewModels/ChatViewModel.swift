@@ -8,6 +8,8 @@ class ChatViewModel: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var inputText = ""
     @Published var isLoading = false
+    /// True while the persisted chat history is being fetched (skeleton state).
+    @Published var isLoadingHistory = false
     @Published var errorMessage: String?
     @Published var selectedText: String? // Store text selected in PDF
     @Published var selectedImage: Data?  // Store image selected in PDF (JPEG data)
@@ -91,6 +93,8 @@ class ChatViewModel: ObservableObject {
     let fileId: String
     private let fileUUID: UUID?
     weak var pdfDocument: PDFDocument?  // PDF referansı (görsel çıkarma için)
+    /// Guards loadHistoryIfNeeded so reopening the chat sheet doesn't refetch.
+    var hasLoadedHistory = false
 
     // MARK: - Smart Suggestions (P4)
     /// Dinamik öneriler - SmartSuggestionService'den alınır

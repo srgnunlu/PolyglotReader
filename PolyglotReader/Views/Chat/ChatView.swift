@@ -32,6 +32,11 @@ struct ChatView: View {
                     ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 12) {
+                            // Geçmiş yüklenirken balon iskeletleri (yalnız içerik iskeletlenir).
+                            if viewModel.isLoadingHistory && viewModel.messages.count <= 1 {
+                                ChatHistorySkeleton()
+                            }
+
                             ForEach(viewModel.messages) { message in
                                 MessageBubble(
                                     message: message,
@@ -327,6 +332,11 @@ struct ChatView: View {
             // doesn't keep mutating the message list in the background.
             .onDisappear {
                 viewModel.cancelActiveStream()
+            }
+            // Persisted history loads once per reader session; the skeleton
+            // above covers the fetch window.
+            .task {
+                await viewModel.loadHistoryIfNeeded()
             }
             }
         }

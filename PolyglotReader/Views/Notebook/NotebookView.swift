@@ -184,51 +184,51 @@ struct NotebookView: View {
     }
 }
 
-// MARK: - Premium Loading View
+// MARK: - Loading Skeleton
+/// Dashboard-shaped skeleton: mirrors the stats header + category grid +
+/// file rows so the loaded layout lands without a jump. Only content is
+/// skeletonned — chrome never is.
 struct NotebookLoadingView: View {
-    @State private var isAnimating = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .stroke(
-                        LinearGradient(
-                            colors: [.purple.opacity(0.2), .indigo.opacity(0.2)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 4
-                    )
-                    .frame(width: 50, height: 50)
+        ScrollView {
+            VStack(spacing: DSSpacing.lg) {
+                // Stats header placeholder (3 cards)
+                HStack(spacing: DSSpacing.md) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        SkeletonBlock(cornerRadius: DSRadius.medium)
+                            .frame(height: 96)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
 
-                Circle()
-                    .trim(from: 0, to: 0.7)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.purple, .indigo],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                    )
-                    .frame(width: 50, height: 50)
-                    .rotationEffect(.degrees(isAnimating ? 360 : 0))
-                    .animation(
-                        reduceMotion ? nil : .linear(duration: 1).repeatForever(autoreverses: false),
-                        value: isAnimating
-                    )
+                // Category grid placeholder (2x2)
+                VStack(spacing: DSSpacing.sm) {
+                    ForEach(0..<2, id: \.self) { _ in
+                        HStack(spacing: DSSpacing.sm) {
+                            SkeletonBlock(cornerRadius: DSRadius.medium)
+                                .frame(height: 72)
+                                .frame(maxWidth: .infinity)
+                            SkeletonBlock(cornerRadius: DSRadius.medium)
+                                .frame(height: 72)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                }
+
+                // File rows placeholder
+                VStack(spacing: DSSpacing.sm) {
+                    ForEach(0..<2, id: \.self) { _ in
+                        SkeletonBlock(cornerRadius: DSRadius.medium)
+                            .frame(height: 56)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
             }
-            .accessibilityHidden(true)
-
-            Text("notebook.loading".localized)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            .padding()
         }
-        .accessibilityElement(children: .combine)
+        .scrollDisabled(true)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("notebook.loading".localized)
-        .onAppear { isAnimating = true }
     }
 }
 

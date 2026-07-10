@@ -61,7 +61,16 @@ extension ChatViewModel {
 
     // MARK: - Load History
 
-    func loadHistory() async {
+    /// Fetches the persisted chat history once per reader session; repeated
+    /// sheet openings reuse the in-memory messages. A non-empty history
+    /// replaces the welcome message wholesale.
+    func loadHistoryIfNeeded() async {
+        guard !hasLoadedHistory else { return }
+        hasLoadedHistory = true
+
+        isLoadingHistory = true
+        defer { isLoadingHistory = false }
+
         do {
             let history = try await supabaseService.getChatHistory(fileId: fileId)
             if !history.isEmpty {

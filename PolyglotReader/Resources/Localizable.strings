@@ -165,6 +165,9 @@
 /* Navigation */
 "chat.title" = "AI Asistan";
 
+/* History */
+"chat.history.loading" = "Sohbet geçmişi yükleniyor...";
+
 /* Input */
 "chat.placeholder" = "Bir şey sor...";
 "chat.send" = "Gönder";
