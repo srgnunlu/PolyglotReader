@@ -95,41 +95,6 @@ enum LiquidGlassIntensity {
     }
 }
 
-// MARK: - Liquid Glass Card
-/// Liquid glass tasarımlı kart bileşeni
-struct LiquidGlassCard<Content: View>: View {
-    let content: Content
-    var cornerRadius: CGFloat = 20
-    var accentColor: Color = .indigo
-    var shadowOpacity: Double = 0.12
-
-    init(
-        cornerRadius: CGFloat = 20,
-        accentColor: Color = .indigo,
-        shadowOpacity: Double = 0.12,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.cornerRadius = cornerRadius
-        self.accentColor = accentColor
-        self.shadowOpacity = shadowOpacity
-        self.content = content()
-    }
-
-    var body: some View {
-        content
-            .background {
-                LiquidGlassBackground(
-                    cornerRadius: cornerRadius,
-                    intensity: .medium,
-                    accentColor: accentColor
-                )
-            }
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            .shadow(color: .black.opacity(shadowOpacity), radius: 12, x: 0, y: 6)
-            .shadow(color: accentColor.opacity(0.08), radius: 20, x: 0, y: 10)
-    }
-}
-
 // MARK: - Liquid Glass Button Style
 struct LiquidGlassButtonStyle: ButtonStyle {
     var isSelected: Bool = false
@@ -212,67 +177,6 @@ struct LiquidGlassSearchBar: View {
     }
 }
 
-// MARK: - Liquid Glass Tab Bar
-struct LiquidGlassTabBar: View {
-    @Binding var selectedTab: Int
-    let tabs: [(icon: String, title: String)]
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                tabButton(for: index, icon: tab.icon, title: tab.title)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
-        .background {
-            LiquidGlassBackground(
-                cornerRadius: 28,
-                intensity: .medium,
-                accentColor: .indigo
-            )
-        }
-        .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
-        .shadow(color: .indigo.opacity(0.1), radius: 30, x: 0, y: 15)
-        .padding(.horizontal, 40)
-        .padding(.bottom, 20)
-    }
-
-    private func tabButton(for index: Int, icon: String, title: String) -> some View {
-        let isSelected = selectedTab == index
-
-        return Button {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                selectedTab = index
-            }
-        } label: {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
-
-                Text(title)
-                    .font(.caption2)
-                    .fontWeight(isSelected ? .semibold : .regular)
-            }
-            .foregroundStyle(isSelected ? .indigo : .secondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background {
-                if isSelected {
-                    Capsule()
-                        .fill(.indigo.opacity(0.12))
-                        .overlay {
-                            Capsule()
-                                .stroke(.indigo.opacity(0.2), lineWidth: 1)
-                        }
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 // MARK: - Liquid Glass Pill Button
 struct LiquidGlassPillButton: View {
     let title: String
@@ -293,36 +197,6 @@ struct LiquidGlassPillButton: View {
             }
         }
         .buttonStyle(LiquidGlassButtonStyle(isSelected: isSelected))
-    }
-}
-
-// MARK: - View Extension
-extension View {
-    /// Liquid glass efekti uygular
-    func liquidGlass(
-        cornerRadius: CGFloat = 20,
-        intensity: LiquidGlassIntensity = .medium,
-        accentColor: Color = .indigo
-    ) -> some View {
-        self
-            .background {
-                LiquidGlassBackground(
-                    cornerRadius: cornerRadius,
-                    intensity: intensity,
-                    accentColor: accentColor
-                )
-            }
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-    }
-
-    /// Liquid glass efekti ile shadow
-    func liquidGlassCard(
-        cornerRadius: CGFloat = 20,
-        shadowOpacity: Double = 0.12
-    ) -> some View {
-        self
-            .liquidGlass(cornerRadius: cornerRadius)
-            .shadow(color: .black.opacity(shadowOpacity), radius: 12, x: 0, y: 6)
     }
 }
 
@@ -348,31 +222,7 @@ extension View {
                 LiquidGlassPillButton(title: "Boyut", icon: nil, isSelected: false) {}
             }
 
-            // Card
-            LiquidGlassCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Örnek PDF.pdf")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                    Text("1.2 MB • 20 Ara 2025")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding()
-            }
-            .frame(width: 180)
-
             Spacer()
-
-            // Tab Bar
-            LiquidGlassTabBar(
-                selectedTab: .constant(0),
-                tabs: [
-                    ("books.vertical", "Kütüphane"),
-                    ("bookmark.fill", "Defterim"),
-                    ("gearshape.fill", "Ayarlar")
-                ]
-            )
         }
         .padding(.top, 50)
     }
