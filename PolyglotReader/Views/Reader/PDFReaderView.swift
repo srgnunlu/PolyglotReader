@@ -177,9 +177,7 @@ struct PDFReaderView: View {
                 startAutoHideTimer()
             }
             .onDisappear {
-                // PDF kapatıldığında popup session memory'sini sıfırla
-                QuickTranslationPopup.resetSessionMemory()
-                logDebug("PDFReaderView", "View disappeared, popup session memory reset")
+                logDebug("PDFReaderView", "View disappeared")
                 speech.stop()
                 autoHideTimer?.invalidate()
             }

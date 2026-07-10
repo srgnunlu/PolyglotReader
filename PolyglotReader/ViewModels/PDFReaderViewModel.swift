@@ -35,6 +35,9 @@ class PDFReaderViewModel: ObservableObject {
     // Hızlı Çeviri Modu
     @Published var isQuickTranslationMode = false
     @Published var showQuickTranslation = false
+    /// Popup pinch scale, remembered for the PDF session. Lives here (not as
+    /// popup static state) so it naturally resets when the reader closes.
+    @Published var translationPopupScale: CGFloat = 1.0
 
     // Görsel Seçim
     @Published var selectedImage: PDFImageInfo?

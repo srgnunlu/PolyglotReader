@@ -37,6 +37,16 @@ extension View {
     func dsHaptic(_ event: DSHapticEvent, trigger: some Equatable) -> some View {
         sensoryFeedback(event.feedback, trigger: trigger)
     }
+
+    /// Declarative haptic that fires only for specific transitions
+    /// (e.g. appear-only: `{ _, new in new }` on a visibility flag).
+    func dsHaptic<T: Equatable>(
+        _ event: DSHapticEvent,
+        trigger: T,
+        condition: @escaping (T, T) -> Bool
+    ) -> some View {
+        sensoryFeedback(event.feedback, trigger: trigger) { old, new in condition(old, new) }
+    }
 }
 
 // MARK: - Imperative Escape Hatch

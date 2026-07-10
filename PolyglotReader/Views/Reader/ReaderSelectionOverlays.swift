@@ -55,7 +55,8 @@ struct ReaderSelectionOverlays: View {
             QuickTranslationPopup(
                 selectedText: text,
                 selectionRect: rect,
-                context: viewModel.fileMetadata.summary
+                context: viewModel.fileMetadata.summary,
+                persistedScale: $viewModel.translationPopupScale
             ) {
                 viewModel.showQuickTranslation = false
                 // Hızlı mod aktifse sadece seçimi temizle, büyük popup'a dönme

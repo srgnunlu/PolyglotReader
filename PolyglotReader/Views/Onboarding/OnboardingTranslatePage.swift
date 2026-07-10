@@ -90,9 +90,7 @@ struct OnboardingTranslatePage: View {
             TranslationPopupContentArea(phase: popupPhase, maxHeight: 150)
         }
         .frame(width: 300)
-        .background { TranslationPopupBackground(cornerRadius: DSRadius.popup) }
-        .clipShape(RoundedRectangle(cornerRadius: DSRadius.popup, style: .continuous))
-        .dsShadow(.floating)
+        .translationPopupSurface()
         .scaleEffect(popupVisible ? 1 : 0.92, anchor: .top)
         .opacity(popupVisible ? 1 : 0)
         .dsAnimation(DSMotion.snappy, value: popupVisible)

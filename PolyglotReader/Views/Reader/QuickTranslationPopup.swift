@@ -3,19 +3,32 @@ import SwiftUI
 /// Seçilen metnin altında görünen hızlı çeviri popup'ı
 /// Liquid Glass tasarımlı, sürüklenebilir ve ölçeklenebilir
 struct QuickTranslationPopup: View {
-    // MARK: - Session Memory (PDF oturumu boyunca hatırlanır)
-    /// PDF kapatılınca sıfırlanır, aynı oturumda hatırlanır.
-    /// TECH-DEBT: static state is shared across popup instances. Safe today because
-    /// only one popup exists at a time and access is main-thread only; scoping it
-    /// per instance would require changing the frozen public API.
-    private static var sessionScale: CGFloat = 1.0
-
     let selectedText: String
     let selectionRect: CGRect
     let context: String? // PDF özeti
+    /// Pinch scale memory — lives in PDFReaderViewModel so it survives popup
+    /// re-presentations within a session and resets when the reader closes.
+    @Binding var persistedScale: CGFloat
     let onDismiss: () -> Void
 
+    init(
+        selectedText: String,
+        selectionRect: CGRect,
+        context: String?,
+        persistedScale: Binding<CGFloat>,
+        onDismiss: @escaping () -> Void
+    ) {
+        self.selectedText = selectedText
+        self.selectionRect = selectionRect
+        self.context = context
+        self._persistedScale = persistedScale
+        self.onDismiss = onDismiss
+        self._scale = State(initialValue: persistedScale.wrappedValue)
+        self._lastScale = State(initialValue: persistedScale.wrappedValue)
+    }
+
     // MARK: - State
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var translationPhase: TranslationPopupPhase = .loading
     @State private var isVisible = false
 
@@ -25,8 +38,8 @@ struct QuickTranslationPopup: View {
     @GestureState private var isDragging = false
 
     // Scale (Büyütme/Küçültme)
-    @State private var scale: CGFloat = QuickTranslationPopup.sessionScale
-    @State private var lastScale: CGFloat = QuickTranslationPopup.sessionScale
+    @State private var scale: CGFloat
+    @State private var lastScale: CGFloat
 
     // Translation Task Management
     @State private var translationTask: Task<Void, Never>?
@@ -34,7 +47,6 @@ struct QuickTranslationPopup: View {
     // MARK: - Constants
     private let minScale: CGFloat = 0.6
     private let maxScale: CGFloat = 2.0
-    private let cornerRadius: CGFloat = 24
 
     var body: some View {
         GeometryReader { geometry in
@@ -51,24 +63,28 @@ struct QuickTranslationPopup: View {
             )
 
             popupContent(layout: layout)
-                .scaleEffect(scale)
+                // Entrance: 0.92 → 1.0 on top of the user's pinch scale.
+                .scaleEffect(scale * (isVisible ? 1.0 : 0.92))
                 .offset(offset)
                 .gesture(combinedGestures(layout: layout))
                 .position(layout.basePosition)
                 .opacity(isVisible ? 1 : 0)
-                .offset(y: isVisible ? 0 : -20)
+        }
+        .dsHaptic(.appear, trigger: isVisible) { _, new in new }
+        .dsHaptic(.complete, trigger: translationPhase) { old, new in
+            Self.translationJustCompleted(from: old, to: new)
         }
         .onAppear {
             // Başlangıç offset'ini ayarla
             offset = .zero
             lastOffset = .zero
 
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+            withAnimation(DSMotion.resolved(DSMotion.snappy, reduceMotion: reduceMotion)) {
                 isVisible = true
             }
             startTranslation(delay: 0)
         }
-        .onChange(of: selectedText) { _ in
+        .onChange(of: selectedText) {
             // Seçilen metin değiştiğinde (tırnaklarla oynandığında)
             // Mevcut çeviriyi iptal et ve yeni çeviri başlat (debounce ile)
             startTranslation(delay: 0.6)
@@ -83,10 +99,19 @@ struct QuickTranslationPopup: View {
             TranslationPopupContentArea(phase: translationPhase, maxHeight: layout.contentMaxHeight)
         }
         .frame(width: layout.popupWidth)
-        .background { TranslationPopupBackground(cornerRadius: cornerRadius) }
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-        .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
-        .shadow(color: .indigo.opacity(0.1), radius: 40, x: 0, y: 20)
+        .translationPopupSurface()
+    }
+
+    // MARK: - Haptic Conditions
+
+    /// True only for the loading → translated transition, so the completion
+    /// haptic never fires on retries-into-failure or text re-selection.
+    private static func translationJustCompleted(
+        from old: TranslationPopupPhase,
+        to new: TranslationPopupPhase
+    ) -> Bool {
+        guard old == .loading, case .translated = new else { return false }
+        return true
     }
 
     // MARK: - Gestures
@@ -114,6 +139,7 @@ struct QuickTranslationPopup: View {
                     popupSize: layout.scaledSize,
                     container: layout.container
                 )
+                // Direct manipulation tracks the finger even with Reduce Motion.
                 withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.8)) {
                     offset = clamped
                 }
@@ -151,34 +177,18 @@ struct QuickTranslationPopup: View {
                     container: rescaled.container
                 )
 
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                withAnimation(DSMotion.resolved(DSMotion.snappy, reduceMotion: reduceMotion)) {
                     scale = finalScale
                     lastScale = finalScale
                     offset = clampedOffset
                     lastOffset = clampedOffset
-                    // Session memory'ı güncelle
-                    QuickTranslationPopup.sessionScale = finalScale
                 }
+                // Session memory: sonraki popup aynı ölçekle açılır.
+                persistedScale = finalScale
             }
     }
 
-    // MARK: - Session Memory Reset
-    /// PDF kapatılırken çağırılmalı
-    static func resetSessionMemory() {
-        sessionScale = 1.0
-    }
-
     // MARK: - Actions
-
-    private func dismiss() {
-        withAnimation(.easeOut(duration: 0.2)) {
-            isVisible = false
-            scale = 0.9
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            onDismiss()
-        }
-    }
 
     private func startTranslation(delay: TimeInterval) {
         // Varsa önceki task'ı iptal et
@@ -250,7 +260,8 @@ struct QuickTranslationPopup: View {
             selectedText: "The integration of artificial intelligence (AI) in dermatology presents"
                 + " a promising frontier for enhancing diagnostic accuracy and treatment planning.",
             selectionRect: CGRect(x: 200, y: 150, width: 100, height: 20),
-            context: "Dermatolojide yapay zeka kullanımı ve tanı doğruluğu üzerine akademik bir çalışma."
+            context: "Dermatolojide yapay zeka kullanımı ve tanı doğruluğu üzerine akademik bir çalışma.",
+            persistedScale: .constant(1.0)
         ) {}
     }
 }
