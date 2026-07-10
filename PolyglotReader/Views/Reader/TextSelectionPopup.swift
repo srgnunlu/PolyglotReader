@@ -8,31 +8,34 @@ struct TextSelectionPopup: View {
     let onHighlight: (String) -> Void
     let onAskAI: () -> Void
     var onAddNote: ((String) async -> Void)?
-    
+
     // MARK: - State
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showNoteSheet = false
     @State private var noteText = ""
     @State private var showCopiedToast = false
-    
+
+    // İkinci satıra genişleyen aksiyonlar ("..." menüsünün yerini alır)
+    @State private var showMoreActions = false
+
     // Inline çeviri için state
     @State private var showTranslation = false
     @State private var translatedText: String?
     @State private var isTranslating = false
     @State private var translationTask: Task<Void, Never>?
-    
+
     // Drag state
     @State private var currentOffset: CGSize = .zero
     @State private var accumulatedOffset: CGSize = .zero
     @State private var initialPosition: CGPoint = .zero
     @State private var hasCalculatedInitialPosition = false
-    
+
     // MARK: - Layout Constants
     private let popupWidth: CGFloat = 360
-    private let cornerRadius: CGFloat = 18
     private let verticalOffset: CGFloat = 20 // Seçimin altında ne kadar uzakta
-    
+
     private let highlightColors = DSColor.Highlight.allCases
-    
+
     var body: some View {
         GeometryReader { geometry in
             // Popup içeriği
@@ -72,27 +75,27 @@ struct TextSelectionPopup: View {
             translationTask?.cancel()
         }
     }
-    
+
     // MARK: - Initial Position Calculator (sadece bir kez çağrılır)
-    
+
     private func calculateInitialPosition(in geometry: GeometryProxy) -> CGPoint {
         let screenWidth = geometry.size.width
         let screenHeight = geometry.size.height
         let safeAreaTop = geometry.safeAreaInsets.top
         let safeAreaBottom = geometry.safeAreaInsets.bottom
-        
+
         let baseHeight: CGFloat = 70
-        
+
         // X pozisyonu: seçimin ortasında, ekran sınırları içinde
         var x = selectionRect.midX
         x = max(popupWidth / 2 + 8, min(screenWidth - popupWidth / 2 - 8, x))
-        
+
         // Y pozisyonu: seçimin altında, sığmazsa üstünde
         let belowSelectionY = selectionRect.maxY + verticalOffset + baseHeight / 2
         let aboveSelectionY = selectionRect.minY - verticalOffset - baseHeight / 2
-        
+
         var y: CGFloat
-        
+
         if belowSelectionY + baseHeight / 2 < screenHeight - safeAreaBottom - 100 {
             y = belowSelectionY
         } else if aboveSelectionY - baseHeight / 2 > safeAreaTop + 100 {
@@ -100,15 +103,15 @@ struct TextSelectionPopup: View {
         } else {
             y = screenHeight / 2
         }
-        
+
         // Ekran sınırları içinde tut
         y = max(safeAreaTop + 40, min(screenHeight - safeAreaBottom - 60, y))
-        
+
         return CGPoint(x: x, y: y)
     }
-    
+
     // MARK: - Drag Gesture
-    
+
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .global)
             .onChanged { value in
@@ -120,14 +123,14 @@ struct TextSelectionPopup: View {
                 currentOffset = .zero
             }
     }
-    
+
     // MARK: - Popup Content
-    
+
     private var popupContent: some View {
         VStack(spacing: 0) {
-            // Sürüklenebilir alan (Drag Handle + Action Bar)
+            // Sürüklenebilir alan (Drag Handle + Action Bar + genişleyen satır)
             draggableArea
-            
+
             // Çeviri alanı - animasyonlu açılış (bağımsız scroll)
             if showTranslation {
                 translationArea
@@ -140,10 +143,8 @@ struct TextSelectionPopup: View {
             }
         }
         .frame(width: popupWidth)
-        .background { liquidGlassBackground }
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-        .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
-        .shadow(color: .indigo.opacity(0.1), radius: 40, x: 0, y: 20)
+        .dsGlass(.popup, shape: .rounded(DSRadius.medium))
+        .dsShadow(.floating)
         .overlay(alignment: .top) {
             if showCopiedToast {
                 copiedToast
@@ -151,8 +152,12 @@ struct TextSelectionPopup: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showTranslation)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCopiedToast)
+        .dsAnimation(DSMotion.smooth, value: showTranslation)
+        .dsAnimation(DSMotion.snappy, value: showMoreActions)
+        .dsAnimation(DSMotion.snappy, value: showCopiedToast)
+        .dsHaptic(.complete, trigger: translatedText) { old, new in
+            old == nil && new != nil
+        }
     }
 
     // MARK: - Copied Toast
@@ -165,26 +170,31 @@ struct TextSelectionPopup: View {
         .font(.caption.weight(.semibold))
         .foregroundStyle(.white)
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(Capsule().fill(Color.green))
-        .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+        .padding(.vertical, DSSpacing.xs)
+        .background(Capsule().fill(DSColor.success))
+        .dsShadow(.subtle)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Metin kopyalandı")
     }
-    
+
     // MARK: - Draggable Area (sadece bu alan sürüklenebilir)
-    
+
     private var draggableArea: some View {
         VStack(spacing: 0) {
             dragHandle
             mainActionBar
+
+            if showMoreActions {
+                expandedActionRow
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
         .contentShape(Rectangle())
         .gesture(dragGesture)
     }
-    
+
     // MARK: - Drag Handle
-    
+
     private var dragHandle: some View {
         VStack(spacing: 0) {
             ZStack {
@@ -197,7 +207,7 @@ struct TextSelectionPopup: View {
                         )
                     )
                     .frame(width: 48, height: 6)
-                
+
                 Capsule()
                     .fill(
                         LinearGradient(
@@ -215,20 +225,15 @@ struct TextSelectionPopup: View {
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
     }
-    
-    // MARK: - Liquid Glass Background
-    
-    private var liquidGlassBackground: some View {
-        LiquidGlassBackground(cornerRadius: cornerRadius, intensity: .medium, accentColor: .indigo)
-    }
-    
+
     // MARK: - Main Action Bar
-    
+
     private var mainActionBar: some View {
         HStack(spacing: 6) {
             // Vurgulama renkleri
             ForEach(highlightColors, id: \.rawValue) { highlight in
                 Button {
+                    DSHaptics.selection()
                     onHighlight(highlight.rawValue)
                 } label: {
                     Circle()
@@ -240,6 +245,7 @@ struct TextSelectionPopup: View {
                         )
                         .contentShape(Circle())
                 }
+                .buttonStyle(HighlightDotButtonStyle())
                 .accessibilityLabel("\(highlight.localizedName) ile vurgula")
             }
 
@@ -266,25 +272,14 @@ struct TextSelectionPopup: View {
                 copySelection()
             }
 
-            // Diğer menü
-            Menu {
-                if onAddNote != nil {
-                    Button {
-                        showNoteSheet = true
-                    } label: {
-                        Label("Not Ekle", systemImage: "note.text")
-                    }
-                }
-                
-                Button {
-                    shareText()
-                } label: {
-                    Label("Paylaş", systemImage: "square.and.arrow.up")
-                }
-            } label: {
-                CompactActionLabel(icon: "ellipsis")
+            // Daha fazla aksiyon: menü yerine ikinci satıra genişler
+            CompactActionButton(
+                icon: "ellipsis",
+                isActive: showMoreActions,
+                accessibilityLabel: showMoreActions ? "Diğer aksiyonları gizle" : "Diğer aksiyonlar"
+            ) {
+                showMoreActions.toggle()
             }
-            .accessibilityLabel("Diğer")
 
             Divider()
                 .frame(height: 20)
@@ -293,7 +288,7 @@ struct TextSelectionPopup: View {
             // Kapat butonu
             Button(action: dismissPopup) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(DSFont.meta.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 28, height: 28)
                     .background(Color(.tertiarySystemBackground).opacity(0.8))
@@ -302,34 +297,70 @@ struct TextSelectionPopup: View {
             }
             .accessibilityLabel("Kapat")
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, DSSpacing.sm)
         .padding(.vertical, 10)
     }
 
+    // MARK: - Expanded Action Row
+
+    /// PDF Expert dersi: gizli menü yerine bağlamsal, görünür ikinci satır.
+    private var expandedActionRow: some View {
+        HStack(spacing: DSSpacing.xs) {
+            if onAddNote != nil {
+                expandedActionButton(icon: "note.text", title: "Not Ekle") {
+                    showNoteSheet = true
+                }
+            }
+
+            expandedActionButton(icon: "square.and.arrow.up", title: "Paylaş") {
+                shareText()
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, DSSpacing.sm)
+        .padding(.bottom, DSSpacing.xs)
+    }
+
+    private func expandedActionButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: DSSpacing.xxs + 2) {
+                Image(systemName: icon)
+                    .font(DSFont.controlIcon)
+
+                Text(title)
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, DSSpacing.sm)
+            .padding(.vertical, DSSpacing.xs)
+            .background(Capsule().fill(Color(.tertiarySystemBackground).opacity(0.6)))
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - Translation Area
-    
+
     private var translationArea: some View {
         VStack(spacing: 0) {
             Divider()
-                .padding(.horizontal, 12)
-            
+                .padding(.horizontal, DSSpacing.sm)
+
             if isTranslating {
-                HStack(spacing: 10) {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                        .tint(.indigo)
-                    
+                VStack(spacing: DSSpacing.xs) {
+                    TranslationWaveIndicator()
+
                     Text("Çevriliyor...")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+                .padding(.vertical, DSSpacing.md)
                 .padding(.horizontal, 14)
             } else if let translated = translatedText {
                 ScrollView(.vertical, showsIndicators: true) {
                     Text(translated)
-                        .font(.system(size: 15, weight: .regular, design: .rounded))
+                        .font(DSFont.translation)
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
                         .lineSpacing(3)
@@ -342,28 +373,28 @@ struct TextSelectionPopup: View {
                 .scrollBounceBehavior(.basedOnSize)
                 .frame(maxHeight: 100) // Max 4-5 satır, içerik daha azsa küçülür
             } else {
-                HStack(spacing: 8) {
+                HStack(spacing: DSSpacing.xs) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(DSColor.warning)
                         .font(.subheadline)
-                    
+
                     Text("Çeviri yapılamadı")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    
+
                     Spacer()
-                    
+
                     Button {
                         startTranslation()
                     } label: {
                         Text("Tekrar Dene")
                             .font(.caption)
                             .fontWeight(.medium)
-                            .foregroundStyle(.indigo)
+                            .foregroundStyle(DSColor.brand)
                     }
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, 12)
+                .padding(.vertical, DSSpacing.sm)
             }
         }
         .background {
@@ -377,42 +408,40 @@ struct TextSelectionPopup: View {
             )
         }
     }
-    
+
     // MARK: - Actions
-    
+
     private func dismissPopup() {
         translationTask?.cancel()
         onDismiss()
     }
-    
+
     private func toggleTranslation() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            showTranslation.toggle()
-        }
-        
+        showTranslation.toggle()
+
         if showTranslation && translatedText == nil && !isTranslating {
             startTranslation()
         }
     }
-    
+
     private func startTranslation() {
         translationTask?.cancel()
-        
+
         translationTask = Task {
             await translate()
         }
     }
-    
+
     private func translate() async {
         guard selectedText.count > 1 else { return }
-        
+
         await MainActor.run {
             isTranslating = true
         }
-        
+
         do {
             let result = try await GeminiService.shared.translateText(selectedText, context: context)
-            
+
             if !Task.isCancelled {
                 await MainActor.run {
                     translatedText = result.translated
@@ -428,22 +457,22 @@ struct TextSelectionPopup: View {
             }
         }
     }
-    
+
     private func copySelection() {
         UIPasteboard.general.string = selectedText
         showCopiedToast = true
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             showCopiedToast = false
         }
     }
-    
+
     private func shareText() {
         let activityVC = UIActivityViewController(
             activityItems: [selectedText],
             applicationActivities: nil
         )
-        
+
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let rootVC = windowScene.windows.first?.rootViewController {
             rootVC.present(activityVC, animated: true)
@@ -451,10 +480,22 @@ struct TextSelectionPopup: View {
     }
 }
 
+// MARK: - Highlight Dot Button Style
+
+/// Vurgu rengi noktası: basılıyken spring ile büyür — "bu rengi seçiyorsun"
+/// hissi. Haptic, aksiyonun kendisinde (.selection) tetiklenir.
+private struct HighlightDotButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 1.25 : 1.0)
+            .dsAnimation(DSMotion.snappy, value: configuration.isPressed)
+    }
+}
+
 #Preview {
     ZStack {
         Color.gray.opacity(0.2).ignoresSafeArea()
-        
+
         TextSelectionPopup(
             selectedText: "Bu bir örnek seçilen metindir ve aksiyon barı test ediliyor.",
             selectionRect: CGRect(x: 100, y: 200, width: 200, height: 30),
