@@ -15,15 +15,18 @@ struct PageSpinner: View {
         Button {
             selectedPage = currentPage
             showPicker = true
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            DSHaptics.lightImpact()
         } label: {
             HStack(spacing: 4) {
+                // Sayfa değişiminde rakamlar akar (dock'taki numericText anı).
                 Text("\(currentPage)")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(DSFont.pageCounter)
                     .foregroundStyle(.primary)
+                    .contentTransition(.numericText(value: Double(currentPage)))
+                    .dsAnimation(DSMotion.snappy, value: currentPage)
 
                 Text("/ \(max(totalPages, 1))")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(DSFont.pageCounterMeta)
                     .foregroundStyle(.secondary)
             }
             .frame(minWidth: 55)
@@ -31,6 +34,7 @@ struct PageSpinner: View {
             .padding(.vertical, 6)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Sayfa \(currentPage) / \(max(totalPages, 1)), sayfa seç")
         .popover(isPresented: $showPicker, arrowEdge: .bottom) {
             PagePickerPopover(
                 selectedPage: $selectedPage,
@@ -39,7 +43,7 @@ struct PageSpinner: View {
                     showPicker = false
                     if page != currentPage {
                         onPageChange(page)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        DSHaptics.mediumImpact()
                     }
                 },
                 onCancel: {
@@ -66,24 +70,24 @@ struct PagePickerPopover: View {
                 Button("İptal") {
                     onCancel()
                 }
-                .font(.system(size: 15))
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
 
                 Spacer()
 
                 Text("Sayfa Seç")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
 
                 Spacer()
 
                 Button("Git") {
                     onConfirm(selectedPage)
                 }
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.indigo)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(DSColor.brand)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, DSSpacing.md)
+            .padding(.vertical, DSSpacing.sm)
 
             Divider()
 
@@ -96,8 +100,8 @@ struct PagePickerPopover: View {
             }
             .pickerStyle(.wheel)
             .frame(height: 150)
-            .onChange(of: selectedPage) { _ in
-                UISelectionFeedbackGenerator().selectionChanged()
+            .onChange(of: selectedPage) {
+                DSHaptics.selection()
             }
         }
         .frame(width: 220)

@@ -43,35 +43,28 @@ struct ScannedPageOCRBanner: View {
         Button {
             recognizeCurrentPage()
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: DSSpacing.xs) {
                 if phase == .recognizing {
                     ProgressView()
                         .scaleEffect(0.7)
                 } else {
                     Image(systemName: phase == .textNotFound ? "exclamationmark.circle" : "text.viewfinder")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(DSFont.controlIcon)
                 }
 
                 Text(bannerTitle)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
             }
             .foregroundStyle(.primary)
             .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background {
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        Capsule()
-                            .stroke(.white.opacity(0.2), lineWidth: 0.5)
-                    }
-            }
+            .padding(.vertical, DSSpacing.xs)
+            .dsGlass(.banner, shape: .capsule)
         }
         .buttonStyle(.plain)
         .disabled(phase == .recognizing)
-        .padding(.bottom, 8)
+        .padding(.bottom, DSSpacing.xs)
         .accessibilityLabel(bannerTitle)
-        .animation(.easeInOut(duration: 0.2), value: phase)
+        .dsAnimation(.easeInOut(duration: 0.2), value: phase)
     }
 
     private var bannerTitle: String {

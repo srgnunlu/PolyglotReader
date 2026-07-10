@@ -27,4 +27,10 @@ enum DSFont {
     static let controlIcon = Font.subheadline.weight(.semibold)
     /// Prominent control icons (primary CTA circles).
     static let controlIconProminent = Font.body.weight(.semibold)
+
+    // MARK: Reader
+    /// Page counter numerals (reader dock spinner) — rounded is its identity.
+    static let pageCounter = Font.system(.subheadline, design: .rounded).weight(.bold)
+    /// Secondary "/ total" part of the page counter.
+    static let pageCounterMeta = Font.system(.caption, design: .rounded).weight(.medium)
 }
