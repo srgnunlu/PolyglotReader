@@ -73,6 +73,7 @@ struct ContentView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var errorHandlingService: ErrorHandlingService
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @State private var showSplash = true
 
     var body: some View {
         Group {
@@ -86,6 +87,19 @@ struct ContentView: View {
         }
         .animation(.easeInOut, value: authViewModel.isAuthenticated)
         .animation(.easeInOut, value: hasSeenOnboarding)
+        .overlay {
+            if showSplash {
+                SplashOverlayView()
+                    .transition(.opacity)
+                    .zIndex(2)
+            }
+        }
+        .task {
+            // Brand moment stays under a second, then hands off to the
+            // destination screen's own entrance animation.
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            withAnimation(.easeOut(duration: 0.3)) { showSplash = false }
+        }
         .overlay(alignment: .top) {
             if let banner = errorHandlingService.banner {
                 ErrorBannerView(banner: banner) {
