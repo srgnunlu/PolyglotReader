@@ -106,6 +106,7 @@ struct PDFReaderView: View {
                 }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+                .presentationCornerRadius(DSRadius.popup)
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
             }
             .onChange(of: showChat) { isShowing in
@@ -138,12 +139,14 @@ struct PDFReaderView: View {
             }
             .sheet(isPresented: $showQuiz) {
                 QuizView(textContext: viewModel.extractedText)
+                    .presentationCornerRadius(DSRadius.popup)
             }
             .sheet(isPresented: $showSearch) {
                 SearchSheet(viewModel: viewModel) {
                     // Arama sonucuna atlama: hedef sayfada kısa sarı parıltı.
                     jumpFlashCount += 1
                 }
+                .presentationCornerRadius(DSRadius.popup)
             }
             .sheet(isPresented: $showNavigator) {
                 if let document = viewModel.document {
@@ -153,6 +156,7 @@ struct PDFReaderView: View {
                         onSelectPage: { viewModel.goToPage($0) },
                         onDismiss: { showNavigator = false }
                     )
+                    .presentationCornerRadius(DSRadius.popup)
                 }
             }
             .sheet(isPresented: $showAnnotationNote) {

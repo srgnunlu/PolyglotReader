@@ -75,6 +75,7 @@ struct NotebookView: View {
                     AnnotationExportView(annotations: viewModel.annotations) {
                         showExport = false
                     }
+                    .presentationCornerRadius(DSRadius.popup)
                 }
         }
     }

@@ -9,11 +9,10 @@ struct NoteDetailSheet: View {
 
     @State private var noteText: String = ""
     @State private var isEditing = false
-    @State private var dragOffset = CGSize.zero
     @State private var showDeleteConfirmation = false
 
     private let maxCharacters = 500
-    private let cornerRadius: CGFloat = 24
+    private let cornerRadius: CGFloat = DSRadius.popup
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,10 +32,8 @@ struct NoteDetailSheet: View {
                 editActionBar
             }
         }
-        .background(liquidGlassBackground)
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-        .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
-        .shadow(color: .indigo.opacity(0.1), radius: 40, x: 0, y: 20)
+        .dsGlass(.popup, shape: .rounded(cornerRadius))
+        .dsShadow(.floating)
         .overlay(alignment: .topLeading) {
             // Delete button
             Button {
@@ -63,8 +60,6 @@ struct NoteDetailSheet: View {
             .padding(.top, 8)
             .padding(.trailing, 16)
         }
-        .offset(y: dragOffset.height)
-        .gesture(dragToDismissGesture)
         .animation(.easeInOut(duration: 0.2), value: isEditing)
         .confirmationDialog(
             "Notu silmek istediğinize emin misiniz?",
@@ -257,34 +252,6 @@ struct NoteDetailSheet: View {
         .contentShape(Rectangle())
     }
 
-    // MARK: - Liquid Glass Background
-    private var liquidGlassBackground: some View {
-        LiquidGlassBackground(
-            cornerRadius: cornerRadius,
-            intensity: .medium,
-            accentColor: .indigo
-        )
-    }
-
-    // MARK: - Gestures
-    private var dragToDismissGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                if value.translation.height > 0 {
-                    dragOffset = value.translation
-                }
-            }
-            .onEnded { value in
-                if value.translation.height > 100 {
-                    dismissWithAnimation()
-                } else {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        dragOffset = .zero
-                    }
-                }
-            }
-    }
-
     // MARK: - Helper Functions
     private var characterCounterText: String {
         "\(noteText.count) / \(maxCharacters)"
@@ -329,9 +296,7 @@ struct NoteDetailSheet: View {
     }
 
     private func deleteWithAnimation() {
-        // Haptic feedback
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
+        DSHaptics.mediumImpact()
 
         onDelete()
 

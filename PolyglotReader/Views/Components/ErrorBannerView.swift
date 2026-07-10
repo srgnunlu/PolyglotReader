@@ -5,7 +5,7 @@ struct ErrorBannerView: View {
     let onDismiss: () -> Void
 
     private var accentColor: Color {
-        banner.isCritical ? .red : .orange
+        banner.isCritical ? DSColor.danger : DSColor.warning
     }
 
     var body: some View {
@@ -59,17 +59,13 @@ struct ErrorBannerView: View {
             }
         }
         .padding(14)
-        .background {
-            LiquidGlassBackground(
-                cornerRadius: 16,
-                intensity: .light,
-                accentColor: accentColor
-            )
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
-        .padding(.horizontal, 16)
+        .dsGlass(.banner, shape: .rounded(DSRadius.medium), tint: accentColor)
+        .dsShadow(.card, tint: accentColor)
+        .padding(.horizontal, DSSpacing.md)
         .padding(.top, 10)
+        // Banner'lar kullanıcı-tetikli işlemlerin sonucudur; belirme anında
+        // tek bir hata haptic'i.
+        .onAppear { DSHaptics.error() }
     }
 }
 

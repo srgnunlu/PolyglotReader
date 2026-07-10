@@ -35,6 +35,7 @@ struct LibraryView: View {
                 }
                 .sheet(isPresented: $showCreateFolder) {
                     CreateFolderSheet(viewModel: viewModel)
+                        .presentationCornerRadius(DSRadius.popup)
                 }
                 .task {
                     await viewModel.loadFiles()

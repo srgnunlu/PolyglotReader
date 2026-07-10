@@ -199,7 +199,10 @@ struct MainTabView: View {
                 )
             }
             .onReceive(NotificationCenter.default.publisher(for: .switchToLibraryTab)) { _ in
-                selectedTab = 0
+                // Programatik tab atlaması ani kesme yerine yumuşak geçer.
+                withAnimation(DSMotion.smooth) {
+                    selectedTab = 0
+                }
             }
     }
 
