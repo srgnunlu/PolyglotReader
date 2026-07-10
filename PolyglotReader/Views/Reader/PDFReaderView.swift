@@ -17,6 +17,8 @@ struct PDFReaderView: View {
     @State private var isPDFRendering = true  // PDF render durumu
     @State private var showAnnotationNote = false
     @State private var selectedAnnotation: Annotation?
+    // Atıf/arama sıçrayışlarında sayfa üzerindeki sarı parıltıyı tetikler.
+    @State private var jumpFlashCount = 0
 
     private let bottomDockInset: CGFloat = 90
     // İçerik-öncelikli okuyucu: chrome 6 saniyede kenara çekilir.
@@ -76,6 +78,8 @@ struct PDFReaderView: View {
                         chatViewModel: chatViewModel,
                         showChat: $showChat
                     )
+
+                    ReaderJumpFlashOverlay(trigger: jumpFlashCount)
                 } else {
                     // Error state when document failed to load
                     ReaderLoadFailedView(
@@ -97,6 +101,8 @@ struct PDFReaderView: View {
                 ChatView(viewModel: chatViewModel) { page in
                     viewModel.goToPage(page)
                     showChat = false
+                    // Atıf navigasyonu: hedef sayfada kısa sarı parıltı.
+                    jumpFlashCount += 1
                 }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
