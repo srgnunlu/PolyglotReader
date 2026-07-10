@@ -190,7 +190,22 @@ struct MainTabView: View {
     @EnvironmentObject var errorHandlingService: ErrorHandlingService
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        tabView
+            .tint(DSColor.brand)
+            .onChange(of: selectedTab) { newValue in
+                errorHandlingService.recordAppState(
+                    currentScreen: tabName(for: newValue),
+                    selectedTab: newValue
+                )
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .switchToLibraryTab)) { _ in
+                selectedTab = 0
+            }
+    }
+
+    @ViewBuilder
+    private var tabView: some View {
+        let tabs = TabView(selection: $selectedTab) {
             LibraryView()
                 .tabItem {
                     Label("Kütüphane", systemImage: "books.vertical")
@@ -209,15 +224,12 @@ struct MainTabView: View {
                 }
                 .tag(2)
         }
-        .tint(.indigo)
-        .onChange(of: selectedTab) { newValue in
-            errorHandlingService.recordAppState(
-                currentScreen: tabName(for: newValue),
-                selectedTab: newValue
-            )
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .switchToLibraryTab)) { _ in
-            selectedTab = 0
+
+        // iOS 26 Liquid Glass: tab bar shrinks out of the way while reading.
+        if #available(iOS 26.0, *) {
+            tabs.tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            tabs
         }
     }
 

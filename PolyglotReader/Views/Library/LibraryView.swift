@@ -13,6 +13,7 @@ struct LibraryView: View {
     @State private var showBulkDeleteConfirm = false
     @State private var showBulkMoveDialog = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var readerZoomNamespace
 
     var body: some View {
         NavigationStack {
@@ -30,6 +31,7 @@ struct LibraryView: View {
                 }
                 .fullScreenCover(item: $selectedFile) { file in
                     PDFReaderView(file: file)
+                        .readerZoomTransition(sourceID: file.id, in: readerZoomNamespace)
                 }
                 .sheet(isPresented: $showCreateFolder) {
                     CreateFolderSheet(viewModel: viewModel)
@@ -254,6 +256,7 @@ struct LibraryView: View {
                     }
                 }
                 .id(file.id)
+                .readerZoomSource(id: file.id, in: readerZoomNamespace)
                 .libraryCardScrollTransition()
             }
         }
@@ -280,6 +283,7 @@ struct LibraryView: View {
                     isThumbnailLoading: viewModel.isThumbnailPending(file)
                 )
                 .padding(.horizontal)
+                .readerZoomSource(id: file.id, in: readerZoomNamespace)
                 .libraryCardScrollTransition()
             }
         }
@@ -427,6 +431,29 @@ struct LibraryView: View {
             }
         case .failure(let error):
             logError("LibraryView", "File import error", error: error)
+        }
+    }
+}
+
+// MARK: - Card -> Reader Zoom Transition (iOS 18+)
+/// The reader opens by zooming out of the tapped card. iOS 17 keeps the
+/// standard cover presentation — a designed default, not a broken fallback.
+extension View {
+    @ViewBuilder
+    func readerZoomSource(id: String, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            matchedTransitionSource(id: id, in: namespace)
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func readerZoomTransition(sourceID: String, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            navigationTransition(.zoom(sourceID: sourceID, in: namespace))
+        } else {
+            self
         }
     }
 }
