@@ -56,16 +56,58 @@ enum DSGlassShape {
     }
 }
 
+// MARK: - Morph Identity (iOS 26)
+/// Yer değiştiren iki cam yüzeyi (bar ↔ collapsed pill gibi) aynı cam varlığı
+/// olarak işaretler: iOS 26'da aynı `DSGlassContainer` içinde, aynı id'yi
+/// taşıyan yüzeyler arasında şekil morph'u oynar. iOS 17-25'te etkisizdir.
+struct DSGlassMorph {
+    let id: String
+    let namespace: Namespace.ID
+
+    init(_ id: String, in namespace: Namespace.ID) {
+        self.id = id
+        self.namespace = namespace
+    }
+}
+
+// MARK: - Container (iOS 26)
+/// Kardeş cam yüzeyleri tek örnekleme bölgesinde gruplar — morph yalnızca bu
+/// kapsayıcının içinde çalışır. iOS 17-25'te içerik olduğu gibi geçer.
+struct DSGlassContainer<Content: View>: View {
+    private let spacing: CGFloat?
+    private let content: () -> Content
+
+    init(spacing: CGFloat? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.spacing = spacing
+        self.content = content
+    }
+
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing, content: content)
+        } else {
+            content()
+        }
+    }
+}
+
 // MARK: - Modifier
 private struct DSGlassModifier: ViewModifier {
     let level: DSGlassLevel
     let glassShape: DSGlassShape
     let tint: Color?
     let interactive: Bool
+    let morph: DSGlassMorph?
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.glassEffect(nativeGlass, in: glassShape.shape)
+            if let morph {
+                content
+                    .glassEffect(nativeGlass, in: glassShape.shape)
+                    .glassEffectID(morph.id, in: morph.namespace)
+            } else {
+                content.glassEffect(nativeGlass, in: glassShape.shape)
+            }
         } else {
             content
                 .background { FallbackGlassSurface(level: level, glassShape: glassShape, tint: tint) }
@@ -159,12 +201,15 @@ extension View {
     ///     (the HIG-correct default) while the fallback uses the brand hue
     ///     for its subtle radial glow.
     ///   - interactive: iOS 26 only — glass shimmers while touched.
+    ///   - morph: iOS 26 only — same id inside one `DSGlassContainer` morphs
+    ///     the glass between swapped surfaces (bar ↔ pill).
     func dsGlass(
         _ level: DSGlassLevel = .card,
         shape: DSGlassShape = .rounded(DSRadius.card),
         tint: Color? = nil,
-        interactive: Bool = false
+        interactive: Bool = false,
+        morph: DSGlassMorph? = nil
     ) -> some View {
-        modifier(DSGlassModifier(level: level, glassShape: shape, tint: tint, interactive: interactive))
+        modifier(DSGlassModifier(level: level, glassShape: shape, tint: tint, interactive: interactive, morph: morph))
     }
 }

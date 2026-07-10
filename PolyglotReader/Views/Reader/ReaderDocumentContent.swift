@@ -25,6 +25,9 @@ struct ReaderDocumentContent: View {
     let onToggleTTS: () -> Void
     let onClose: () -> Void
 
+    /// iOS 26 cam morph kimlikleri: bar ve collapsed pill aynı cam varlığıdır.
+    @Namespace private var chromeGlassNamespace
+
     var body: some View {
         ZStack {
             pdfView
@@ -80,22 +83,29 @@ struct ReaderDocumentContent: View {
 
     private var barsLayer: some View {
         VStack(spacing: 0) {
-            // Top Bar with collapse animation
-            if barsVisible && !isPDFRendering {
-                ReaderTopBar(
-                    viewModel: viewModel,
-                    showSearch: $showSearch,
-                    showNavigator: $showNavigator,
-                    onClose: onClose
-                )
-                .transition(.asymmetric(
-                    insertion: .move(edge: .top).combined(with: .opacity),
-                    removal: .move(edge: .top).combined(with: .opacity)
-                ))
-            } else if !isPDFRendering && !isFocusMode {
-                // Collapsed top indicator
-                CollapsedBarIndicator(position: .top)
+            // Top Bar with collapse animation — iOS 26'da bar ve pill aynı
+            // cam kapsayıcıyı paylaşır, geçişte şekil morph'u oynar.
+            DSGlassContainer {
+                if barsVisible && !isPDFRendering {
+                    ReaderTopBar(
+                        viewModel: viewModel,
+                        showSearch: $showSearch,
+                        showNavigator: $showNavigator,
+                        onClose: onClose,
+                        glassMorph: DSGlassMorph("reader.chrome.top", in: chromeGlassNamespace)
+                    )
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
+                } else if !isPDFRendering && !isFocusMode {
+                    // Collapsed top indicator
+                    CollapsedBarIndicator(
+                        position: .top,
+                        glassMorph: DSGlassMorph("reader.chrome.top", in: chromeGlassNamespace)
+                    )
                     .transition(.opacity)
+                }
             }
 
             Spacer()
@@ -111,22 +121,28 @@ struct ReaderDocumentContent: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
-            // Bottom Bar with collapse animation
-            if barsVisible && !isPDFRendering {
-                ReaderBottomBar(
-                    viewModel: viewModel,
-                    speech: speech,
-                    showChat: $showChat,
-                    onToggleTTS: onToggleTTS
-                )
-                .transition(.asymmetric(
-                    insertion: .move(edge: .bottom).combined(with: .opacity),
-                    removal: .move(edge: .bottom).combined(with: .opacity)
-                ))
-            } else if !isPDFRendering && !isFocusMode {
-                // Collapsed bottom indicator
-                CollapsedBarIndicator(position: .bottom)
+            // Bottom Bar with collapse animation — üst bar ile aynı morph deseni.
+            DSGlassContainer {
+                if barsVisible && !isPDFRendering {
+                    ReaderBottomBar(
+                        viewModel: viewModel,
+                        speech: speech,
+                        showChat: $showChat,
+                        onToggleTTS: onToggleTTS,
+                        glassMorph: DSGlassMorph("reader.chrome.bottom", in: chromeGlassNamespace)
+                    )
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
+                } else if !isPDFRendering && !isFocusMode {
+                    // Collapsed bottom indicator
+                    CollapsedBarIndicator(
+                        position: .bottom,
+                        glassMorph: DSGlassMorph("reader.chrome.bottom", in: chromeGlassNamespace)
+                    )
                     .transition(.opacity)
+                }
             }
         }
     }

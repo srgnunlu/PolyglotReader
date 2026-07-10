@@ -9,6 +9,8 @@ struct ReaderTopBar: View {
     @Binding var showSearch: Bool
     @Binding var showNavigator: Bool
     let onClose: () -> Void
+    /// iOS 26: collapsed pill ile aynı id → bar↔pill cam morph'u.
+    var glassMorph: DSGlassMorph?
 
     @State private var showsPageCounter = false
     @State private var counterRevealTask: Task<Void, Never>?
@@ -34,7 +36,7 @@ struct ReaderTopBar: View {
         }
         .padding(.horizontal, DSSpacing.sm)
         .padding(.vertical, DSSpacing.xs)
-        .dsGlass(.bar, shape: .capsule)
+        .dsGlass(.bar, shape: .capsule, morph: glassMorph)
         .dsShadow(.floating)
         .padding(.horizontal, DSSpacing.md)
         .padding(.top, 60)  // Safe area için Dynamic Island altında kalması için
@@ -104,12 +106,14 @@ struct ReaderIconButton: View {
 struct CollapsedBarIndicator: View {
     enum Position { case top, bottom }
     let position: Position
+    /// iOS 26: ilgili bar ile aynı id → bar↔pill cam morph'u.
+    var glassMorph: DSGlassMorph?
 
     var body: some View {
         Capsule()
             .fill(.clear)
             .frame(width: 60, height: 5)
-            .dsGlass(.control, shape: .capsule)
+            .dsGlass(.control, shape: .capsule, morph: glassMorph)
             .padding(position == .top ? .top : .bottom, position == .top ? 16 : 24)
     }
 }
