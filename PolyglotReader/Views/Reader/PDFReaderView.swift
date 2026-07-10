@@ -140,7 +140,10 @@ struct PDFReaderView: View {
                 QuizView(textContext: viewModel.extractedText)
             }
             .sheet(isPresented: $showSearch) {
-                SearchSheet(viewModel: viewModel)
+                SearchSheet(viewModel: viewModel) {
+                    // Arama sonucuna atlama: hedef sayfada kısa sarı parıltı.
+                    jumpFlashCount += 1
+                }
             }
             .sheet(isPresented: $showNavigator) {
                 if let document = viewModel.document {

@@ -3,7 +3,12 @@ import SwiftUI
 // MARK: - Search Sheet
 struct SearchSheet: View {
     @ObservedObject var viewModel: PDFReaderViewModel
+    /// Bir sonuca atlanınca okuyucudaki sarı parıltıyı tetikler
+    /// (atıf navigasyonuyla aynı geri bildirim dili).
+    var onJumpToResult: (() -> Void)?
+
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
@@ -98,6 +103,8 @@ struct SearchSheet: View {
             Text(resultPositionText)
                 .font(.caption)
                 .monospacedDigit()
+                .contentTransition(.numericText())
+                .dsAnimation(DSMotion.snappy, value: viewModel.currentSearchIndex)
 
             Button {
                 viewModel.nextSearchResult()
@@ -118,10 +125,21 @@ struct SearchSheet: View {
                 ForEach(Array(viewModel.searchResults.enumerated()), id: \.offset) { index, result in
                     Button {
                         viewModel.selectSearchResult(at: index)
+                        // Satıra dokunmak "bu sonuca git" demektir: sheet
+                        // kapanır, okuyucuda parıltı yanar. Prev/next ile
+                        // gezinme ise sheet içinde kalır.
+                        onJumpToResult?()
+                        dismiss()
                     } label: {
                         searchResultRow(index: index, result: result)
                     }
                     .buttonStyle(.plain)
+                    // Kenardan girerken kademeli belirme (kütüphane kartlarıyla aynı dil).
+                    .scrollTransition(.interactive) { [reduceMotion] view, phase in
+                        view
+                            .opacity(!reduceMotion && !phase.isIdentity ? 0.55 : 1)
+                            .scaleEffect(!reduceMotion && !phase.isIdentity ? 0.97 : 1)
+                    }
 
                     Divider()
                         .padding(.leading, 16)
@@ -135,10 +153,10 @@ struct SearchSheet: View {
             VStack(spacing: 2) {
                 Image(systemName: "doc.text")
                     .font(.caption)
-                    .foregroundStyle(.indigo)
+                    .foregroundStyle(DSColor.brand)
                 Text("\(result.pageNumber)")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.indigo)
+                    .foregroundStyle(DSColor.brand)
             }
             .frame(width: 36)
 
@@ -147,7 +165,7 @@ struct SearchSheet: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
-                Text(result.snippet.isEmpty ? viewModel.searchQuery : result.snippet)
+                Text(highlightedSnippet(result.snippet.isEmpty ? viewModel.searchQuery : result.snippet))
                     .font(.subheadline)
                     .foregroundStyle(.primary)
                     .lineLimit(3)
@@ -159,16 +177,40 @@ struct SearchSheet: View {
             if index == viewModel.currentSearchIndex {
                 Image(systemName: "chevron.right")
                     .font(.caption)
-                    .foregroundStyle(.indigo)
+                    .foregroundStyle(DSColor.brand)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(index == viewModel.currentSearchIndex ? Color.indigo.opacity(0.08) : Color.clear)
+        .background(index == viewModel.currentSearchIndex ? DSColor.brand.opacity(0.08) : Color.clear)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Sayfa \(result.pageNumber). \(result.snippet)")
+    }
+
+    /// Snippet içindeki tüm sorgu eşleşmelerini vurgu sarısıyla işaretler.
+    /// Sarı zemin açık renk olduğundan eşleşme metni her iki temada da
+    /// siyaha sabitlenir (PDF üzerindeki vurgularla aynı mantık).
+    private func highlightedSnippet(_ snippet: String) -> AttributedString {
+        var attributed = AttributedString(snippet)
+        let query = viewModel.searchQuery.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return attributed }
+
+        var searchStart = snippet.startIndex
+        while let match = snippet.range(
+            of: query,
+            options: [.caseInsensitive, .diacriticInsensitive],
+            range: searchStart..<snippet.endIndex
+        ) {
+            if let attributedRange = Range(match, in: attributed) {
+                attributed[attributedRange].backgroundColor = DSColor.Highlight.yellow.color
+                attributed[attributedRange].foregroundColor = Color.black
+            }
+            searchStart = match.upperBound
+        }
+
+        return attributed
     }
 
     @ViewBuilder
@@ -176,7 +218,8 @@ struct SearchSheet: View {
         Spacer()
         VStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 40))
+                .font(.largeTitle)
+                .imageScale(.large)
                 .foregroundStyle(.secondary.opacity(0.6))
             Text(message)
                 .font(.subheadline)
