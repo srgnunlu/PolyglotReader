@@ -42,6 +42,10 @@ extension LibraryViewModel {
                 }
             )
 
+            // Storage upload finished — pin 100% so the overlay shows its
+            // checkmark moment while finalization (folder, thumbnail) runs.
+            uploadProgress = 1.0
+
             await attachFileToCurrentFolder(&metadata)
             applyThumbnail(from: data, to: &metadata)
             await finalizeUpload(metadata: metadata, pdfData: data)

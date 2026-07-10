@@ -120,51 +120,77 @@ struct UploadingOverlay: View {
     var body: some View {
         let clampedProgress = min(max(progress, 0), 1)
         let percent = Int(clampedProgress * 100)
+        // Storage upload is done at 100%, but thumbnail/folder finalization
+        // may still run — show a brief checkmark moment instead of vanishing.
+        let isFinishing = percent >= 100
 
         ZStack {
             Color.black.opacity(0.4)
                 .ignoresSafeArea()
 
-            VStack(spacing: 16) {
+            VStack(spacing: DSSpacing.md) {
                 ZStack {
-                    Circle()
-                        .stroke(.white.opacity(0.2), lineWidth: 4)
-                        .frame(width: 50, height: 50)
-
-                    Circle()
-                        .trim(from: 0, to: 0.7)
-                        .stroke(.white, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                        .frame(width: 50, height: 50)
-                        .rotationEffect(.degrees(isAnimating ? 360 : 0))
-                        .animation(
-                            reduceMotion ? nil : .linear(duration: 1).repeatForever(autoreverses: false),
-                            value: isAnimating
-                        )
+                    if isFinishing {
+                        Image(systemName: "checkmark.circle.fill")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 50, height: 50)
+                            .foregroundStyle(DSColor.success)
+                            .transition(.scale(scale: 0.6).combined(with: .opacity))
+                    } else {
+                        uploadSpinner
+                            .transition(.opacity)
+                    }
                 }
                 .accessibilityHidden(true)
 
-                Text("library.uploading".localized(with: percent))
-                    .font(.headline)
-                    .foregroundStyle(.white)
+                Text(
+                    isFinishing
+                        ? "library.upload.finishing".localized
+                        : "library.uploading".localized(with: percent)
+                )
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .contentTransition(.numericText(value: Double(percent)))
+                .dsAnimation(DSMotion.snappy, value: percent)
 
                 ProgressView(value: clampedProgress)
                     .progressViewStyle(.linear)
-                    .tint(.white)
+                    .tint(DSColor.brand)
                     .frame(width: 200)
             }
-            .padding(36)
-            .background {
-                LiquidGlassBackground(
-                    cornerRadius: 24,
-                    intensity: .heavy,
-                    accentColor: .indigo
-                )
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 24))
-            .shadow(color: .black.opacity(0.25), radius: 30, x: 0, y: 15)
+            .padding(DSSpacing.xl + DSSpacing.xxs)
+            .dsGlass(.popup, shape: .rounded(DSRadius.popup))
+            .dsShadow(.floating)
+            .dsAnimation(DSMotion.snappy, value: isFinishing)
+        }
+        .dsHaptic(.success, trigger: percent) { old, new in
+            old < 100 && new >= 100
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("library.uploading".localized(with: percent))
+        .accessibilityLabel(
+            isFinishing
+                ? "library.upload.finishing".localized
+                : "library.uploading".localized(with: percent)
+        )
+    }
+
+    private var uploadSpinner: some View {
+        ZStack {
+            Circle()
+                .stroke(DSColor.brand.opacity(0.2), lineWidth: 4)
+                .frame(width: 50, height: 50)
+
+            Circle()
+                .trim(from: 0, to: 0.7)
+                .stroke(DSColor.brand, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .frame(width: 50, height: 50)
+                .rotationEffect(.degrees(isAnimating ? 360 : 0))
+                .animation(
+                    reduceMotion ? nil : .linear(duration: 1).repeatForever(autoreverses: false),
+                    value: isAnimating
+                )
+        }
         .onAppear { isAnimating = true }
     }
 }
