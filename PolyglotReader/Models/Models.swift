@@ -398,6 +398,15 @@ struct TranslationResult: Codable {
     var detectedLanguage: String
 }
 
+// MARK: - Detailed Translation Result
+/// Depth layer of the quick-translation popup: a context-aware full
+/// translation plus alternative senses for short selections.
+struct DetailedTranslationResult: Codable, Equatable {
+    var contextualTranslation: String
+    /// Alternative renderings (2-4 for words/short phrases, empty for passages).
+    var alternatives: [String]
+}
+
 // MARK: - Selection Data
 struct SelectionData {
     var text: String

@@ -45,6 +45,13 @@ class GeminiService: ObservableObject {
         }
     }
 
+    /// Depth layer of the quick-translation popup: contextual translation + alternatives.
+    func translateTextDetailed(_ text: String, context: String? = nil) async throws -> DetailedTranslationResult {
+        try await executeServiceCall {
+            try await analysisService.translateTextDetailed(text, context: context)
+        }
+    }
+
     // MARK: - Smart Note
 
     func generateSmartNote(_ text: String) async throws -> String {

@@ -9,6 +9,9 @@ struct QuickTranslationPopup: View {
     /// Pinch scale memory — lives in PDFReaderViewModel so it survives popup
     /// re-presentations within a session and resets when the reader closes.
     @Binding var persistedScale: CGFloat
+    /// Depth layer CTA: hands the selection off to the AI chat. Optional so
+    /// contexts without a chat (previews) simply hide the button.
+    let onAskAI: (() -> Void)?
     let onDismiss: () -> Void
 
     init(
@@ -16,12 +19,14 @@ struct QuickTranslationPopup: View {
         selectionRect: CGRect,
         context: String?,
         persistedScale: Binding<CGFloat>,
+        onAskAI: (() -> Void)? = nil,
         onDismiss: @escaping () -> Void
     ) {
         self.selectedText = selectedText
         self.selectionRect = selectionRect
         self.context = context
         self._persistedScale = persistedScale
+        self.onAskAI = onAskAI
         self.onDismiss = onDismiss
         self._scale = State(initialValue: persistedScale.wrappedValue)
         self._lastScale = State(initialValue: persistedScale.wrappedValue)
@@ -31,6 +36,11 @@ struct QuickTranslationPopup: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var translationPhase: TranslationPopupPhase = .loading
     @State private var isVisible = false
+
+    // Detail layer (depth on demand)
+    @State private var isDetailExpanded = false
+    @State private var detailPhase: TranslationDetailPhase = .idle
+    @State private var detailTask: Task<Void, Never>?
 
     // Drag (Sürükleme)
     @State private var offset = CGSize.zero
@@ -59,7 +69,8 @@ struct QuickTranslationPopup: View {
                     dx: -containerGlobal.minX,
                     dy: -containerGlobal.minY
                 ),
-                scale: scale
+                scale: scale,
+                detailHeight: detailAllowance(expanded: isDetailExpanded)
             )
 
             popupContent(layout: layout)
@@ -86,7 +97,9 @@ struct QuickTranslationPopup: View {
         }
         .onChange(of: selectedText) {
             // Seçilen metin değiştiğinde (tırnaklarla oynandığında)
-            // Mevcut çeviriyi iptal et ve yeni çeviri başlat (debounce ile)
+            // Mevcut çeviriyi iptal et ve yeni çeviri başlat (debounce ile);
+            // önceki seçimin detayı artık geçersiz.
+            resetDetail()
             startTranslation(delay: 0.6)
         }
     }
@@ -97,9 +110,86 @@ struct QuickTranslationPopup: View {
         VStack(spacing: 0) {
             TranslationPopupDragHandle()
             TranslationPopupContentArea(phase: translationPhase, maxHeight: layout.contentMaxHeight)
+
+            if case .translated = translationPhase {
+                TranslationPopupDetailToggle(isExpanded: isDetailExpanded) {
+                    toggleDetail(layout: layout)
+                }
+
+                if isDetailExpanded {
+                    TranslationPopupDetailPanel(
+                        phase: detailPhase,
+                        onRetry: { loadDetail() },
+                        onAskAI: onAskAI
+                    )
+                    .transition(.opacity)
+                }
+            }
         }
         .frame(width: layout.popupWidth)
         .translationPopupSurface()
+        .dsAnimation(DSMotion.smooth, value: isDetailExpanded)
+        .dsAnimation(DSMotion.smooth, value: detailPhase)
+    }
+
+    // MARK: - Detail Layer
+
+    /// Unscaled height budget the detail layer adds to the popup, fed into
+    /// the layout clamp so an expanded panel stays on screen.
+    private func detailAllowance(expanded: Bool) -> CGFloat {
+        guard case .translated = translationPhase else { return 0 }
+        let toggle = TranslationPopupLayout.detailToggleHeight
+        return expanded ? toggle + TranslationPopupLayout.detailPanelHeight : toggle
+    }
+
+    private func toggleDetail(layout: TranslationPopupLayoutContext) {
+        let willExpand = !isDetailExpanded
+
+        // Re-clamp the drag offset for the new size: a popup parked at the
+        // bottom edge must slide up instead of growing off-screen.
+        var expandedContext = layout
+        expandedContext.detailHeight = detailAllowance(expanded: willExpand)
+        let clampedOffset = TranslationPopupLayout.clampedOffset(
+            offset,
+            base: expandedContext.basePosition,
+            popupSize: expandedContext.scaledSize,
+            container: expandedContext.container
+        )
+
+        withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
+            isDetailExpanded = willExpand
+            offset = clampedOffset
+            lastOffset = clampedOffset
+        }
+
+        if willExpand, detailPhase == .idle {
+            loadDetail()
+        }
+    }
+
+    private func loadDetail() {
+        detailTask?.cancel()
+        detailPhase = .loading
+
+        detailTask = Task {
+            do {
+                let result = try await GeminiService.shared.translateTextDetailed(selectedText, context: context)
+                if !Task.isCancelled {
+                    detailPhase = .loaded(result)
+                }
+            } catch {
+                if !Task.isCancelled {
+                    detailPhase = .failed
+                    logError("QuickTranslation", "Detaylı çeviri hatası", error: error)
+                }
+            }
+        }
+    }
+
+    private func resetDetail() {
+        detailTask?.cancel()
+        detailPhase = .idle
+        isDetailExpanded = false
     }
 
     // MARK: - Haptic Conditions
@@ -219,14 +309,19 @@ struct QuickTranslationPopup: View {
 
             if !Task.isCancelled {
                 await MainActor.run {
-                    translationPhase = .translated(result.translated)
+                    // Animated: the detail toggle appears and shifts the popup height.
+                    withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
+                        translationPhase = .translated(result.translated)
+                    }
                     logInfo("QuickTranslation", "Çeviri tamamlandı")
                 }
             }
         } catch {
             if !Task.isCancelled {
                 await MainActor.run {
-                    translationPhase = .failed
+                    withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
+                        translationPhase = .failed
+                    }
                     logError("QuickTranslation", "Çeviri hatası", error: error)
                 }
             }

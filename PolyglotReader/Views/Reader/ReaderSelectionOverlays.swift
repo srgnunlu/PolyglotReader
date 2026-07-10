@@ -56,7 +56,14 @@ struct ReaderSelectionOverlays: View {
                 selectedText: text,
                 selectionRect: rect,
                 context: viewModel.fileMetadata.summary,
-                persistedScale: $viewModel.translationPopupScale
+                persistedScale: $viewModel.translationPopupScale,
+                onAskAI: {
+                    // Detay katmanı CTA'sı: seçim sohbete taşınır (TextSelectionPopup akışıyla aynı).
+                    chatViewModel.selectedText = viewModel.selectedText
+                    viewModel.showQuickTranslation = false
+                    viewModel.clearSelection()
+                    showChat = true
+                }
             ) {
                 viewModel.showQuickTranslation = false
                 // Hızlı mod aktifse sadece seçimi temizle, büyük popup'a dönme

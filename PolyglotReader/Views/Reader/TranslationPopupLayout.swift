@@ -12,6 +12,10 @@ enum TranslationPopupLayout {
     static let selectionGap: CGFloat = 16
     /// Minimum padding kept between the popup and the container edges.
     static let edgePadding: CGFloat = 8
+    /// Height of the "Detay" pull handle row shown once a translation exists.
+    static let detailToggleHeight: CGFloat = 32
+    /// Max height budgeted for the expanded detail panel (content + CTA).
+    static let detailPanelHeight: CGFloat = 200
 
     /// Popup width for a given container (mirrors the old UIScreen-based sizing).
     static func popupWidth(for containerSize: CGSize) -> CGFloat {
@@ -85,6 +89,10 @@ struct TranslationPopupLayoutContext {
     let containerSize: CGSize
     let selectionRect: CGRect
     let scale: CGFloat
+    /// Extra unscaled height budgeted for the expanded detail layer
+    /// (0 while collapsed). Feeds the clamp math so an open detail panel
+    /// can never push the popup off-screen.
+    var detailHeight: CGFloat = 0
 
     var container: CGRect { CGRect(origin: .zero, size: containerSize) }
     var isLandscape: Bool { containerSize.width > containerSize.height }
@@ -100,7 +108,7 @@ struct TranslationPopupLayoutContext {
     var scaledSize: CGSize {
         CGSize(
             width: popupWidth * scale,
-            height: (TranslationPopupLayout.handleHeight + contentMaxHeight) * scale
+            height: (TranslationPopupLayout.handleHeight + contentMaxHeight + detailHeight) * scale
         )
     }
 
@@ -118,7 +126,8 @@ struct TranslationPopupLayoutContext {
         TranslationPopupLayoutContext(
             containerSize: containerSize,
             selectionRect: selectionRect,
-            scale: newScale
+            scale: newScale,
+            detailHeight: detailHeight
         )
     }
 }
