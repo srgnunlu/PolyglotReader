@@ -9,6 +9,7 @@ struct PDFCardView: View {
     var availableFolders: [Folder] = []
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
+    var isThumbnailLoading: Bool = false
 
     @State private var showDeleteConfirmation = false
     @State private var isPressed = false
@@ -114,6 +115,9 @@ struct PDFCardView: View {
                         .frame(width: geo.size.width)
                         .frame(height: geo.size.height, alignment: .top)
                 }
+                .transition(.opacity)
+            } else if isThumbnailLoading {
+                SkeletonBlock()
             } else {
                 // Gradient arka plan
                 LinearGradient(
@@ -242,6 +246,7 @@ struct PDFListRowView: View {
     let onDelete: () -> Void
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
+    var isThumbnailLoading: Bool = false
 
     @State private var showDeleteConfirmation = false
 
@@ -342,6 +347,9 @@ struct PDFListRowView: View {
                         .frame(width: geo.size.width)
                         .frame(height: geo.size.height, alignment: .top)
                 }
+                .transition(.opacity)
+            } else if isThumbnailLoading {
+                SkeletonBlock()
             } else {
                 LinearGradient(
                     colors: [.indigo.opacity(0.1), .purple.opacity(0.08)],

@@ -10,6 +10,7 @@ struct FlippablePDFCardView: View {
     let onGenerateSummary: (_ force: Bool) -> Void
     var onMoveToFolder: ((Folder?) -> Void)?
     var availableFolders: [Folder] = []
+    var isThumbnailLoading: Bool = false
 
     @State private var isFlipped = false
     @State private var flipProgress: CGFloat = 0
@@ -53,7 +54,8 @@ struct FlippablePDFCardView: View {
             onTap: onTap,
             onDelete: onDelete,
             onMoveToFolder: onMoveToFolder,
-            availableFolders: availableFolders
+            availableFolders: availableFolders,
+            isThumbnailLoading: isThumbnailLoading
         )
             .overlay(alignment: .topTrailing) {
                 // Minimal AI Summary Button

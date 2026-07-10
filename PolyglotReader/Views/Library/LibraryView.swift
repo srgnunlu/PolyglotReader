@@ -56,9 +56,9 @@ struct LibraryView: View {
             // Gradient arka plan
             LinearGradient(
                 colors: [
-                    Color(.systemGroupedBackground),
-                    Color.indigo.opacity(0.03),
-                    Color(.systemGroupedBackground)
+                    DSColor.surfacePrimary,
+                    DSColor.brand.opacity(0.03),
+                    DSColor.surfacePrimary
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -227,30 +227,34 @@ struct LibraryView: View {
             GridItem(.flexible(), spacing: 16)
         ], spacing: 16) {
             ForEach(viewModel.filteredFiles) { file in
-                if viewModel.isSelectionMode {
-                    PDFCardView(
-                        file: file,
-                        onTap: { viewModel.toggleSelection(file) },
-                        onDelete: {},
-                        isSelectionMode: true,
-                        isSelected: viewModel.isSelected(file)
-                    )
-                    .id(file.id)
-                } else {
-                    FlippablePDFCardView(
-                        file: file,
-                        onTap: { selectedFile = file },
-                        onDelete: { Task { await viewModel.deleteFile(file) } },
-                        onGenerateSummary: { force in
-                            Task { await viewModel.generateSummary(for: file, force: force) }
-                        },
-                        onMoveToFolder: { folder in
-                            Task { await viewModel.moveFile(file, to: folder) }
-                        },
-                        availableFolders: viewModel.folders
-                    )
-                    .id(file.id)
+                Group {
+                    if viewModel.isSelectionMode {
+                        PDFCardView(
+                            file: file,
+                            onTap: { viewModel.toggleSelection(file) },
+                            onDelete: {},
+                            isSelectionMode: true,
+                            isSelected: viewModel.isSelected(file),
+                            isThumbnailLoading: viewModel.isThumbnailPending(file)
+                        )
+                    } else {
+                        FlippablePDFCardView(
+                            file: file,
+                            onTap: { selectedFile = file },
+                            onDelete: { Task { await viewModel.deleteFile(file) } },
+                            onGenerateSummary: { force in
+                                Task { await viewModel.generateSummary(for: file, force: force) }
+                            },
+                            onMoveToFolder: { folder in
+                                Task { await viewModel.moveFile(file, to: folder) }
+                            },
+                            availableFolders: viewModel.folders,
+                            isThumbnailLoading: viewModel.isThumbnailPending(file)
+                        )
+                    }
                 }
+                .id(file.id)
+                .libraryCardScrollTransition()
             }
         }
         .padding(.horizontal)
@@ -272,9 +276,11 @@ struct LibraryView: View {
                         Task { await viewModel.deleteFile(file) }
                     },
                     isSelectionMode: viewModel.isSelectionMode,
-                    isSelected: viewModel.isSelected(file)
+                    isSelected: viewModel.isSelected(file),
+                    isThumbnailLoading: viewModel.isThumbnailPending(file)
                 )
                 .padding(.horizontal)
+                .libraryCardScrollTransition()
             }
         }
     }
@@ -289,18 +295,11 @@ struct LibraryView: View {
                         viewModel.navigateBack()
                     } label: {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.indigo)
+                            .font(DSFont.controlIcon)
+                            .foregroundStyle(DSColor.brand)
                             .frame(width: 36, height: 36)
                             .frame(minWidth: 44, minHeight: 44)
-                            .background {
-                                Circle()
-                                    .fill(.ultraThinMaterial)
-                                    .overlay {
-                                        Circle()
-                                            .stroke(.white.opacity(0.2), lineWidth: 0.5)
-                                    }
-                            }
+                            .dsGlass(.control, shape: .circle)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("library.accessibility.back".localized)
@@ -310,23 +309,16 @@ struct LibraryView: View {
 
                 // Görünüm modu değiştir
                 Button {
-                    withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(DSMotion.resolved(DSMotion.snappy, reduceMotion: reduceMotion)) {
                         viewModel.viewMode = viewModel.viewMode == .grid ? .list : .grid
                     }
                 } label: {
                     Image(systemName: viewModel.viewMode == .grid ? "list.bullet" : "square.grid.2x2")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(DSFont.controlIcon)
                         .foregroundStyle(.primary.opacity(0.7))
                         .frame(width: 36, height: 36)
                         .frame(minWidth: 44, minHeight: 44)
-                        .background {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                                .overlay {
-                                    Circle()
-                                        .stroke(.white.opacity(0.2), lineWidth: 0.5)
-                                }
-                        }
+                        .dsGlass(.control, shape: .circle)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("library.accessibility.view_mode".localized)
@@ -339,23 +331,16 @@ struct LibraryView: View {
             HStack(spacing: 8) {
                 // Çoklu seçim modu
                 Button {
-                    withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DSMotion.resolved(DSMotion.snappy, reduceMotion: reduceMotion)) {
                         viewModel.toggleSelectionMode()
                     }
                 } label: {
                     Image(systemName: viewModel.isSelectionMode ? "xmark" : "checklist")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(viewModel.isSelectionMode ? Color.indigo : Color.primary.opacity(0.7))
+                        .font(DSFont.controlIcon)
+                        .foregroundStyle(viewModel.isSelectionMode ? DSColor.brand : Color.primary.opacity(0.7))
                         .frame(width: 36, height: 36)
                         .frame(minWidth: 44, minHeight: 44)
-                        .background {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                                .overlay {
-                                    Circle()
-                                        .stroke(.white.opacity(0.2), lineWidth: 0.5)
-                                }
-                        }
+                        .dsGlass(.control, shape: .circle)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(viewModel.isSelectionMode ? "Seçimi bitir" : "Çoklu seçim")
@@ -363,7 +348,7 @@ struct LibraryView: View {
 
                 // Arama butonu
                 Button {
-                    withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DSMotion.resolved(DSMotion.snappy, reduceMotion: reduceMotion)) {
                         isSearchActive.toggle()
                         if !isSearchActive {
                             searchInput = ""
@@ -372,29 +357,21 @@ struct LibraryView: View {
                     }
                 } label: {
                     Image(systemName: isSearchActive ? "xmark" : "magnifyingglass")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(isSearchActive ? Color.indigo : Color.primary.opacity(0.7))
+                        .font(DSFont.controlIcon)
+                        .foregroundStyle(isSearchActive ? DSColor.brand : Color.primary.opacity(0.7))
                         .frame(width: 36, height: 36)
                         .frame(minWidth: 44, minHeight: 44)
                         .background {
-                            Group {
-                                if isSearchActive {
-                                    Circle()
-                                        .fill(Color.indigo.opacity(0.15))
-                                        .overlay {
-                                            Circle()
-                                                .stroke(Color.indigo.opacity(0.3), lineWidth: 0.5)
-                                        }
-                                } else {
-                                    Circle()
-                                        .fill(.ultraThinMaterial)
-                                        .overlay {
-                                            Circle()
-                                                .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
-                                        }
-                                }
+                            if isSearchActive {
+                                Circle()
+                                    .fill(DSColor.brand.opacity(0.15))
+                                    .overlay {
+                                        Circle()
+                                            .stroke(DSColor.brand.opacity(0.3), lineWidth: 0.5)
+                                    }
                             }
                         }
+                        .dsGlass(.control, shape: .circle)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("library.accessibility.search".localized)
@@ -406,18 +383,11 @@ struct LibraryView: View {
                     showCreateFolder = true
                 } label: {
                     Image(systemName: "folder.badge.plus")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(DSFont.controlIcon)
                         .foregroundStyle(.primary.opacity(0.7))
                         .frame(width: 36, height: 36)
                         .frame(minWidth: 44, minHeight: 44)
-                        .background {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                                .overlay {
-                                    Circle()
-                                        .stroke(.white.opacity(0.2), lineWidth: 0.5)
-                                }
-                        }
+                        .dsGlass(.control, shape: .circle)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("library.accessibility.create_folder".localized)
@@ -429,20 +399,14 @@ struct LibraryView: View {
                     showFileImporter = true
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(DSFont.controlIconProminent)
                         .foregroundStyle(.white)
                         .frame(width: 36, height: 36)
                         .frame(minWidth: 44, minHeight: 44)
                         .background {
                             Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.indigo, .indigo.opacity(0.85)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .shadow(color: .indigo.opacity(0.4), radius: 6, x: 0, y: 3)
+                                .fill(DSColor.brandGradient)
+                                .shadow(color: DSColor.brand.opacity(0.4), radius: 6, x: 0, y: 3)
                         }
                 }
                 .buttonStyle(.plain)
@@ -464,6 +428,26 @@ struct LibraryView: View {
         case .failure(let error):
             logError("LibraryView", "File import error", error: error)
         }
+    }
+}
+
+// MARK: - Card Scroll Transition
+/// Cards fade+scale slightly at the viewport edges — depth without noise.
+private struct LibraryCardScrollTransition: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content.scrollTransition(.interactive) { [reduceMotion] view, phase in
+            view
+                .opacity(!reduceMotion && !phase.isIdentity ? 0.55 : 1)
+                .scaleEffect(!reduceMotion && !phase.isIdentity ? 0.96 : 1)
+        }
+    }
+}
+
+extension View {
+    func libraryCardScrollTransition() -> some View {
+        modifier(LibraryCardScrollTransition())
     }
 }
 

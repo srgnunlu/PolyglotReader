@@ -46,7 +46,7 @@ struct EmptyLibraryView: View {
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [.indigo.opacity(0.1), .clear],
+                            colors: [DSColor.brand.opacity(0.1), .clear],
                             center: .center,
                             startRadius: 0,
                             endRadius: 60
@@ -61,12 +61,12 @@ struct EmptyLibraryView: View {
 
                 Image(systemName: "doc.text.magnifyingglass")
                     .font(.system(size: 50, weight: .light))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.indigo, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                    .foregroundStyle(DSColor.brandGradient)
+                    // Gentle float sells "waiting for its first document".
+                    .offset(y: isAnimating && !reduceMotion ? -6 : 0)
+                    .animation(
+                        reduceMotion ? nil : .easeInOut(duration: 2.4).repeatForever(autoreverses: true),
+                        value: isAnimating
                     )
             }
             .accessibilityHidden(true)

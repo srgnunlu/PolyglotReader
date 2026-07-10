@@ -5,6 +5,12 @@ import PDFKit
 extension LibraryViewModel {
     // MARK: - Thumbnail Loading (Lazy)
 
+    /// True while the file's thumbnail is being generated — drives the
+    /// card skeleton state.
+    func isThumbnailPending(_ file: PDFDocumentMetadata) -> Bool {
+        file.thumbnailData == nil && pendingThumbnailIds.contains(file.id)
+    }
+
     func loadThumbnailIfNeeded(for file: PDFDocumentMetadata) {
         // Zaten thumbnail varsa veya yükleme devam ediyorsa atla
         guard file.thumbnailData == nil else { return }
@@ -28,10 +34,14 @@ extension LibraryViewModel {
             await generateThumbnail(for: file)
         }
         thumbnailLoadingTasks[file.id] = task
+        pendingThumbnailIds.insert(file.id)
     }
 
     private func generateThumbnail(for file: PDFDocumentMetadata) async {
-        defer { thumbnailLoadingTasks[file.id] = nil }
+        defer {
+            thumbnailLoadingTasks[file.id] = nil
+            pendingThumbnailIds.remove(file.id)
+        }
 
         do {
             // PDF'i indir
