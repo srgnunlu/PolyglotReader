@@ -43,6 +43,7 @@ struct OnboardingAIPage: View {
                 }
             }
             .accessibilityHidden(true)
+            .onboardingParallax()
 
             VStack(spacing: DSSpacing.sm) {
                 Text("onboarding.page3.title".localized)

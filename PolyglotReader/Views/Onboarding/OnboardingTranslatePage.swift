@@ -50,8 +50,12 @@ struct OnboardingTranslatePage: View {
     // MARK: - Stage
     private var demoStage: some View {
         VStack(spacing: DSSpacing.md) {
+            // Popup "sayfanın üzerinde yüzer" — kaydırmada karttan biraz daha
+            // geride kalması bu katman farkını hissettirir.
             sentenceCard
+                .onboardingParallax(strength: 0.10)
             popup
+                .onboardingParallax(strength: 0.18)
         }
         .frame(height: 280, alignment: .top)
     }
