@@ -502,3 +502,13 @@
 "reader.tts.pause" = "Duraklat";
 "reader.tts.resume" = "Devam Et";
 "reader.tts.stop" = "Durdur";
+
+/* ===========================================
+   MARK: - Design System: Highlight Palette
+   =========================================== */
+
+"highlight.color.yellow" = "Sarı";
+"highlight.color.green" = "Yeşil";
+"highlight.color.pink" = "Pembe";
+"highlight.color.blue" = "Mavi";
+"highlight.color.other" = "Diğer";

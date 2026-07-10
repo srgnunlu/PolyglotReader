@@ -31,12 +31,7 @@ struct TextSelectionPopup: View {
     private let cornerRadius: CGFloat = 18
     private let verticalOffset: CGFloat = 20 // Seçimin altında ne kadar uzakta
     
-    private let highlightColors = [
-        "#fef08a", // Yellow
-        "#bbf7d0", // Green
-        "#fbcfe8", // Pink
-        "#bae6fd"  // Blue
-    ]
+    private let highlightColors = DSColor.Highlight.allCases
     
     var body: some View {
         GeometryReader { geometry in
@@ -232,12 +227,12 @@ struct TextSelectionPopup: View {
     private var mainActionBar: some View {
         HStack(spacing: 6) {
             // Vurgulama renkleri
-            ForEach(highlightColors, id: \.self) { colorHex in
+            ForEach(highlightColors, id: \.rawValue) { highlight in
                 Button {
-                    onHighlight(colorHex)
+                    onHighlight(highlight.rawValue)
                 } label: {
                     Circle()
-                        .fill(Color(hex: colorHex) ?? .yellow)
+                        .fill(highlight.color)
                         .frame(width: 24, height: 24)
                         .overlay(
                             Circle()
@@ -245,7 +240,7 @@ struct TextSelectionPopup: View {
                         )
                         .contentShape(Circle())
                 }
-                .accessibilityLabel("\(colorName(for: colorHex)) ile vurgula")
+                .accessibilityLabel("\(highlight.localizedName) ile vurgula")
             }
 
             Divider()
@@ -311,17 +306,6 @@ struct TextSelectionPopup: View {
         .padding(.vertical, 10)
     }
 
-    /// Maps a highlight hex to a Turkish color name for VoiceOver.
-    private func colorName(for hex: String) -> String {
-        switch hex {
-        case "#fef08a": return "Sarı"
-        case "#bbf7d0": return "Yeşil"
-        case "#fbcfe8": return "Pembe"
-        case "#bae6fd": return "Mavi"
-        default: return "Renk"
-        }
-    }
-    
     // MARK: - Translation Area
     
     private var translationArea: some View {
