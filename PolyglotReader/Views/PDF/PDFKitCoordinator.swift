@@ -350,6 +350,15 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
         }
     }
 
+    // MARK: - Focus Mode (iki parmak çift dokunuş)
+
+    @objc func handleTwoFingerDoubleTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        DispatchQueue.main.async {
+            self.parent.onTwoFingerDoubleTap?()
+        }
+    }
+
     // MARK: - Tap Handler
 
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {

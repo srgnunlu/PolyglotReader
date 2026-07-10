@@ -44,18 +44,22 @@ struct OnboardingReadPage: View {
     // MARK: - Layered Document
     private var documentStack: some View {
         ZStack {
-            // Depth layers — further sheets sit higher and dimmer.
+            // Depth layers — further sheets sit higher and dimmer, and lag
+            // more during the page swipe (graded parallax sells the depth).
             documentSheet(scale: 0.86, tint: DSColor.brandSecondary.opacity(0.12))
                 .offset(y: appeared ? -36 : 12)
                 .opacity(appeared ? 1 : 0)
+                .onboardingParallax(strength: 0.24)
 
             documentSheet(scale: 0.93, tint: DSColor.brand.opacity(0.10))
                 .offset(y: appeared ? -18 : 6)
                 .opacity(appeared ? 1 : 0)
+                .onboardingParallax(strength: 0.18)
 
             frontSheet
                 .offset(y: appeared ? 0 : 24)
                 .opacity(appeared ? 1 : 0)
+                .onboardingParallax(strength: 0.12)
         }
         .dsAnimation(DSMotion.smooth, value: appeared)
         .frame(width: 220, height: 280)

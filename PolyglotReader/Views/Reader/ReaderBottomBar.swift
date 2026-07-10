@@ -7,6 +7,8 @@ struct ReaderBottomBar: View {
     @ObservedObject var speech: SpeechService
     @Binding var showChat: Bool
     let onToggleTTS: () -> Void
+    /// iOS 26: collapsed pill ile aynı id → dock↔pill cam morph'u.
+    var glassMorph: DSGlassMorph?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -27,7 +29,7 @@ struct ReaderBottomBar: View {
         }
         .padding(.horizontal, DSSpacing.md)
         .padding(.vertical, DSSpacing.sm)
-        .dsGlass(.bar, shape: .rounded(DSRadius.dock))
+        .dsGlass(.bar, shape: .rounded(DSRadius.dock), morph: glassMorph)
         .dsShadow(.floating)
         .padding(.bottom, DSSpacing.md)
         .padding(.horizontal, DSSpacing.md)

@@ -14,13 +14,19 @@ struct ReaderDocumentContent: View {
     @Binding var showSearch: Bool
     @Binding var showNavigator: Bool
     let barsVisible: Bool
+    /// Odak modu: tüm chrome (pill'ler, banner, TTS şeridi dahil) gizlenir.
+    let isFocusMode: Bool
     let bottomDockInset: CGFloat
 
     let onSelection: (String, CGRect, Int, [CGRect]) -> Void
     let onAnnotationTap: (Annotation) -> Void
     let onToggleBars: () -> Void
+    let onToggleFocusMode: () -> Void
     let onToggleTTS: () -> Void
     let onClose: () -> Void
+
+    /// iOS 26 cam morph kimlikleri: bar ve collapsed pill aynı cam varlığıdır.
+    @Namespace private var chromeGlassNamespace
 
     var body: some View {
         ZStack {
@@ -63,7 +69,8 @@ struct ReaderDocumentContent: View {
                 // PDF'e tıklandığında barları toggle et
                 onToggleBars()
             },
-            onAnnotationTap: onAnnotationTap
+            onAnnotationTap: onAnnotationTap,
+            onTwoFingerDoubleTap: onToggleFocusMode
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white)
@@ -76,53 +83,66 @@ struct ReaderDocumentContent: View {
 
     private var barsLayer: some View {
         VStack(spacing: 0) {
-            // Top Bar with collapse animation
-            if barsVisible && !isPDFRendering {
-                ReaderTopBar(
-                    viewModel: viewModel,
-                    showSearch: $showSearch,
-                    showNavigator: $showNavigator,
-                    onClose: onClose
-                )
-                .transition(.asymmetric(
-                    insertion: .move(edge: .top).combined(with: .opacity),
-                    removal: .move(edge: .top).combined(with: .opacity)
-                ))
-            } else if !isPDFRendering {
-                // Collapsed top indicator
-                CollapsedBarIndicator(position: .top)
+            // Top Bar with collapse animation — iOS 26'da bar ve pill aynı
+            // cam kapsayıcıyı paylaşır, geçişte şekil morph'u oynar.
+            DSGlassContainer {
+                if barsVisible && !isPDFRendering {
+                    ReaderTopBar(
+                        viewModel: viewModel,
+                        showSearch: $showSearch,
+                        showNavigator: $showNavigator,
+                        onClose: onClose,
+                        glassMorph: DSGlassMorph("reader.chrome.top", in: chromeGlassNamespace)
+                    )
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
+                } else if !isPDFRendering && !isFocusMode {
+                    // Collapsed top indicator
+                    CollapsedBarIndicator(
+                        position: .top,
+                        glassMorph: DSGlassMorph("reader.chrome.top", in: chromeGlassNamespace)
+                    )
                     .transition(.opacity)
+                }
             }
 
             Spacer()
 
             // Taranmış (metin katmanı olmayan) sayfalarda OCR pili
-            if !isPDFRendering {
+            if !isPDFRendering && !isFocusMode {
                 ScannedPageOCRBanner(viewModel: viewModel)
             }
 
             // Sesli okuma kontrol şeridi (okuma aktifken görünür)
-            if speech.isSpeaking && !isPDFRendering {
+            if speech.isSpeaking && !isPDFRendering && !isFocusMode {
                 TTSControlStrip(speech: speech, viewModel: viewModel)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
-            // Bottom Bar with collapse animation
-            if barsVisible && !isPDFRendering {
-                ReaderBottomBar(
-                    viewModel: viewModel,
-                    speech: speech,
-                    showChat: $showChat,
-                    onToggleTTS: onToggleTTS
-                )
-                .transition(.asymmetric(
-                    insertion: .move(edge: .bottom).combined(with: .opacity),
-                    removal: .move(edge: .bottom).combined(with: .opacity)
-                ))
-            } else if !isPDFRendering {
-                // Collapsed bottom indicator
-                CollapsedBarIndicator(position: .bottom)
+            // Bottom Bar with collapse animation — üst bar ile aynı morph deseni.
+            DSGlassContainer {
+                if barsVisible && !isPDFRendering {
+                    ReaderBottomBar(
+                        viewModel: viewModel,
+                        speech: speech,
+                        showChat: $showChat,
+                        onToggleTTS: onToggleTTS,
+                        glassMorph: DSGlassMorph("reader.chrome.bottom", in: chromeGlassNamespace)
+                    )
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
+                } else if !isPDFRendering && !isFocusMode {
+                    // Collapsed bottom indicator
+                    CollapsedBarIndicator(
+                        position: .bottom,
+                        glassMorph: DSGlassMorph("reader.chrome.bottom", in: chromeGlassNamespace)
+                    )
                     .transition(.opacity)
+                }
             }
         }
     }

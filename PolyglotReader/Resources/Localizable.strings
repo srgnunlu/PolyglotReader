@@ -604,3 +604,6 @@
 "library.no_files_filtered" = "Bu filtreyle eşleşen dosya yok";
 "notedetail.delete_confirm" = "Notu silmek istediğinize emin misiniz?";
 "navigator.outline_entry" = "%@, Sayfa %d";
+
+/* Faz 5: Odak modu */
+"reader.focus_mode.on" = "Odak modu açık";

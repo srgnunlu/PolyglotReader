@@ -13,6 +13,10 @@ struct PDFReaderView: View {
     @State private var showSearch = false
     @State private var showNavigator = false
     @State private var barsVisible = true
+    // Odak modu: iki parmak çift dokunuşla girilir; TÜM chrome gizlenir.
+    // Tek dokunuş her zaman güvenli çıkış kapısıdır (barlar geri gelir).
+    @State private var isFocusMode = false
+    @State private var focusHintTrigger = 0
     @State private var autoHideTimer: Timer?
     @State private var isPDFRendering = true  // PDF render durumu
     @State private var showAnnotationNote = false
@@ -56,6 +60,7 @@ struct PDFReaderView: View {
                         showSearch: $showSearch,
                         showNavigator: $showNavigator,
                         barsVisible: barsVisible,
+                        isFocusMode: isFocusMode,
                         bottomDockInset: bottomDockInset,
                         onSelection: { text, rect, page, pdfRects in
                             viewModel.handleSelection(text: text, rect: rect, page: page, pdfRects: pdfRects)
@@ -69,6 +74,7 @@ struct PDFReaderView: View {
                             }
                         },
                         onToggleBars: toggleBars,
+                        onToggleFocusMode: toggleFocusMode,
                         onToggleTTS: toggleTTS,
                         onClose: closeReader
                     )
@@ -80,6 +86,8 @@ struct PDFReaderView: View {
                     )
 
                     ReaderJumpFlashOverlay(trigger: jumpFlashCount)
+
+                    ReaderFocusModeHint(trigger: focusHintTrigger)
                 } else {
                     // Error state when document failed to load
                     ReaderLoadFailedView(
@@ -236,6 +244,12 @@ struct PDFReaderView: View {
 
     // MARK: - Bar Toggle & Auto-Hide
     private func toggleBars() {
+        // Odak modundayken tek dokunuş modu kapatır — kullanıcı asla mahsur kalmaz.
+        if isFocusMode {
+            toggleFocusMode()
+            return
+        }
+
         withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
             barsVisible.toggle()
         }
@@ -247,7 +261,30 @@ struct PDFReaderView: View {
         }
     }
 
+    // MARK: - Focus Mode
+    /// İki parmak çift dokunuş: tüm chrome (barlar, pill'ler, banner'lar) çekilir,
+    /// yalnız sayfa kalır. Tekrar aynı gesture ya da tek dokunuş moddan çıkarır.
+    private func toggleFocusMode() {
+        let entering = !isFocusMode
+
+        withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
+            isFocusMode = entering
+            barsVisible = !entering
+        }
+
+        DSHaptics.softImpact()
+
+        if entering {
+            autoHideTimer?.invalidate()
+            focusHintTrigger += 1
+        } else {
+            startAutoHideTimer()
+        }
+    }
+
     private func startAutoHideTimer() {
+        // Odak modunda zamanlayıcıya gerek yok — chrome zaten tamamen gizli.
+        guard !isFocusMode else { return }
         autoHideTimer?.invalidate()
         autoHideTimer = Timer.scheduledTimer(withTimeInterval: autoHideDelay, repeats: false) { _ in
             withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {

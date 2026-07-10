@@ -26,6 +26,8 @@ struct PDFKitView: UIViewRepresentable {
     var onRenderComplete: (() -> Void)?
     var onTap: (() -> Void)?
     var onAnnotationTap: ((Annotation) -> Void)?
+    /// İki parmak çift dokunuş — okuyucunun odak modu geçişini tetikler.
+    var onTwoFingerDoubleTap: (() -> Void)?
 
     func makeCoordinator() -> PDFKitCoordinator {
         PDFKitCoordinator(self)
@@ -84,6 +86,17 @@ struct PDFKitView: UIViewRepresentable {
                 coordinator?.handleTouchEnded()
             }
         }
+
+        // Odak modu: iki parmak çift dokunuş. Tek parmaklı tap ile çakışmaz —
+        // UITapGestureRecognizer fazla parmak gördüğünde kendiliğinden fail olur.
+        let focusTapGesture = UITapGestureRecognizer(
+            target: coordinator,
+            action: #selector(PDFKitCoordinator.handleTwoFingerDoubleTap(_:))
+        )
+        focusTapGesture.numberOfTapsRequired = 2
+        focusTapGesture.numberOfTouchesRequired = 2
+        focusTapGesture.delegate = coordinator
+        pdfView.addGestureRecognizer(focusTapGesture)
 
         let longPressGesture = UILongPressGestureRecognizer(
             target: coordinator,
