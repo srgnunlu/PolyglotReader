@@ -9,7 +9,8 @@ import PostgREST
 final class SupabaseDatabaseService {
     // MARK: - Properties
 
-    private let client: SupabaseClient
+    // Internal: +TranslationHistory extension'ı da kullanır.
+    let client: SupabaseClient
 
     // MARK: - Initialization
 

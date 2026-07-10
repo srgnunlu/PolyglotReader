@@ -35,6 +35,9 @@ class PDFReaderViewModel: ObservableObject {
     // Hızlı Çeviri Modu
     @Published var isQuickTranslationMode = false
     @Published var showQuickTranslation = false
+    /// Popup pinch scale, remembered for the PDF session. Lives here (not as
+    /// popup static state) so it naturally resets when the reader closes.
+    @Published var translationPopupScale: CGFloat = 1.0
 
     // Görsel Seçim
     @Published var selectedImage: PDFImageInfo?
@@ -43,7 +46,8 @@ class PDFReaderViewModel: ObservableObject {
     let fileMetadata: PDFDocumentMetadata
     private let pdfService = PDFService.shared
     private let geminiService = GeminiService.shared
-    private let supabaseService = SupabaseService.shared
+    // Internal: +Translation extension'ı da kullanır.
+    let supabaseService = SupabaseService.shared
     private var pdfData: Data?
 
     // MARK: - Page Pre-rendering
@@ -479,12 +483,6 @@ class PDFReaderViewModel: ObservableObject {
     func clearImageSelection() {
         selectedImage = nil
         showImagePopup = false
-    }
-
-    func toggleQuickTranslationMode() {
-        isQuickTranslationMode.toggle()
-        clearSelection()
-        logInfo("PDFReaderVM", isQuickTranslationMode ? "Hızlı Çeviri Modu açıldı" : "Normal mod")
     }
 
     // MARK: - Annotations

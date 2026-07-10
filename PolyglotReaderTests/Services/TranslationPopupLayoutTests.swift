@@ -140,4 +140,33 @@ final class TranslationPopupLayoutTests: XCTestCase {
         XCTAssertEqual(rescaled.containerSize, context.containerSize)
         XCTAssertEqual(rescaled.selectionRect, context.selectionRect)
     }
+
+    // MARK: - Detail Layer Height
+
+    func testDetailHeightGrowsScaledSizeAndSurvivesRescale() {
+        let context = TranslationPopupLayoutContext(
+            containerSize: CGSize(width: 400, height: 800),
+            selectionRect: CGRect(x: 100, y: 100, width: 100, height: 20),
+            scale: 1.0,
+            detailHeight: 232
+        )
+
+        // (handle 28 + content 180 + detail 232) * scale 1 = 440
+        XCTAssertEqual(context.scaledSize.height, 440)
+        XCTAssertEqual(context.rescaled(to: 2.0).detailHeight, 232)
+    }
+
+    func testExpandedDetailPopupStillClampsInsideContainer() {
+        // Selection near the bottom: the expanded popup must flip/clamp fully on screen.
+        let context = TranslationPopupLayoutContext(
+            containerSize: CGSize(width: 400, height: 800),
+            selectionRect: CGRect(x: 100, y: 720, width: 200, height: 20),
+            scale: 1.0,
+            detailHeight: TranslationPopupLayout.detailToggleHeight + TranslationPopupLayout.detailPanelHeight
+        )
+        let position = context.basePosition
+
+        XCTAssertGreaterThanOrEqual(position.y - context.scaledSize.height / 2, 0)
+        XCTAssertLessThanOrEqual(position.y + context.scaledSize.height / 2, 800)
+    }
 }

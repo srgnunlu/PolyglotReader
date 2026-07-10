@@ -10,6 +10,7 @@ struct FlippablePDFCardView: View {
     let onGenerateSummary: (_ force: Bool) -> Void
     var onMoveToFolder: ((Folder?) -> Void)?
     var availableFolders: [Folder] = []
+    var isThumbnailLoading: Bool = false
 
     @State private var isFlipped = false
     @State private var flipProgress: CGFloat = 0
@@ -53,7 +54,8 @@ struct FlippablePDFCardView: View {
             onTap: onTap,
             onDelete: onDelete,
             onMoveToFolder: onMoveToFolder,
-            availableFolders: availableFolders
+            availableFolders: availableFolders,
+            isThumbnailLoading: isThumbnailLoading
         )
             .overlay(alignment: .topTrailing) {
                 // Minimal AI Summary Button
@@ -190,42 +192,56 @@ struct FlippablePDFCardView: View {
     }
 
     // MARK: - Loading View
-    @State private var isRotating = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var loadingView: some View {
         VStack(spacing: 16) {
-            // Animated shimmer effect
             ZStack {
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [.purple.opacity(0.1), .indigo.opacity(0.15)],
+                            colors: [DSColor.aiAccent.opacity(0.1), DSColor.brand.opacity(0.15)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                     .frame(width: 50, height: 50)
 
-                Image(systemName: "sparkle")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.purple, .indigo],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .scaleEffect(isRotating ? 1.15 : 0.9)
-                    .opacity(isRotating ? 1 : 0.6)
-                    .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isRotating)
+                sparklePulse
             }
 
             Text("Özet hazırlanıyor...")
-                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .font(Font.system(.caption, design: .rounded).weight(.medium))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { isRotating = true }
+    }
+
+    /// AI özeti hazırlanırken sparkle nabzı — dikkat döngüsü PhaseAnimator'da;
+    /// Reduce Motion'da statik parlak hal.
+    @ViewBuilder
+    private var sparklePulse: some View {
+        let icon = Image(systemName: "sparkle")
+            .font(.title3.weight(.medium))
+            .foregroundStyle(
+                LinearGradient(
+                    colors: [DSColor.aiAccent, DSColor.brand],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+
+        if reduceMotion {
+            icon
+        } else {
+            icon.phaseAnimator([false, true]) { view, pulsing in
+                view
+                    .scaleEffect(pulsing ? 1.15 : 0.9)
+                    .opacity(pulsing ? 1 : 0.6)
+            } animation: { _ in
+                .easeInOut(duration: 0.8)
+            }
+        }
     }
 
     // MARK: - Empty State

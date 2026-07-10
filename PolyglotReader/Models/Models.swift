@@ -398,6 +398,34 @@ struct TranslationResult: Codable {
     var detectedLanguage: String
 }
 
+// MARK: - Detailed Translation Result
+/// Depth layer of the quick-translation popup: a context-aware full
+/// translation plus alternative senses for short selections.
+struct DetailedTranslationResult: Codable, Equatable {
+    var contextualTranslation: String
+    /// Alternative renderings (2-4 for words/short phrases, empty for passages).
+    var alternatives: [String]
+}
+
+// MARK: - Translation History Entry
+/// A completed quick-translation persisted for spaced review
+/// (Notebook > Çeviriler category).
+struct TranslationHistoryEntry: Identifiable, Equatable {
+    let id: String
+    let fileId: String
+    let fileName: String
+    let sourceText: String
+    let translatedText: String
+    let createdAt: Date
+
+    var shortDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd MMM"
+        formatter.locale = Locale(identifier: "tr_TR")
+        return formatter.string(from: createdAt)
+    }
+}
+
 // MARK: - Selection Data
 struct SelectionData {
     var text: String

@@ -72,16 +72,34 @@ struct PolyglotReaderApp: App {
 struct ContentView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var errorHandlingService: ErrorHandlingService
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @State private var showSplash = true
 
     var body: some View {
         Group {
             if authViewModel.isAuthenticated {
                 MainTabView()
+            } else if !hasSeenOnboarding {
+                OnboardingView()
             } else {
                 AuthView()
             }
         }
         .animation(.easeInOut, value: authViewModel.isAuthenticated)
+        .animation(.easeInOut, value: hasSeenOnboarding)
+        .overlay {
+            if showSplash {
+                SplashOverlayView()
+                    .transition(.opacity)
+                    .zIndex(2)
+            }
+        }
+        .task {
+            // Brand moment stays under a second, then hands off to the
+            // destination screen's own entrance animation.
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            withAnimation(.easeOut(duration: 0.3)) { showSplash = false }
+        }
         .overlay(alignment: .top) {
             if let banner = errorHandlingService.banner {
                 ErrorBannerView(banner: banner) {
@@ -101,7 +119,7 @@ struct ContentView: View {
         }
         .onAppear {
             errorHandlingService.recordAppState(
-                currentScreen: authViewModel.isAuthenticated ? "MainTab" : "Auth",
+                currentScreen: initialScreenName,
                 isAuthenticated: authViewModel.isAuthenticated
             )
 
@@ -116,6 +134,11 @@ struct ContentView: View {
                 isAuthenticated: newValue
             )
         }
+    }
+
+    private var initialScreenName: String {
+        if authViewModel.isAuthenticated { return "MainTab" }
+        return hasSeenOnboarding ? "Auth" : "Onboarding"
     }
 
     private func buildAlert(for alert: ErrorHandlingService.ErrorAlert) -> Alert {
@@ -167,7 +190,25 @@ struct MainTabView: View {
     @EnvironmentObject var errorHandlingService: ErrorHandlingService
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        tabView
+            .tint(DSColor.brand)
+            .onChange(of: selectedTab) { newValue in
+                errorHandlingService.recordAppState(
+                    currentScreen: tabName(for: newValue),
+                    selectedTab: newValue
+                )
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .switchToLibraryTab)) { _ in
+                // Programatik tab atlaması ani kesme yerine yumuşak geçer.
+                withAnimation(DSMotion.smooth) {
+                    selectedTab = 0
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var tabView: some View {
+        let tabs = TabView(selection: $selectedTab) {
             LibraryView()
                 .tabItem {
                     Label("Kütüphane", systemImage: "books.vertical")
@@ -186,15 +227,12 @@ struct MainTabView: View {
                 }
                 .tag(2)
         }
-        .tint(.indigo)
-        .onChange(of: selectedTab) { newValue in
-            errorHandlingService.recordAppState(
-                currentScreen: tabName(for: newValue),
-                selectedTab: newValue
-            )
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .switchToLibraryTab)) { _ in
-            selectedTab = 0
+
+        // iOS 26 Liquid Glass: tab bar shrinks out of the way while reading.
+        if #available(iOS 26.0, *) {
+            tabs.tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            tabs
         }
     }
 

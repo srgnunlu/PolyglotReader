@@ -75,6 +75,46 @@ class GeminiAnalysisService {
         }
     }
 
+    // MARK: - Detailed Translation (popup depth layer)
+
+    /// LingQ-style depth on demand: context-aware full translation plus
+    /// alternative senses. Not cached — it is invoked explicitly and rarely,
+    /// unlike the hot quick-translation path.
+    func translateTextDetailed(_ text: String, context: String? = nil) async throws -> DetailedTranslationResult {
+        guard !text.isEmpty else {
+            return DetailedTranslationResult(contextualTranslation: "", alternatives: [])
+        }
+
+        let cappedText = String(text.prefix(2000))
+
+        return try await GeminiConfig.executeWithRetry(serviceName: "GeminiAnalysis") {
+            var contextPrompt = ""
+            if let context, !context.isEmpty {
+                contextPrompt = "\nDoküman Bağlamı (Özet): \(context)\n"
+            }
+
+            let prompt = """
+            Aşağıdaki metni derinlemesine çevir:\(contextPrompt)
+            "\(cappedText)"
+
+            Görev:
+            1. Kaynak dili tespit et; kaynak Türkçe ise İngilizce'ye, değilse Türkçe'ye çevir.
+            2. Doküman bağlamını dikkate alarak terminolojiye sadık, akıcı ve TAM bir çeviri yap.
+            3. Metin tek bir kelime veya kısa bir ifadeyse (en fazla 6 kelime) bağlama göre \
+            2-4 alternatif karşılık listele; daha uzun bir pasajsa boş liste döndür.
+            4. JSON formatında döndür: {"contextualTranslation": "...", "alternatives": ["...", "..."]}
+            """
+
+            let response = try await self.model.generateContent(prompt)
+            guard let responseText = response.text else { throw GeminiError.noResponse }
+
+            let cleanedText = self.cleanJSON(responseText)
+            guard let data = cleanedText.data(using: .utf8) else { throw GeminiError.parseError }
+
+            return try JSONDecoder().decode(DetailedTranslationResult.self, from: data)
+        }
+    }
+
     // MARK: - Smart Note
 
     func generateSmartNote(_ text: String) async throws -> String {

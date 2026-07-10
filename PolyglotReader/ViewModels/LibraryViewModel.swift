@@ -38,8 +38,12 @@ class LibraryViewModel: ObservableObject {
     let supabaseService = SupabaseService.shared
     let pdfService = PDFService.shared
 
-    // Thumbnail loading tasks (cache moved to CacheService)
+    // Thumbnail loading tasks (cache moved to CacheService).
+    // Kept as a plain var so deinit (nonisolated) can still cancel them.
     var thumbnailLoadingTasks: [String: Task<Void, Never>] = [:]
+    // Reactive mirror of in-flight thumbnail work — drives card skeletons,
+    // including clearing them when generation fails.
+    @Published var pendingThumbnailIds: Set<String> = []
     let summaryCacheKeyPrefix = "pdf_summary_cache_"
 
     enum ViewMode {

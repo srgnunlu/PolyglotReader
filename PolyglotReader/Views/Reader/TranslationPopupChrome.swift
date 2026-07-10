@@ -53,63 +53,17 @@ struct TranslationPopupDragHandle: View {
     }
 }
 
-// MARK: - Liquid Glass Background
+// MARK: - Popup Surface
 
-/// QuickTranslationPopup'ın Liquid Glass arka planı
-struct TranslationPopupBackground: View {
-    let cornerRadius: CGFloat
-
-    var body: some View {
-        ZStack {
-            // Ana blur katmanı
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(.ultraThinMaterial)
-
-            // Gradient overlay - üst parlama
-            LinearGradient(
-                colors: [
-                    .white.opacity(0.35),
-                    .white.opacity(0.1),
-                    .clear
-                ],
-                startPoint: .top,
-                endPoint: .center
-            )
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-
-            // Renkli cam efekti
-            RadialGradient(
-                colors: [
-                    .indigo.opacity(0.08),
-                    .purple.opacity(0.05),
-                    .clear
-                ],
-                center: .topLeading,
-                startRadius: 0,
-                endRadius: 200
-            )
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-
-            // İç glow
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            .white.opacity(0.7),
-                            .white.opacity(0.3),
-                            .white.opacity(0.1),
-                            .white.opacity(0.3)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.5
-                )
-
-            // Dış ince kenar
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(.white.opacity(0.2), lineWidth: 0.5)
-                .blur(radius: 0.5)
-        }
+extension View {
+    /// Shared surface of the quick-translation popup: glass + clip + signature
+    /// shadow in one call. Used by the real popup AND the onboarding demo so
+    /// the two can never drift apart. On iOS 26 the glass is interactive —
+    /// it shimmers under the finger while the popup is dragged.
+    func translationPopupSurface() -> some View {
+        self
+            .dsGlass(.popup, shape: .rounded(DSRadius.popup), interactive: true)
+            .clipShape(RoundedRectangle(cornerRadius: DSRadius.popup, style: .continuous))
+            .dsShadow(.floating)
     }
 }

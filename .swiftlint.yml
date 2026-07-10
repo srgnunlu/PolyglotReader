@@ -207,6 +207,22 @@ custom_rules:
     message: "Consider using localized strings for user-facing text"
     severity: warning
 
+  # DesignSystem: fixed font sizes break Dynamic Type
+  no_fixed_font_size:
+    name: "No Fixed Font Sizes"
+    regex: '\.system\s*\(\s*size:'
+    message: "Fixed sizes break Dynamic Type - use DSFont tokens or @ScaledMetric (DesignSystem/DSFont.swift)"
+    severity: warning
+
+  # DesignSystem: hex color literals belong in the palette
+  no_inline_hex_color:
+    name: "No Inline Hex Colors"
+    regex: 'Color\s*\(\s*hex:\s*"'
+    message: "Hex literals belong in DSColor / asset catalog (DesignSystem/DSColor.swift)"
+    severity: warning
+    excluded:
+      - ".*/DesignSystem/DSColor\\.swift"
+
 # ============================================
 # ANALYZER RULES
 # ============================================

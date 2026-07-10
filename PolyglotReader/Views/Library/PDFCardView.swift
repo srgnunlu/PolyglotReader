@@ -9,6 +9,7 @@ struct PDFCardView: View {
     var availableFolders: [Folder] = []
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
+    var isThumbnailLoading: Bool = false
 
     @State private var showDeleteConfirmation = false
     @State private var isPressed = false
@@ -96,7 +97,7 @@ struct PDFCardView: View {
             }
             .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
         }
-        .buttonStyle(PDFCardButtonStyle())
+        .buttonStyle(DSPressableButtonStyle())
         .accessibilityAddTraits(isSelectionMode && isSelected ? [.isSelected] : [])
     }
 
@@ -114,6 +115,9 @@ struct PDFCardView: View {
                         .frame(width: geo.size.width)
                         .frame(height: geo.size.height, alignment: .top)
                 }
+                .transition(.opacity)
+            } else if isThumbnailLoading {
+                SkeletonBlock()
             } else {
                 // Gradient arka plan
                 LinearGradient(
@@ -226,15 +230,6 @@ struct PDFCardView: View {
     }
 }
 
-// MARK: - PDF Card Button Style
-struct PDFCardButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
-    }
-}
-
 // MARK: - PDF List Row View
 struct PDFListRowView: View {
     let file: PDFDocumentMetadata
@@ -242,6 +237,7 @@ struct PDFListRowView: View {
     let onDelete: () -> Void
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
+    var isThumbnailLoading: Bool = false
 
     @State private var showDeleteConfirmation = false
 
@@ -326,7 +322,7 @@ struct PDFListRowView: View {
                 }
             }
         }
-        .buttonStyle(PDFCardButtonStyle())
+        .buttonStyle(DSPressableButtonStyle())
         .accessibilityAddTraits(isSelectionMode && isSelected ? [.isSelected] : [])
     }
 
@@ -342,6 +338,9 @@ struct PDFListRowView: View {
                         .frame(width: geo.size.width)
                         .frame(height: geo.size.height, alignment: .top)
                 }
+                .transition(.opacity)
+            } else if isThumbnailLoading {
+                SkeletonBlock()
             } else {
                 LinearGradient(
                     colors: [.indigo.opacity(0.1), .purple.opacity(0.08)],

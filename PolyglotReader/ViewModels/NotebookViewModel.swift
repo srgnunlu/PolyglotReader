@@ -34,10 +34,10 @@ enum NotebookCategory: String, CaseIterable, Identifiable {
         case .favorites: return "#F59E0B"
         case .notes: return "#6366F1"
         case .aiNotes: return "#8B5CF6"
-        case .yellow: return "#fef08a"
-        case .green: return "#bbf7d0"
-        case .blue: return "#bae6fd"
-        case .pink: return "#fbcfe8"
+        case .yellow: return DSColor.Highlight.yellow.rawValue
+        case .green: return DSColor.Highlight.green.rawValue
+        case .blue: return DSColor.Highlight.blue.rawValue
+        case .pink: return DSColor.Highlight.pink.rawValue
         case .underlines: return "#EF4444"
         case .files: return "#3B82F6"
         }
@@ -72,18 +72,15 @@ class NotebookViewModel: ObservableObject {
     @Published var stats = AnnotationStats()
     @Published var fileAnnotationCounts: [FileAnnotationInfo] = []
     @Published var recentFavorites: [AnnotationWithFile] = []
+    // Çeviri geçmişi (Defterim > Çeviriler)
+    @Published var translationHistory: [TranslationHistoryEntry] = []
 
     // MARK: - Network Status (Phase 6)
     @Published private(set) var isOffline = false
 
     private let supabaseService = SupabaseService.shared
 
-    static let highlightColors = [
-        ("#fef08a", "Sarı"),
-        ("#bbf7d0", "Yeşil"),
-        ("#fbcfe8", "Pembe"),
-        ("#bae6fd", "Mavi")
-    ]
+    static let highlightColors = DSColor.Highlight.allCases.map { ($0.rawValue, $0.localizedName) }
 
     // MARK: - Lifecycle
 
@@ -155,13 +152,13 @@ class NotebookViewModel: ObservableObject {
                 case .aiNotes:
                     return ann.isAiGenerated
                 case .yellow:
-                    return ann.color.lowercased() == "#fef08a" && ann.type == .highlight
+                    return DSColor.Highlight.from(hex: ann.color) == .yellow && ann.type == .highlight
                 case .green:
-                    return ann.color.lowercased() == "#bbf7d0" && ann.type == .highlight
+                    return DSColor.Highlight.from(hex: ann.color) == .green && ann.type == .highlight
                 case .blue:
-                    return ann.color.lowercased() == "#bae6fd" && ann.type == .highlight
+                    return DSColor.Highlight.from(hex: ann.color) == .blue && ann.type == .highlight
                 case .pink:
-                    return ann.color.lowercased() == "#fbcfe8" && ann.type == .highlight
+                    return DSColor.Highlight.from(hex: ann.color) == .pink && ann.type == .highlight
                 case .underlines:
                     return ann.type == .underline
                 case .files:
@@ -296,10 +293,35 @@ class NotebookViewModel: ObservableObject {
         async let annotationsTask: () = loadAnnotations()
         async let statsTask: () = loadStats()
         async let fileCountsTask: () = loadFileAnnotationCounts()
+        async let translationsTask: () = loadTranslationHistory()
 
         await annotationsTask
         await statsTask
         await fileCountsTask
+        await translationsTask
+    }
+
+    // MARK: - Translation History
+
+    func loadTranslationHistory() async {
+        do {
+            translationHistory = try await supabaseService.getTranslationHistory()
+            logInfo("NotebookVM", "Çeviri geçmişi yüklendi", details: "\(translationHistory.count) adet")
+        } catch {
+            // Geçmiş yüklenemezse dashboard'ın kalanı etkilenmez.
+            logError("NotebookVM", "Çeviri geçmişi yükleme hatası", error: error)
+        }
+    }
+
+    func deleteTranslation(_ id: String) async {
+        do {
+            try await supabaseService.deleteTranslationHistory(id: id)
+            translationHistory.removeAll { $0.id == id }
+            logInfo("NotebookVM", "Çeviri geçmişinden silindi", details: "ID: \(id)")
+        } catch {
+            errorMessage = "notebook.translations.delete_failed".localized
+            logError("NotebookVM", "Çeviri silme hatası", error: error)
+        }
     }
 
     func toggleFavorite(_ id: String) async {
@@ -436,12 +458,6 @@ struct AnnotationWithFile: Identifiable {
     }
 
     var colorName: String {
-        switch color.lowercased() {
-        case "#fef08a": return "Sarı"
-        case "#bbf7d0": return "Yeşil"
-        case "#bae6fd": return "Mavi"
-        case "#fbcfe8": return "Pembe"
-        default: return "Diğer"
-        }
+        DSColor.Highlight.from(hex: color)?.localizedName ?? "highlight.color.other".localized
     }
 }

@@ -276,28 +276,6 @@ struct LiquidGlassFolderButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Compact Folder Card View (Eski - uyumluluk için)
-/// Daha kompakt klasör kartı
-struct CompactFolderCardView: View {
-    let folder: Folder
-    var onTap: () -> Void
-    var onDelete: (() -> Void)?
-
-    var body: some View {
-        LiquidGlassFolderCard(folder: folder, onTap: onTap, onDelete: onDelete)
-    }
-}
-
-// MARK: - Folder Section View (Eski - uyumluluk için)
-/// Klasörleri grid olarak gösteren bölüm
-struct FolderSectionView: View {
-    @ObservedObject var viewModel: LibraryViewModel
-
-    var body: some View {
-        CollapsibleFolderSection(viewModel: viewModel)
-    }
-}
-
 // MARK: - Breadcrumb View
 /// Klasör hiyerarşisi navigasyonu
 struct BreadcrumbView: View {

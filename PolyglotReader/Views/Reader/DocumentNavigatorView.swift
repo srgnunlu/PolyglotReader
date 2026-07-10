@@ -84,6 +84,12 @@ struct DocumentNavigatorView: View {
             }
             .buttonStyle(.plain)
             .disabled(entry.pageIndex == nil)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(
+                entry.pageIndex.map {
+                    "navigator.outline_entry".localized(with: entry.label, $0 + 1)
+                } ?? entry.label
+            )
         }
         .listStyle(.plain)
     }

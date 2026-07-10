@@ -32,13 +32,22 @@ struct QuizView: View {
                         onRetry: { viewModel.reset() },
                         onClose: { dismiss() }
                     )
+                    .transition(.opacity)
                 } else if let question = viewModel.currentQuestion {
                     QuestionView(
                         viewModel: viewModel,
                         question: question
                     )
+                    // Yeni soru kartı sağdan kayar, eski soru solarak çekilir.
+                    .id(viewModel.currentQuestionIndex)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .opacity
+                    ))
                 }
             }
+            .dsAnimation(DSMotion.smooth, value: viewModel.currentQuestionIndex)
+            .dsAnimation(DSMotion.smooth, value: viewModel.showResult)
             .navigationTitle("quiz.title".localized)
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingReview) {
@@ -73,12 +82,13 @@ struct LoadingQuizView: View {
         VStack(spacing: 24) {
             ZStack {
                 Circle()
-                    .fill(Color.indigo.opacity(0.1))
+                    .fill(DSColor.brand.opacity(0.1))
                     .frame(width: 100, height: 100)
 
                 Image(systemName: "brain")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.indigo)
+                    .font(.largeTitle)
+                    .imageScale(.large)
+                    .foregroundStyle(DSColor.brand)
                     .scaleEffect(isAnimating ? 1.1 : 1.0)
                     .animation(
                         reduceMotion ? nil : .easeInOut(duration: 1).repeatForever(),
@@ -113,8 +123,9 @@ struct ErrorQuizView: View {
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 50))
-                .foregroundStyle(.red)
+                .font(.largeTitle)
+                .imageScale(.large)
+                .foregroundStyle(DSColor.danger)
                 .accessibilityHidden(true)
 
             Text("quiz.error.title".localized)
@@ -190,7 +201,7 @@ struct QuestionView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("quiz.explanation".localized, systemImage: "lightbulb.fill")
                         .font(.caption)
-                        .foregroundStyle(.indigo)
+                        .foregroundStyle(DSColor.brand)
 
                     Text(explanation)
                         .font(.subheadline)
@@ -198,7 +209,7 @@ struct QuestionView: View {
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.indigo.opacity(0.1))
+                .background(DSColor.brand.opacity(0.1))
                 .cornerRadius(12)
                 .padding(.horizontal)
             }
@@ -221,9 +232,10 @@ struct QuestionView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .frame(minHeight: 44)
-                    .background(Color.indigo)
+                    .background(DSColor.brand)
                     .cornerRadius(16)
                 }
+                .buttonStyle(DSPressableButtonStyle())
                 .padding()
                 .accessibilityLabel(
                     viewModel.currentQuestionIndex == viewModel.questions.count - 1
@@ -246,15 +258,19 @@ struct OptionButton: View {
     let isAnswered: Bool
     let action: () -> Void
 
+    /// Yanlış seçilen şık için tek seferlik sarsıntı sayacı.
+    @State private var wrongShakes: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var backgroundColor: Color {
         guard isAnswered else {
-            return isSelected ? Color.indigo.opacity(0.1) : Color(.secondarySystemBackground)
+            return isSelected ? DSColor.brand.opacity(0.1) : Color(.secondarySystemBackground)
         }
 
         if isCorrect {
-            return Color.green.opacity(0.15)
+            return DSColor.success.opacity(0.15)
         } else if isSelected {
-            return Color.red.opacity(0.15)
+            return DSColor.danger.opacity(0.15)
         } else {
             return Color(.secondarySystemBackground).opacity(0.5)
         }
@@ -262,13 +278,13 @@ struct OptionButton: View {
 
     var borderColor: Color {
         guard isAnswered else {
-            return isSelected ? Color.indigo : Color.clear
+            return isSelected ? DSColor.brand : Color.clear
         }
 
         if isCorrect {
-            return Color.green
+            return DSColor.success
         } else if isSelected {
-            return Color.red
+            return DSColor.danger
         } else {
             return Color.clear
         }
@@ -286,10 +302,10 @@ struct OptionButton: View {
                 if isAnswered {
                     if isCorrect {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(DSColor.success)
                     } else if isSelected {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(DSColor.danger)
                     }
                 }
             }
@@ -305,6 +321,22 @@ struct OptionButton: View {
             )
         }
         .disabled(isAnswered)
+        // Doğru cevap bouncy bir vurguyla hafifçe büyür; yanlış seçim sarsılır.
+        .scaleEffect(isAnswered && isCorrect ? 1.02 : 1.0)
+        .dsAnimation(DSMotion.celebrate, value: isAnswered)
+        .modifier(HorizontalShakeEffect(animatableData: wrongShakes))
+        .dsHaptic(.success, trigger: isAnswered) { old, new in
+            !old && new && isSelected && isCorrect
+        }
+        .dsHaptic(.error, trigger: isAnswered) { old, new in
+            !old && new && isSelected && !isCorrect
+        }
+        .onChange(of: isAnswered) {
+            guard isAnswered, isSelected, !isCorrect, !reduceMotion else { return }
+            withAnimation(.linear(duration: 0.35)) {
+                wrongShakes += 1
+            }
+        }
         .accessibilityLabel(text)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityValue(
@@ -316,202 +348,19 @@ struct OptionButton: View {
     }
 }
 
-// MARK: - Result View
-struct QuizResultView: View {
-    let score: Int
-    let total: Int
-    let percentage: Int
-    let incorrectCount: Int
-    let onReview: () -> Void
-    let onRetry: () -> Void
-    let onClose: () -> Void
+// MARK: - Horizontal Shake Effect
+/// Yanlış cevap sarsıntısı: animatableData her +1 arttığında 3 tam salınım.
+private struct HorizontalShakeEffect: GeometryEffect {
+    var amplitude: CGFloat = 7
+    var shakesPerUnit: CGFloat = 3
+    var animatableData: CGFloat
 
-    var body: some View {
-        VStack(spacing: 32) {
-            ZStack {
-                Circle()
-                    .stroke(Color.gray.opacity(0.2), lineWidth: 12)
-                    .frame(width: 150, height: 150)
-
-                Circle()
-                    .trim(from: 0, to: CGFloat(percentage) / 100)
-                    .stroke(Color.indigo, style: StrokeStyle(lineWidth: 12, lineCap: .round))
-                    .frame(width: 150, height: 150)
-                    .rotationEffect(.degrees(-90))
-
-                Text("%\(percentage)")
-                    .font(.system(size: 40, weight: .bold))
-                    .foregroundStyle(.indigo)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(percentage)%")
-
-            VStack(spacing: 8) {
-                Text("quiz.complete.title".localized)
-                    .font(.title2.bold())
-                    .accessibilityAddTraits(.isHeader)
-
-                Text("quiz.score_summary".localized(with: total, score))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            VStack(spacing: 12) {
-                if incorrectCount > 0 {
-                    Button(action: onReview) {
-                        Label("quiz.review.button".localized, systemImage: "list.bullet.clipboard")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .frame(minHeight: 44)
-                            .background(Color.indigo)
-                            .cornerRadius(16)
-                    }
-                    .accessibilityIdentifier("review_answers_button")
-                }
-
-                Button(action: onRetry) {
-                    Label("quiz.retry".localized, systemImage: "arrow.clockwise")
-                        .font(.headline)
-                        .foregroundStyle(.indigo)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .frame(minHeight: 44)
-                        .background(Color.indigo.opacity(0.12))
-                        .cornerRadius(16)
-                }
-                .accessibilityIdentifier("retry_result_button")
-
-                Button(action: onClose) {
-                    Text("common.close".localized)
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .frame(minHeight: 44)
-                }
-                .accessibilityIdentifier("close_result_button")
-            }
-            .padding(.horizontal, 40)
-        }
-        .padding()
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        let translation = amplitude * sin(animatableData * .pi * 2 * shakesPerUnit)
+        return ProjectionTransform(CGAffineTransform(translationX: translation, y: 0))
     }
 }
 
-// MARK: - Review View
-struct QuizReviewView: View {
-    @ObservedObject var viewModel: QuizViewModel
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    ForEach(Array(viewModel.questions.enumerated()), id: \.offset) { index, question in
-                        ReviewQuestionCard(
-                            number: index + 1,
-                            question: question,
-                            userAnswer: viewModel.userAnswers[index]
-                        )
-                    }
-                }
-                .padding()
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("quiz.review.title".localized)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("common.close".localized) { dismiss() }
-                        .accessibilityIdentifier("close_review_button")
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Review Question Card
-struct ReviewQuestionCard: View {
-    let number: Int
-    let question: QuizQuestion
-    let userAnswer: Int?
-
-    private var isCorrect: Bool {
-        userAnswer == question.correctAnswerIndex
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundStyle(isCorrect ? .green : .red)
-
-                Text("\(number). \(question.question)")
-                    .font(.subheadline.weight(.semibold))
-            }
-
-            VStack(spacing: 8) {
-                ForEach(Array(question.options.enumerated()), id: \.offset) { optionIndex, option in
-                    reviewOption(optionIndex: optionIndex, option: option)
-                }
-            }
-
-            if let explanation = question.explanation, !explanation.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("quiz.explanation".localized, systemImage: "lightbulb.fill")
-                        .font(.caption)
-                        .foregroundStyle(.indigo)
-                    Text(explanation)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 4)
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground))
-        .cornerRadius(14)
-        .accessibilityElement(children: .combine)
-    }
-
-    @ViewBuilder
-    private func reviewOption(optionIndex: Int, option: String) -> some View {
-        let isAnswer = optionIndex == question.correctAnswerIndex
-        let isUserWrong = optionIndex == userAnswer && !isCorrect
-
-        HStack(spacing: 8) {
-            Image(systemName: isAnswer ? "checkmark" : (isUserWrong ? "xmark" : "circle"))
-                .font(.caption2)
-                .foregroundStyle(isAnswer ? .green : (isUserWrong ? .red : .secondary))
-                .frame(width: 16)
-
-            Text(option)
-                .font(.caption)
-                .foregroundStyle(isAnswer ? .green : (isUserWrong ? .red : .primary))
-
-            Spacer()
-
-            if isUserWrong {
-                Text("quiz.review.your_answer".localized)
-                    .font(.caption2)
-                    .foregroundStyle(.red)
-            } else if isAnswer {
-                Text("quiz.review.correct_answer".localized)
-                    .font(.caption2)
-                    .foregroundStyle(.green)
-            }
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .background(
-            (isAnswer ? Color.green.opacity(0.1) : (isUserWrong ? Color.red.opacity(0.1) : Color.clear))
-        )
-        .cornerRadius(8)
-    }
-}
 
 #Preview {
     QuizView(textContext: "Sample text for quiz generation")

@@ -5,6 +5,7 @@ enum NotebookRoute: Hashable {
     case allFiles
     case category(NotebookCategory)
     case file(String)
+    case translations
 }
 
 struct NotebookView: View {
@@ -57,6 +58,8 @@ struct NotebookView: View {
                 .refreshable {
                     await viewModel.refreshAnnotations()
                 }
+                // Pull-to-refresh spinner picks up the brand hue.
+                .tint(DSColor.brand)
                 .alert("common.error".localized, isPresented: .init(
                     get: { viewModel.errorMessage != nil },
                     set: { if !$0 { viewModel.errorMessage = nil } }
@@ -72,6 +75,7 @@ struct NotebookView: View {
                     AnnotationExportView(annotations: viewModel.annotations) {
                         showExport = false
                     }
+                    .presentationCornerRadius(DSRadius.popup)
                 }
         }
     }
@@ -96,7 +100,8 @@ struct NotebookView: View {
 
             if viewModel.isLoading && viewModel.annotations.isEmpty {
                 NotebookLoadingView()
-            } else if viewModel.annotations.isEmpty {
+            } else if viewModel.annotations.isEmpty && viewModel.translationHistory.isEmpty {
+                // Neither annotations nor saved translations yet.
                 EmptyNotebookView(
                     hasFilters: false
                 ) {
@@ -110,7 +115,8 @@ struct NotebookView: View {
                     onSelectCategory: { path.append(.category($0)) },
                     onSelectFile: { path.append(.file($0)) },
                     onSelectAnnotation: { navigateToFile(annotation: $0) },
-                    onShowAllFiles: { path.append(.allFiles) }
+                    onShowAllFiles: { path.append(.allFiles) },
+                    onSelectTranslations: { path.append(.translations) }
                 )
                 .transition(.opacity)
             }
@@ -149,6 +155,9 @@ struct NotebookView: View {
                 onDismiss: popPath
             )
             .toolbar(.hidden, for: .navigationBar)
+
+        case .translations:
+            TranslationHistoryView(viewModel: viewModel)
         }
     }
 
@@ -182,51 +191,51 @@ struct NotebookView: View {
     }
 }
 
-// MARK: - Premium Loading View
+// MARK: - Loading Skeleton
+/// Dashboard-shaped skeleton: mirrors the stats header + category grid +
+/// file rows so the loaded layout lands without a jump. Only content is
+/// skeletonned — chrome never is.
 struct NotebookLoadingView: View {
-    @State private var isAnimating = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .stroke(
-                        LinearGradient(
-                            colors: [.purple.opacity(0.2), .indigo.opacity(0.2)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 4
-                    )
-                    .frame(width: 50, height: 50)
+        ScrollView {
+            VStack(spacing: DSSpacing.lg) {
+                // Stats header placeholder (3 cards)
+                HStack(spacing: DSSpacing.md) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        SkeletonBlock(cornerRadius: DSRadius.medium)
+                            .frame(height: 96)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
 
-                Circle()
-                    .trim(from: 0, to: 0.7)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.purple, .indigo],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                    )
-                    .frame(width: 50, height: 50)
-                    .rotationEffect(.degrees(isAnimating ? 360 : 0))
-                    .animation(
-                        reduceMotion ? nil : .linear(duration: 1).repeatForever(autoreverses: false),
-                        value: isAnimating
-                    )
+                // Category grid placeholder (2x2)
+                VStack(spacing: DSSpacing.sm) {
+                    ForEach(0..<2, id: \.self) { _ in
+                        HStack(spacing: DSSpacing.sm) {
+                            SkeletonBlock(cornerRadius: DSRadius.medium)
+                                .frame(height: 72)
+                                .frame(maxWidth: .infinity)
+                            SkeletonBlock(cornerRadius: DSRadius.medium)
+                                .frame(height: 72)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                }
+
+                // File rows placeholder
+                VStack(spacing: DSSpacing.sm) {
+                    ForEach(0..<2, id: \.self) { _ in
+                        SkeletonBlock(cornerRadius: DSRadius.medium)
+                            .frame(height: 56)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
             }
-            .accessibilityHidden(true)
-
-            Text("notebook.loading".localized)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            .padding()
         }
-        .accessibilityElement(children: .combine)
+        .scrollDisabled(true)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("notebook.loading".localized)
-        .onAppear { isAnimating = true }
     }
 }
 

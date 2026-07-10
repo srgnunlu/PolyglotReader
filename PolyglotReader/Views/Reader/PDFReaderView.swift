@@ -5,6 +5,7 @@ struct PDFReaderView: View {
     @StateObject private var viewModel: PDFReaderViewModel
     @StateObject private var chatViewModel: ChatViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @StateObject private var speech = SpeechService()
     @State private var showChat = false
@@ -16,9 +17,12 @@ struct PDFReaderView: View {
     @State private var isPDFRendering = true  // PDF render durumu
     @State private var showAnnotationNote = false
     @State private var selectedAnnotation: Annotation?
+    // Atıf/arama sıçrayışlarında sayfa üzerindeki sarı parıltıyı tetikler.
+    @State private var jumpFlashCount = 0
 
     private let bottomDockInset: CGFloat = 90
-    private let autoHideDelay: TimeInterval = 10.0
+    // İçerik-öncelikli okuyucu: chrome 6 saniyede kenara çekilir.
+    private let autoHideDelay: TimeInterval = 6.0
     private let initialPage: Int?
 
     init(file: PDFDocumentMetadata, initialPage: Int? = nil) {
@@ -37,7 +41,7 @@ struct PDFReaderView: View {
                     VStack(spacing: 16) {
                         ProgressView()
                             .scaleEffect(1.2)
-                        Text("Doküman yükleniyor...")
+                        Text("reader.loading_document".localized)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -74,6 +78,8 @@ struct PDFReaderView: View {
                         chatViewModel: chatViewModel,
                         showChat: $showChat
                     )
+
+                    ReaderJumpFlashOverlay(trigger: jumpFlashCount)
                 } else {
                     // Error state when document failed to load
                     ReaderLoadFailedView(
@@ -95,9 +101,12 @@ struct PDFReaderView: View {
                 ChatView(viewModel: chatViewModel) { page in
                     viewModel.goToPage(page)
                     showChat = false
+                    // Atıf navigasyonu: hedef sayfada kısa sarı parıltı.
+                    jumpFlashCount += 1
                 }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+                .presentationCornerRadius(DSRadius.popup)
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
             }
             .onChange(of: showChat) { isShowing in
@@ -130,9 +139,14 @@ struct PDFReaderView: View {
             }
             .sheet(isPresented: $showQuiz) {
                 QuizView(textContext: viewModel.extractedText)
+                    .presentationCornerRadius(DSRadius.popup)
             }
             .sheet(isPresented: $showSearch) {
-                SearchSheet(viewModel: viewModel)
+                SearchSheet(viewModel: viewModel) {
+                    // Arama sonucuna atlama: hedef sayfada kısa sarı parıltı.
+                    jumpFlashCount += 1
+                }
+                .presentationCornerRadius(DSRadius.popup)
             }
             .sheet(isPresented: $showNavigator) {
                 if let document = viewModel.document {
@@ -142,6 +156,7 @@ struct PDFReaderView: View {
                         onSelectPage: { viewModel.goToPage($0) },
                         onDismiss: { showNavigator = false }
                     )
+                    .presentationCornerRadius(DSRadius.popup)
                 }
             }
             .sheet(isPresented: $showAnnotationNote) {
@@ -177,13 +192,11 @@ struct PDFReaderView: View {
                 startAutoHideTimer()
             }
             .onDisappear {
-                // PDF kapatıldığında popup session memory'sini sıfırla
-                QuickTranslationPopup.resetSessionMemory()
-                logDebug("PDFReaderView", "View disappeared, popup session memory reset")
+                logDebug("PDFReaderView", "View disappeared")
                 speech.stop()
                 autoHideTimer?.invalidate()
             }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: speech.isSpeaking)
+            .dsAnimation(DSMotion.smooth, value: speech.isSpeaking)
             .onChange(of: showChat) { isOpen in
                 if isOpen {
                     autoHideTimer?.invalidate()
@@ -223,7 +236,7 @@ struct PDFReaderView: View {
 
     // MARK: - Bar Toggle & Auto-Hide
     private func toggleBars() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+        withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
             barsVisible.toggle()
         }
 
@@ -237,7 +250,7 @@ struct PDFReaderView: View {
     private func startAutoHideTimer() {
         autoHideTimer?.invalidate()
         autoHideTimer = Timer.scheduledTimer(withTimeInterval: autoHideDelay, repeats: false) { _ in
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
                 barsVisible = false
             }
         }
