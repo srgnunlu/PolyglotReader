@@ -76,14 +76,17 @@ AS $$
     LIMIT match_count;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.match_chunks TO authenticated;
+GRANT EXECUTE ON FUNCTION public.match_chunks(vector, float, int, text) TO authenticated;
 
 -- ---------------------------------------------------------------------------
 -- search_chunks_bm25: language-aware via stored columns + metadata returns.
 -- search_language has a DEFAULT so existing 3-arg callers keep working.
 -- Separate IF branches (not CASE inside WHERE) keep each query GIN-indexable.
 -- ---------------------------------------------------------------------------
+-- Two historical overloads may coexist: (text,text,int) from 20260103 and a
+-- resurrected (text,uuid,int) from 20260109. Drop both so the name is unique.
 DROP FUNCTION IF EXISTS public.search_chunks_bm25(text, text, int);
+DROP FUNCTION IF EXISTS public.search_chunks_bm25(text, uuid, int);
 
 CREATE FUNCTION public.search_chunks_bm25(
     search_file_id text,
@@ -144,7 +147,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.search_chunks_bm25 TO authenticated;
+GRANT EXECUTE ON FUNCTION public.search_chunks_bm25(text, text, int, text) TO authenticated;
 
 -- ---------------------------------------------------------------------------
 -- search_chunks_bm25_lang: keep the web-facing signature, delegate to the
@@ -174,4 +177,4 @@ AS $$
     ) b;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.search_chunks_bm25_lang TO authenticated;
+GRANT EXECUTE ON FUNCTION public.search_chunks_bm25_lang(text, uuid, int, text) TO authenticated;
