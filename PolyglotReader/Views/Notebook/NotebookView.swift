@@ -28,7 +28,7 @@ struct NotebookView: View {
                             } label: {
                                 Image(systemName: "square.and.arrow.up")
                                     .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(.indigo)
+                                    .foregroundStyle(DSColor.brand)
                                     .frame(minWidth: 44, minHeight: 44)
                             }
                             .accessibilityLabel("annotation.export.title".localized)

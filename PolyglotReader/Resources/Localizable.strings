@@ -315,6 +315,15 @@
 "notebook.translations.empty.title" = "Henüz çeviri yok";
 "notebook.translations.empty.subtitle" = "Okurken bir metni seçip anında çevir; tamamlanan çeviriler burada birikir.";
 "notebook.translations.delete_failed" = "Çeviri silinemedi";
+"notebook.translations.search" = "Çeviri, kaynak metin veya dosya ara";
+"notebook.translations.empty.search" = "Aramanla eşleşen çeviri bulunamadı";
+"notebook.translations.sort" = "Sıralama";
+"notebook.translations.sort.newest" = "En Yeni";
+"notebook.translations.sort.oldest" = "En Eski";
+"notebook.translations.group_by_file" = "Dosyaya Göre Grupla";
+"notebook.translations.options" = "Sıralama ve gruplama seçenekleri";
+"notebook.translations.expand.hint" = "Tam metni görmek için dokun";
+"notebook.translations.collapse.hint" = "Önizlemeye dönmek için dokun";
 
 /* Empty State */
 "notebook.empty.title" = "Henüz Not Yok";
