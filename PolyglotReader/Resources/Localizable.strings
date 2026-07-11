@@ -185,6 +185,10 @@
 "chat.deep_search" = "Derin Arama";
 "chat.deep_search_active" = "Derin Arama aktif - Yanıtlar daha yavaş olabilir";
 "chat.copy" = "Kopyala";
+"chat.share" = "Paylaş";
+"chat.speak" = "Sesli Oku";
+"chat.regenerate" = "Yanıtı Yeniden Oluştur";
+"chat.code" = "kod";
 "chat.suggestions.header" = "Başlamak için deneyin";
 "chat.scroll_to_bottom" = "Son mesaja git";
 "chat.clear.title" = "Sohbeti Temizle";

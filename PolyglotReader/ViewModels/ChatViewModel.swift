@@ -17,6 +17,11 @@ class ChatViewModel: ObservableObject {
     @Published var isDeepSearchEnabled = false  // Derin Arama (Reranking + Query Expansion)
     @Published var cachedImageMetadata: [PDFImageMetadata] = []  // Dosyadaki görseller
 
+    /// Son başarısız gönderimin kullanıcı metni — hata balonundaki inline
+    /// "Tekrar Dene" butonu bunu yeniden gönderir (kullanıcı balonu zaten
+    /// listede olduğundan tekrar eklenmez).
+    var pendingRetryText: String?
+
     // MARK: - Smart Suggestions (P4)
     @Published var smartSuggestions: [ChatSuggestion] = []
     @Published var currentPageNumber: Int = 1

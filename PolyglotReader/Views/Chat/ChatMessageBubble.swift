@@ -6,9 +6,16 @@ struct MessageBubble: View {
     let message: ChatMessage
     var isStreaming: Bool = false
     var showsTimestamp: Bool = false
+    /// AI yanıtını sesli okutur (nil ise menüde gösterilmez).
+    var onSpeak: ((String) -> Void)?
+    /// Son AI yanıtı için "Yanıtı Yeniden Oluştur" (nil ise gösterilmez).
+    var onRegenerate: (() -> Void)?
+    /// Hata balonundaki inline "Tekrar Dene" (nil ise buton gösterilmez).
+    var onRetry: (() -> Void)?
     let onNavigateToPage: (Int) -> Void
 
     private var isUser: Bool { message.role == .user }
+    private var isError: Bool { message.isError == true }
     private var bubbleColor: Color {
         isUser ? DSColor.brand : Color(.secondarySystemBackground)
     }
@@ -80,7 +87,9 @@ struct MessageBubble: View {
             }
 
             // Message content
-            if message.role == .model {
+            if isError {
+                errorContent
+            } else if message.role == .model {
                 // Profesyonel Markdown renderer (tablolar, listeler, başlıklar)
                 MarkdownView(text: message.text, onNavigateToPage: onNavigateToPage)
             } else {
@@ -120,6 +129,28 @@ struct MessageBubble: View {
             } label: {
                 Label("chat.copy".localized, systemImage: "doc.on.doc")
             }
+
+            ShareLink(item: message.text) {
+                Label("chat.share".localized, systemImage: "square.and.arrow.up")
+            }
+
+            if !isUser, !isError, let onSpeak {
+                Button {
+                    DSHaptics.lightImpact()
+                    onSpeak(message.text)
+                } label: {
+                    Label("chat.speak".localized, systemImage: "speaker.wave.2")
+                }
+            }
+
+            if !isUser, !isError, let onRegenerate {
+                Button {
+                    DSHaptics.lightImpact()
+                    onRegenerate()
+                } label: {
+                    Label("chat.regenerate".localized, systemImage: "arrow.clockwise")
+                }
+            }
         }
         .dsAnimation(DSMotion.smooth, value: isStreaming)
 
@@ -127,6 +158,33 @@ struct MessageBubble: View {
             bubble.dsShadow(.subtle, tint: DSColor.brand)
         } else {
             bubble
+        }
+    }
+
+    /// Hata balonu: uyarı ikonu + mesaj + inline "Tekrar Dene". Retry artık
+    /// yalnızca genel hata banner'ında değil, hatanın olduğu yerde.
+    private var errorContent: some View {
+        VStack(alignment: .leading, spacing: DSSpacing.xs) {
+            HStack(alignment: .top, spacing: DSSpacing.xs) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(DSColor.warning)
+                Text(message.text)
+                    .font(.subheadline)
+            }
+
+            if let onRetry {
+                Button {
+                    DSHaptics.lightImpact()
+                    onRetry()
+                } label: {
+                    Label("common.retry".localized, systemImage: "arrow.clockwise")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(DSColor.brand)
+                }
+                .buttonStyle(DSPressableButtonStyle())
+                .accessibilityIdentifier("chat_retry_button")
+            }
         }
     }
 }

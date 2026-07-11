@@ -76,10 +76,12 @@ struct Folder: Codable, Identifiable, Hashable {
     var userId: String
     var createdAt: Date
     var fileCount: Int
+    var icon: String?           // SF Symbol (DB'de `folders.icon`; eski kayıtlar için nil)
 
-    /// User-selected glyph (stored locally) with a sensible default.
+    /// User-selected glyph: DB value first, then the legacy local store,
+    /// then the default. Local store survives until the icon migration lands.
     var sfSymbol: String {
-        FolderIconStore.shared.icon(for: id) ?? "folder.fill"
+        icon ?? FolderIconStore.shared.icon(for: id) ?? "folder.fill"
     }
 
     init(
@@ -89,7 +91,8 @@ struct Folder: Codable, Identifiable, Hashable {
         parentId: UUID? = nil,
         userId: String,
         createdAt: Date = Date(),
-        fileCount: Int = 0
+        fileCount: Int = 0,
+        icon: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -98,6 +101,7 @@ struct Folder: Codable, Identifiable, Hashable {
         self.userId = userId
         self.createdAt = createdAt
         self.fileCount = fileCount
+        self.icon = icon
     }
 }
 
@@ -145,6 +149,18 @@ struct PDFDocumentMetadata: Codable, Identifiable {
     var tags: [Tag]
     var aiCategory: String?
 
+    // Favori ve Okuma İlerlemesi
+    var isFavorite: Bool
+    var pageCount: Int?         // files.page_count — eski kayıtlarda nil, lazy backfill
+    var lastReadPage: Int?      // reading_progress.page
+    var lastOpenedAt: Date?     // reading_progress.updated_at → "Son Açılan" sıralaması
+
+    /// 0...1 arası okuma ilerlemesi; sayfa sayısı bilinmiyorsa nil.
+    var readingProgress: Double? {
+        guard let pageCount, pageCount > 0, let lastReadPage else { return nil }
+        return min(1.0, Double(lastReadPage) / Double(pageCount))
+    }
+
     var formattedSize: String {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useKB, .useMB, .useGB]
@@ -169,7 +185,11 @@ struct PDFDocumentMetadata: Codable, Identifiable {
         summary: String? = nil,
         folderId: UUID? = nil,
         tags: [Tag] = [],
-        aiCategory: String? = nil
+        aiCategory: String? = nil,
+        isFavorite: Bool = false,
+        pageCount: Int? = nil,
+        lastReadPage: Int? = nil,
+        lastOpenedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -181,6 +201,10 @@ struct PDFDocumentMetadata: Codable, Identifiable {
         self.folderId = folderId
         self.tags = tags
         self.aiCategory = aiCategory
+        self.isFavorite = isFavorite
+        self.pageCount = pageCount
+        self.lastReadPage = lastReadPage
+        self.lastOpenedAt = lastOpenedAt
     }
 }
 
@@ -368,17 +392,28 @@ struct ChatMessage: Codable, Identifiable {
     var role: MessageRole
     var text: String
     var timestamp: Date
+    /// UI-only flag: marks a locally generated error bubble so the view can
+    /// render an inline retry button. Optional so payloads persisted before
+    /// this field decode fine (nil). Never written to the chats table.
+    var isError: Bool?
 
     enum MessageRole: String, Codable {
         case user
         case model
     }
 
-    init(id: String = UUID().uuidString, role: MessageRole, text: String, timestamp: Date = Date()) {
+    init(
+        id: String = UUID().uuidString,
+        role: MessageRole,
+        text: String,
+        timestamp: Date = Date(),
+        isError: Bool? = nil
+    ) {
         self.id = id
         self.role = role
         self.text = text
         self.timestamp = timestamp
+        self.isError = isError
     }
 }
 

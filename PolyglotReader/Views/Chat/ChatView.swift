@@ -9,6 +9,10 @@ struct ChatView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isInputFocused: Bool
 
+    /// AI yanıtlarını sesli okumak için (Reader'daki SpeechService'in chat'e
+    /// bağlanmış hali) — balon menüsünden "Sesli Oku".
+    @StateObject private var speech = SpeechService()
+
     // Scroll throttle için debounce state
     @State private var lastScrollTime: Date = .distantPast
     private let scrollDebounceInterval: TimeInterval = 0.1 // 100ms debounce
@@ -36,6 +40,14 @@ struct ChatView: View {
         viewModel.isLoading
             && message.role == .model
             && message.id == viewModel.messages.last?.id
+    }
+
+    /// "Yanıtı Yeniden Oluştur" yalnız son (tamamlanmış) AI yanıtında sunulur.
+    private func isLastModelMessage(_ message: ChatMessage) -> Bool {
+        message.role == .model
+            && message.isError != true
+            && message.id == viewModel.messages.last?.id
+            && !viewModel.isLoading
     }
 
     /// Kullanıcı balonu input alanından "uçarak" gelir (mikro-uçuş);
@@ -120,11 +132,18 @@ struct ChatView: View {
             // doesn't keep mutating the message list in the background.
             .onDisappear {
                 viewModel.cancelActiveStream()
+                speech.stop()
             }
             // Persisted history loads once per reader session; the skeleton
             // above covers the fetch window.
             .task {
                 await viewModel.loadHistoryIfNeeded()
+                // Boş sohbette klavye hazır beklesin; geçmiş varsa okuma
+                // alanını klavye ile daraltma.
+                if viewModel.messages.count <= 1 {
+                    try? await Task.sleep(nanoseconds: 400_000_000)
+                    isInputFocused = true
+                }
             }
         }
     }
@@ -145,6 +164,16 @@ struct ChatView: View {
                             message: message,
                             isStreaming: isStreamingMessage(message),
                             showsTimestamp: showsTimestamp(at: index),
+                            onSpeak: { text in
+                                speech.stop()
+                                speech.speak(text)
+                            },
+                            onRegenerate: isLastModelMessage(message) ? {
+                                Task { await viewModel.regenerateLastResponse() }
+                            } : nil,
+                            onRetry: message.isError == true ? {
+                                Task { await viewModel.retryLastFailedMessage() }
+                            } : nil,
                             onNavigateToPage: onNavigateToPage
                         )
                         .id(message.id)
