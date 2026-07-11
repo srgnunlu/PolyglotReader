@@ -12,6 +12,7 @@ import {
     CorioLogo,
     NewChatIcon,
     HistoryIcon,
+    DownloadIcon,
     CloseIcon,
     SendIcon,
     UserAvatarIcon,
@@ -389,6 +390,23 @@ export function ChatPanel({
         handleSendMessage(suggestion);
     };
 
+    // Konuşmayı Markdown dosyası olarak indirir (iOS ShareLink eşleniği).
+    const handleExport = () => {
+        if (messages.length === 0) return;
+        const body = messages
+            .map(m => `**${m.role === 'user' ? 'Sen' : 'Corio AI'}**\n\n${m.text}`)
+            .join('\n\n---\n\n');
+        const blob = new Blob([`# Corio AI Sohbeti\n\n${body}\n`], {
+            type: 'text/markdown;charset=utf-8',
+        });
+        const url = URL.createObjectURL(blob);
+        const anchor = window.document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'corio-sohbet.md';
+        anchor.click();
+        URL.revokeObjectURL(url);
+    };
+
     if (!isOpen) return null;
 
     const handlePanelMouseDown = (e: React.MouseEvent) => {
@@ -457,6 +475,14 @@ export function ChatPanel({
                         title="Yeni Sohbet"
                     >
                         <NewChatIcon size={18} />
+                    </button>
+                    <button
+                        className={styles.iconBtn}
+                        onClick={handleExport}
+                        title="Sohbeti Dışa Aktar (.md)"
+                        disabled={messages.length === 0}
+                    >
+                        <DownloadIcon size={18} />
                     </button>
                     <div className={styles.historyContainer} ref={historyRef}>
                         <button
