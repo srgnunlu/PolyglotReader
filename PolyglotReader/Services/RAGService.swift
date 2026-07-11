@@ -339,6 +339,9 @@ class RAGService: ObservableObject {
             // Smart defaults: Config'den al veya parametreden override
             let shouldRerank = enableRerank ?? RAGConfig.enableDefaultReranking
             let shouldExpandQuery = enableQueryExpansion ?? shouldAutoExpandQuery(query)
+            // Derin arama = geniş aday havuzu + LLM rerank. Havuz genişlemeden
+            // rerank tek başına "derin" bir şey yapmıyordu (aynı 10 aday).
+            let isDeepSearch = shouldRerank
 
             // Deliberately sequential: expansion consumes the translated query,
             // search consumes the final query, rerank consumes search results.
@@ -349,7 +352,7 @@ class RAGService: ObservableObject {
             var scoredChunks = try await searchService.hybridSearch(
                 query: searchQuery,
                 fileId: fileId,
-                topK: RAGConfig.topK
+                topK: isDeepSearch ? RAGConfig.deepSearchTopK : RAGConfig.topK
             )
 
             guard !scoredChunks.isEmpty else {
@@ -370,8 +373,12 @@ class RAGService: ObservableObject {
                 return ("", [])
             }
 
-            // Dinamik context token limiti
-            let maxTokens = determineContextTokenLimit(for: query)
+            // Dinamik context token limiti — derin modda taban yükselir ki
+            // genişleyen aday havuzu bağlama gerçekten sığsın.
+            var maxTokens = determineContextTokenLimit(for: query)
+            if isDeepSearch {
+                maxTokens = max(maxTokens, RAGConfig.deepSearchMinContextTokens)
+            }
             let context = contextBuilder.buildContextWithTokenLimit(from: scoredChunks, maxTokens: maxTokens)
             let chunks = scoredChunks.prefix(RAGConfig.rerankTopK).map { $0.chunk }
 
@@ -510,10 +517,13 @@ class RAGService: ObservableObject {
     // MARK: - Reranking Helper
 
     private func rerankChunksHelper(_ chunks: [ScoredChunk], query: String) async throws -> [ScoredChunk] {
-        // Chunk içeriklerini hazırla
+        // Chunk içeriklerini hazırla. Tüm adaylar puanlanır (derin modda 24'e
+        // kadar); 600 karakterlik önizleme tablolu/listeli chunk'ların da
+        // adil yargılanmasını sağlar (200 karakter çoğu chunk'ta başlıktan
+        // öteye geçemiyordu).
         var chunkTexts = ""
-        for (index, scored) in chunks.prefix(RAGConfig.topK).enumerated() {
-            let preview = String(scored.chunk.content.prefix(200))
+        for (index, scored) in chunks.prefix(RAGConfig.deepSearchTopK).enumerated() {
+            let preview = String(scored.chunk.content.prefix(600))
             chunkTexts += "[\(index)]: \(preview)...\n\n"
         }
 
@@ -529,8 +539,9 @@ class RAGService: ObservableObject {
             rerankedChunks[item.index].rerankScore = item.score
         }
 
-        // Rerank skoruna göre sırala
-        let sorted = rerankedChunks.sorted { ($0.rerankScore ?? 0) > ($1.rerankScore ?? 0) }
+        // finalScore = rerankScore ?? rrfScore: Gemini'nin puanlamadığı chunk
+        // sıfıra çakılıp kaybolmaz, hybrid arama sırasındaki yerini korur.
+        let sorted = rerankedChunks.sorted { $0.finalScore > $1.finalScore }
 
         return sorted
     }

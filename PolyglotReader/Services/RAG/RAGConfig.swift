@@ -12,6 +12,9 @@ enum RAGConfig {
 
     // MARK: - Search Settings (Precision-Focused)
     static let topK = 10                    // 8→10: Daha fazla aday, reranking ile filtrelenir
+    /// Derin arama aday havuzu: geniş havuz + LLM rerank = gerçek "derin" mod.
+    /// Normal modda 10 aday yeterli; derin modda 24 aday çekilip yeniden sıralanır.
+    static let deepSearchTopK = 24
     static let rerankTopK = 6               // Context'e dahil edilecek chunk sayısı
     static let similarityThreshold: Float = 0.45  // 0.30→0.45: Alakasız chunk'ları filtrele
     static let minAnswerSimilarity: Float = 0.55  // 0.50→0.55: Daha yüksek güven eşiği
@@ -24,6 +27,9 @@ enum RAGConfig {
     static let maxContextTokens = 30000     // 20k→30k: Daha zengin bağlam
     static let shortQueryContextTokens = 12000  // Kısa sorular için optimize
     static let comparisonContextTokens = 50000  // Karşılaştırma sorguları için
+    /// Derin aramada bağlam tabanı: sorgu tipi ne olursa olsun en az bu kadar
+    /// token'lık bağlam kurulur — geniş aday havuzu boşa gitmesin.
+    static let deepSearchMinContextTokens = 40000
     static let tokenMultiplier: Float = 1.3 // Kelime → token çarpanı
 
     // MARK: - Cache Settings (Extended)
@@ -43,14 +49,17 @@ enum RAGConfig {
     static let maxRetryAttempts = 3                  // Hata durumunda retry sayısı
     static let retryDelayBase: UInt64 = 500_000_000  // 500ms - Exponential backoff başlangıç
 
-    // MARK: - Query Enhancement (Always Active)
+    // MARK: - Query Enhancement
     static let enableQueryExpansionForShortQueries = true  // < 5 kelime için otomatik
-    static let enableDefaultReranking = true               // Her zaman rerank yap
+    /// NOT: ChatViewModel her çağrıda bayrağı açıkça geçtiği için bu default
+    /// yalnız doğrudan performRAGQuery çağrılarında devreye girer — pratikte
+    /// rerank yalnızca Derin Arama modunda çalışır.
+    static let enableDefaultReranking = true
     static let shortQueryThreshold = 5                     // Kısa sorgu kelime limiti
-    /// Minimum candidate count for the extra Gemini rerank call. Below this
-    /// (hybrid search returned fewer than the requested pool) reranking adds
-    /// latency without changing which chunks make it into the context.
-    static let rerankMinCandidates = topK
+    /// Minimum candidate count for the extra Gemini rerank call. rerankTopK'nın
+    /// biraz üstü: az-aday senaryolarında (küçük doküman, örtüşen sonuçlar)
+    /// rerank sessizce devre dışı kalmasın — sıralama yine de önemli.
+    static let rerankMinCandidates = 8
 }
 
 // MARK: - RAG Errors

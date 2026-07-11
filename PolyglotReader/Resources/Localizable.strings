@@ -526,6 +526,8 @@
 "reader.tts.pause" = "Duraklat";
 "reader.tts.resume" = "Devam Et";
 "reader.tts.stop" = "Durdur";
+"reader.tts.rate" = "Okuma hızı";
+"reader.tts.natural_voice_hint" = "Daha doğal ses için: Ayarlar → Erişilebilirlik → Sesli İçerik → Sesler'den geliştirilmiş bir ses indirin.";
 
 /* ===========================================
    MARK: - Design System: Highlight Palette

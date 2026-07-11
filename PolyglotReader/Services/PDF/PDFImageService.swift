@@ -46,8 +46,27 @@ class PDFImageService: ObservableObject {
         }
 
         if let bestRegion = hittingRegions.max(by: { $0.width * $0.height < $1.width * $1.height }) {
-             logInfo("PDFImageService", "Vision görsel bulundu")
-            return bestRegion
+            // İkinci geçiş: seçilen kümeye yakın duran komşu kümeleri de kat.
+            // Panelli figürlerde ilk kümeleme bazen figürün yalnız bir bölümünü
+            // yakalar; kullanıcının dokunduğu bütünün geri kalanı bitişik ayrı
+            // kümelerde kalır — burada tek bounding box'ta birleştirilir.
+            let pageWidth = page.bounds(for: .mediaBox).width
+            let mergeThreshold = max(30, pageWidth * 0.04)
+            var merged = bestRegion
+            var didGrow = true
+            while didGrow {
+                didGrow = false
+                let expanded = merged.insetBy(dx: -mergeThreshold, dy: -mergeThreshold)
+                for region in regions where region != merged && expanded.intersects(region) {
+                    let candidate = merged.union(region)
+                    if candidate != merged {
+                        merged = candidate
+                        didGrow = true
+                    }
+                }
+            }
+            logInfo("PDFImageService", "Vision görsel bulundu")
+            return merged
         }
 
         // 4. Heuristic Fallback (Vision bulamazsa)
