@@ -105,8 +105,7 @@ struct PDFCardView: View {
     private var thumbnailView: some View {
         ZStack(alignment: .top) {
             // PDF Thumbnail veya placeholder
-            if let thumbnailData = file.thumbnailData,
-               let uiImage = UIImage(data: thumbnailData) {
+            if let uiImage = ThumbnailImageProvider.image(for: file.id, data: file.thumbnailData) {
                 // Sayfanın üst kısmını göster (başlık görünsün)
                 GeometryReader { geo in
                     Image(uiImage: uiImage)
@@ -134,6 +133,7 @@ struct PDFCardView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "doc.text.fill")
                         .font(.system(size: 32, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [.indigo.opacity(0.7), .purple.opacity(0.5)],
@@ -329,8 +329,7 @@ struct PDFListRowView: View {
     // MARK: - List Thumbnail
     private var listThumbnail: some View {
         ZStack(alignment: .top) {
-            if let thumbnailData = file.thumbnailData,
-               let uiImage = UIImage(data: thumbnailData) {
+            if let uiImage = ThumbnailImageProvider.image(for: file.id, data: file.thumbnailData) {
                 GeometryReader { geo in
                     Image(uiImage: uiImage)
                         .resizable()

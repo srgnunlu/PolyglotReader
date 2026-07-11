@@ -128,7 +128,9 @@ extension LibraryViewModel {
 
     private func thumbnailDiskURL(for fileId: String) -> URL? {
         guard let directory = thumbnailCacheDirectoryURL() else { return nil }
-        return directory.appendingPathComponent("\(fileId).jpg")
+        // "_v2": thumbnail çözünürlüğü 300x400 → 600x800 yükseltildi; eski
+        // düşük çözünürlüklü disk cache'i atlanır ve bir defalık yeniden üretilir.
+        return directory.appendingPathComponent("\(fileId)_v2.jpg")
     }
 
     private func loadThumbnailFromDisk(fileId: String) -> Data? {

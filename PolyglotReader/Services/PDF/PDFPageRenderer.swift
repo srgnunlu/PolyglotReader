@@ -43,8 +43,9 @@ class PDFPageRenderer {
 
     // MARK: - Thumbnail Generation
 
-    /// Thumbnail boyutu artırıldı - başlık kısmı daha net görünsün
-    func generateThumbnail(for document: PDFDocument, size: CGSize = CGSize(width: 300, height: 400)) -> UIImage? {
+    /// Kart 170pt genişlikte, 3x ekranda ~510px ister — 300px kaynak bulanıktı.
+    /// 600x800 retina yoğunluğunu karşılar; JPEG ile boyut maliyeti düşük kalır.
+    func generateThumbnail(for document: PDFDocument, size: CGSize = CGSize(width: 600, height: 800)) -> UIImage? {
         guard let firstPage = document.page(at: 0) else { return nil }
         return firstPage.thumbnail(of: size, for: .mediaBox)
     }
