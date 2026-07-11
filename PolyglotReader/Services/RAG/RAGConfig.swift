@@ -31,7 +31,12 @@ enum RAGConfig {
     static let cacheTTL: TimeInterval = 14400 // 2→4 saat (7200→14400)
 
     // MARK: - API Settings
-    static let embeddingModel = "text-embedding-004"
+    // text-embedding-004 emekli (404). gemini-embedding-001 varsayılanı 3072
+    // boyut; DB şeması vector(768) olduğundan istek gövdesinde
+    // outputDimensionality=768 kesilmesi yapılır (RAGEmbeddingService).
+    // Kesilmiş vektörler normalize değildir — arama cosine kullandığı için
+    // sıralama etkilenmez.
+    static let embeddingModel = "gemini-embedding-001"
     static let embeddingDimension = 768
     static let rateLimitDelay: UInt64 = 100_000_000 // 100ms - Rate limit koruması
     static let batchSize = 5                         // Batch embedding boyutu

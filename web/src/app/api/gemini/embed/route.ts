@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { EMBEDDING_MODEL, getAuthenticatedUserId, getGeminiApiKey } from '@/lib/server/gemini';
+import { EMBEDDING_DIMENSION, EMBEDDING_MODEL, getAuthenticatedUserId, getGeminiApiKey } from '@/lib/server/gemini';
 import { AI_EMBED_LIMIT, enforceRateLimit } from '@/lib/server/rateLimit';
 
-// Generates a 768-dim embedding (text-embedding-004) for RAG search.
+// Generates a 768-dim embedding (gemini-embedding-001, truncated) for RAG search.
 export async function POST(req: NextRequest) {
     const userId = await getAuthenticatedUserId();
     if (!userId) {
@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
                 body: JSON.stringify({
                     model: `models/${EMBEDDING_MODEL}`,
                     content: { parts: [{ text }] },
+                    outputDimensionality: EMBEDDING_DIMENSION,
                 }),
             }
         );

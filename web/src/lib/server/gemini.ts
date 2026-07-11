@@ -5,7 +5,11 @@ import { createServerSupabase } from '../supabase-server';
 // so it is read from GEMINI_API_KEY (no NEXT_PUBLIC_ prefix).
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-export const EMBEDDING_MODEL = 'text-embedding-004';
+// text-embedding-004 was retired by Google (404). gemini-embedding-001
+// defaults to 3072 dims; requests pass outputDimensionality=768 to match the
+// vector(768) DB schema (truncated vectors are fine for cosine search).
+export const EMBEDDING_MODEL = 'gemini-embedding-001';
+export const EMBEDDING_DIMENSION = 768;
 
 export function getGeminiApiKey(): string {
     if (!GEMINI_API_KEY) {

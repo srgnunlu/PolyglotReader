@@ -33,9 +33,11 @@ class RAGEmbeddingService {
 
     // MARK: - Cache Operations
 
-    /// Cache hash oluşturur
+    /// Cache hash oluşturur. Model adı hash'e dahil: model değişiminde eski
+    /// uzayın vektörleri (bellek + disk cache) kendiliğinden miss olur —
+    /// farklı embedding uzayları asla karışmaz.
     private func cacheKey(for text: String) -> String {
-        let data = Data(text.utf8)
+        let data = Data("\(RAGConfig.embeddingModel):\(text)".utf8)
         let hash = SHA256.hash(data: data)
         return hash.compactMap { String(format: "%02x", $0) }.joined()
     }
@@ -272,7 +274,9 @@ class RAGEmbeddingService {
                 "parts": [
                     ["text": text]
                 ]
-            ]
+            ],
+            // DB şeması vector(768); gemini-embedding-001 varsayılanı 3072.
+            "outputDimensionality": RAGConfig.embeddingDimension
         ]
     }
 
