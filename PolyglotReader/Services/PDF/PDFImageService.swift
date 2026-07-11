@@ -31,12 +31,19 @@ class PDFImageService: ObservableObject {
             return annotationBounds
         }
 
-        // 2. Vision ile Taraması
-        // Tüm sayfayı taramak yerine, sadece noktaya yakın adayları bulabiliriz
-        // Ancak tutarlılık için helper'ı kullanıp hit-test yapacağız.
+        // 2. Content stream taraması: PDF'in GERÇEK görsel yerleşimleri.
+        // Vision kenar tespitinin aksine tam sınırları verir; panelli
+        // figürler parçalanmaz, altyazı/başlık metni kutuya karışmaz.
+        if let exactBounds = detectImageFromContentStream(at: point, in: page) {
+            logInfo("PDFImageService", "XObject görsel bulundu")
+            return exactBounds
+        }
+
+        // 3. Vision ile Tarama (fallback — content stream'de görsel yoksa,
+        // örn. vektör çizimli figürler)
         let regions = await visionHelper.detectImageRegions(in: page)
 
-        // 3. Hit-Test: Hangi region noktayı içeriyor?
+        // 4. Hit-Test: Hangi region noktayı içeriyor?
         // En "anlamlı" region'ı seç (en kapsamlı, yani area'sı büyük olan değil, en iyi cluster)
         // Helper zaten cluster edilmiş regionları döndürüyor.
 
@@ -46,11 +53,30 @@ class PDFImageService: ObservableObject {
         }
 
         if let bestRegion = hittingRegions.max(by: { $0.width * $0.height < $1.width * $1.height }) {
-             logInfo("PDFImageService", "Vision görsel bulundu")
-            return bestRegion
+            // İkinci geçiş: seçilen kümeye yakın duran komşu kümeleri de kat.
+            // Panelli figürlerde ilk kümeleme bazen figürün yalnız bir bölümünü
+            // yakalar; kullanıcının dokunduğu bütünün geri kalanı bitişik ayrı
+            // kümelerde kalır — burada tek bounding box'ta birleştirilir.
+            let pageWidth = page.bounds(for: .mediaBox).width
+            let mergeThreshold = max(30, pageWidth * 0.04)
+            var merged = bestRegion
+            var didGrow = true
+            while didGrow {
+                didGrow = false
+                let expanded = merged.insetBy(dx: -mergeThreshold, dy: -mergeThreshold)
+                for region in regions where region != merged && expanded.intersects(region) {
+                    let candidate = merged.union(region)
+                    if candidate != merged {
+                        merged = candidate
+                        didGrow = true
+                    }
+                }
+            }
+            logInfo("PDFImageService", "Vision görsel bulundu")
+            return merged
         }
 
-        // 4. Heuristic Fallback (Vision bulamazsa)
+        // 5. Heuristic Fallback (Vision da bulamazsa)
         if let heuristic = detectPotentialImageRegion(at: point, in: page) {
             logInfo("PDFImageService", "Heuristic görsel bulundu")
             return heuristic
@@ -142,6 +168,42 @@ class PDFImageService: ObservableObject {
         visionHelper.renderRegion(rect: rect, in: page, scale: 2.0)
     }
 
+    // MARK: - Content Stream Detection
+
+    /// Sayfaya gerçekten yerleştirilmiş raster görsellerin sınırlarından,
+    /// dokunulan noktayı içeren figürü bulur. Bir figür birden çok
+    /// XObject'ten oluşabilir (paneller, katmanlı şeritler) — yakın parçalar
+    /// önce kümelenir, karar bütün figüre verilir.
+    private func detectImageFromContentStream(at point: CGPoint, in page: PDFPage) -> CGRect? {
+        let pageBounds = page.bounds(for: .mediaBox)
+        let rects = PDFImageXObjectLocator.shared.imageRects(on: page)
+            .map { $0.intersection(pageBounds) }
+            .filter { !$0.isEmpty && $0.width >= 12 && $0.height >= 12 }
+        guard !rects.isEmpty else { return nil }
+
+        // Tam sayfa kaplayan arka plan görselleri kümelemeye sokulmaz;
+        // yoksa sayfadaki her figür arka planla tek dev kümede birleşirdi.
+        let pageArea = pageBounds.width * pageBounds.height
+        let figureRects = rects.filter { ($0.width * $0.height) <= pageArea * 0.85 }
+        let backgroundRects = rects.filter { ($0.width * $0.height) > pageArea * 0.85 }
+
+        let mergeThreshold = max(24, pageBounds.width * 0.03)
+        let clusters = PDFImageVisionHelper.clusterRects(figureRects, proximityThreshold: mergeThreshold)
+
+        // Noktayı içeren EN KÜÇÜK küme: iç içe adaylarda kullanıcının
+        // kastettiği spesifik figürdür.
+        let hits = clusters.filter { $0.insetBy(dx: -16, dy: -16).contains(point) }
+        if let best = hits.min(by: { $0.width * $0.height < $1.width * $1.height }) {
+            return best
+        }
+
+        // Figür bulunamadıysa ve nokta bir arka plan görselinin (taranmış
+        // sayfa vb.) içindeyse onu döndür.
+        return backgroundRects
+            .filter { $0.contains(point) }
+            .min { $0.width * $0.height < $1.width * $1.height }
+    }
+
     // MARK: - Helpers
 
     private func detectAnnotationImage(at point: CGPoint, in page: PDFPage) -> CGRect? {
@@ -156,7 +218,7 @@ class PDFImageService: ObservableObject {
         return nil
     }
 
-    private func detectPotentialImageRegion(at point: CGPoint, in page: PDFPage, radius: CGFloat = 80) -> CGRect? {
+    private func detectPotentialImageRegion(at point: CGPoint, in page: PDFPage, radius: CGFloat = 120) -> CGRect? {
         // Basit boşluk kontrolü
         if let selection = page.selectionForWord(at: point),
            let text = selection.string,

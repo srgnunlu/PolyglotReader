@@ -73,8 +73,8 @@ class RAGContextBuilder {
 
         ## Kaynak Gösterme Kuralları
         - Yanıtlarında bilgi verirken mutlaka sayfa numarasını belirt
-        - Format: "...bu bilgi Sayfa X'te yer almaktadır" veya "(Sayfa X)"
-        - Birden fazla kaynaktan bilgi alıyorsan hepsini belirt: "(Sayfa X, Y, Z)"
+        - Format MUTLAKA tıklanabilir link olsun: [Sayfa X](jump:X) — örnek: "... [Sayfa 5](jump:5)"
+        - Birden fazla kaynaktan bilgi alıyorsan hepsini ayrı linkle: [Sayfa 3](jump:3), [Sayfa 7](jump:7)
         - Tablo veya liste içeren bölümleri özellikle vurgula
 
         """

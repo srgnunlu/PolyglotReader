@@ -86,9 +86,13 @@ class GeminiRAGService {
             2. Alakalı terimleri ve kavramları ekle
             3. Kısa bir varsayımsal cevap oluştur (HyDE - doküman içeriği gibi yaz)
 
+            ÖNEMLİ: "expanded" ve "keywords" çıktıları SORUNUN DİLİNDE olmalı.
+            Soru İngilizce ise İngilizce genişlet, Türkçe ise Türkçe. (Sorgu
+            arama öncesi doküman diline çevrilmiş olabilir; dili DEĞİŞTİRME.)
+
             JSON formatında döndür:
             {
-                "expanded": "Genişletilmiş soru metni (Türkçe)",
+                "expanded": "Genişletilmiş soru metni (sorunun diliyle)",
                 "keywords": ["anahtar", "kelime", "listesi"],
                 "hypotheticalAnswer": "Bu konuda... (2-3 cümle varsayımsal cevap)"
             }

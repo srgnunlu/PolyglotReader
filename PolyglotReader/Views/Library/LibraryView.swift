@@ -305,7 +305,9 @@ struct LibraryView: View {
     }
 
     private var fileList: some View {
-        VStack(spacing: 12) {
+        // Lazy: liste modunda da yalnızca görünür satırlar oluşturulsun —
+        // kalabalık kütüphanede scroll takılmasının ana kaynağıydı.
+        LazyVStack(spacing: 12) {
             ForEach(viewModel.filteredFiles) { file in
                 PDFListRowView(
                     file: file,

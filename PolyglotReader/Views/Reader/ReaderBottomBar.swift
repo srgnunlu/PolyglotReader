@@ -66,6 +66,9 @@ struct ReaderBottomBar: View {
                 .foregroundStyle(disabled ? Color.secondary.opacity(0.4) : Color.primary)
                 .frame(width: 36, height: 36)
                 .dsGlass(.control, shape: .circle)
+                // Dokunma alanı HIG minimumu 44pt — görsel daire 36pt kalır.
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -98,6 +101,12 @@ struct ReaderBottomBar: View {
             if viewModel.isQuickTranslationMode {
                 Text("reader.translation_on".localized)
                     .font(DSFont.meta.weight(.semibold))
+                    // Dar dock'ta metin dikey kırılıp "çe-vir-i" olmasın: tek
+                    // satır + gerçek genişliğinde sabitle; sığmazsa harf kırpma
+                    // yerine hafif küçült.
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .minimumScaleFactor(0.8)
             }
         }
         .foregroundStyle(viewModel.isQuickTranslationMode ? .white : .primary)

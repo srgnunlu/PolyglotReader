@@ -95,25 +95,41 @@ struct ReaderIconButton: View {
             Image(systemName: systemName)
                 .font(DSFont.controlIcon)
                 .foregroundStyle(isActive ? .primary : .secondary)
-                .frame(width: 32, height: 32)
+                .frame(width: 36, height: 36)
                 .dsGlass(.control, shape: .circle)
+                // Görsel daire 36pt kalır; dokunma alanı HIG minimumu 44pt'ye
+                // genişler — bar butonlarını ıskalamak barı kapatıyordu.
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 }
 
 // MARK: - Collapsed Bar Indicator
+/// Bar gizliyken kalan ince pil. Artık dokunulabilir: geniş (120x44) görünmez
+/// dokunma alanı barları geri getirir — küçük pili nokta atışı hedeflemek gerekmez.
 struct CollapsedBarIndicator: View {
     enum Position { case top, bottom }
     let position: Position
     /// iOS 26: ilgili bar ile aynı id → bar↔pill cam morph'u.
     var glassMorph: DSGlassMorph?
+    var onTap: (() -> Void)?
 
     var body: some View {
-        Capsule()
-            .fill(.clear)
-            .frame(width: 60, height: 5)
-            .dsGlass(.control, shape: .capsule, morph: glassMorph)
-            .padding(position == .top ? .top : .bottom, position == .top ? 16 : 24)
+        Button {
+            onTap?()
+        } label: {
+            Capsule()
+                .fill(.clear)
+                .frame(width: 60, height: 5)
+                .dsGlass(.control, shape: .capsule, morph: glassMorph)
+                .frame(width: 120, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(onTap == nil)
+        .padding(position == .top ? .top : .bottom, position == .top ? 16 : 24)
+        .accessibilityLabel("reader.show_bars".localized)
     }
 }

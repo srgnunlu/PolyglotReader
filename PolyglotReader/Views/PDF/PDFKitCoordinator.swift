@@ -314,17 +314,31 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
     private func showImageSelectionHighlight(rect: CGRect, page: PDFPage, in view: PDFView) {
         let viewRect = view.convert(rect, from: page)
         let highlightView = UIView(frame: viewRect)
-        highlightView.backgroundColor = UIColor.systemIndigo.withAlphaComponent(0.3)
-        highlightView.layer.borderColor = UIColor.systemIndigo.withAlphaComponent(0.8).cgColor
-        highlightView.layer.borderWidth = 2.0
-        highlightView.layer.cornerRadius = 4
+        highlightView.backgroundColor = UIColor.systemIndigo.withAlphaComponent(0.22)
+        highlightView.layer.borderColor = UIColor.systemIndigo.cgColor
+        highlightView.layer.borderWidth = 2.5
+        highlightView.layer.cornerRadius = 6
         highlightView.isUserInteractionEnabled = false
         view.addSubview(highlightView)
 
-        UIView.animate(withDuration: 0.3, delay: 0.5, options: .curveEaseOut) {
-            highlightView.alpha = 0
+        // Pop-in: hafif büyük başlayıp figürün üstüne otur — tespit edilen
+        // sınırlar solmadan önce net biçimde görülsün.
+        highlightView.transform = CGAffineTransform(scaleX: 1.06, y: 1.06)
+        highlightView.alpha = 0
+        UIView.animate(
+            withDuration: 0.25,
+            delay: 0,
+            usingSpringWithDamping: 0.7,
+            initialSpringVelocity: 0.5
+        ) {
+            highlightView.transform = .identity
+            highlightView.alpha = 1
         } completion: { _ in
-            highlightView.removeFromSuperview()
+            UIView.animate(withDuration: 0.35, delay: 0.9, options: .curveEaseOut) {
+                highlightView.alpha = 0
+            } completion: { _ in
+                highlightView.removeFromSuperview()
+            }
         }
     }
 
@@ -364,6 +378,8 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {
         guard let pdfView = pdfView else { return }
         let tapLocation = gesture.location(in: pdfView)
+        // Dokunuşun dikey konumu (0-1) — bar toggle bölge mantığına taşınır.
+        let tapYFraction = tapLocation.y / max(pdfView.bounds.height, 1)
 
         // Note Icon Check
         if let page = pdfView.page(for: tapLocation, nearest: true) {
@@ -398,12 +414,12 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
 
                 DispatchQueue.main.async {
                     self.parent.onSelection?("", CGRect.zero, 0, [])
-                    self.parent.onTap?()
+                    self.parent.onTap?(tapYFraction)
                 }
             }
         } else {
             DispatchQueue.main.async {
-                self.parent.onTap?()
+                self.parent.onTap?(tapYFraction)
             }
         }
     }

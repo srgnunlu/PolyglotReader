@@ -1,5 +1,5 @@
 import SwiftUI
-import UIKit // Needed for UIRectCorner
+import UIKit // UIPasteboard + UIImage
 
 struct ChatView: View {
     @ObservedObject var viewModel: ChatViewModel
@@ -8,16 +8,26 @@ struct ChatView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isInputFocused: Bool
-    
+
     // Scroll throttle için debounce state
     @State private var lastScrollTime: Date = .distantPast
     private let scrollDebounceInterval: TimeInterval = 0.1 // 100ms debounce
+
+    /// Alt sınır görünür mü? Kullanıcı eski mesajları okurken akış onu
+    /// aşağı çekmesin; ayrıca "sona git" butonunun görünürlüğünü belirler.
+    @State private var isNearBottom = true
+    @State private var showClearConfirmation = false
+    private let bottomAnchorID = "chat_bottom_anchor"
 
     // MARK: - Computed Properties
     /// Seçili görselin UIImage'ı
     private var selectedUIImage: UIImage? {
         guard let data = viewModel.selectedImage else { return nil }
         return UIImage(data: data)
+    }
+
+    private var canSend: Bool {
+        !viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty && viewModel.canSendMessage
     }
 
     /// Akış hâlâ sürerken son model mesajı "yazılıyor" kabul edilir —
@@ -40,27 +50,17 @@ struct ChatView: View {
         )
     }
 
-    /// Derin arama açıkken beyin ikonu hafifçe nabız atar — "aktif olarak
-    /// daha derin düşünüyor" sinyali. Reduce Motion'da statik büyük hal.
-    @ViewBuilder
-    private var deepSearchBrainIcon: some View {
-        let icon = Image(
-            systemName: viewModel.isDeepSearchEnabled
-                ? "brain.head.profile.fill"
-                : "brain.head.profile"
-        )
-        .font(.title2)
-        .foregroundStyle(viewModel.isDeepSearchEnabled ? DSColor.aiAccent : .secondary)
+    /// Zaman damgası yalnız konuşma kırılımlarında gösterilir: rol değişimi,
+    /// 5 dakikadan uzun ara veya son mesaj — WhatsApp/iMessage dili.
+    private func showsTimestamp(at index: Int) -> Bool {
+        let messages = viewModel.messages
+        guard index < messages.count else { return false }
+        if index == messages.count - 1 { return true }
 
-        if viewModel.isDeepSearchEnabled && !reduceMotion {
-            icon.phaseAnimator([1.08, 1.0]) { view, scale in
-                view.scaleEffect(scale)
-            } animation: { _ in
-                .easeInOut(duration: 1.1)
-            }
-        } else {
-            icon.scaleEffect(viewModel.isDeepSearchEnabled ? 1.1 : 1.0)
-        }
+        let current = messages[index]
+        let next = messages[index + 1]
+        if next.role != current.role { return true }
+        return next.timestamp.timeIntervalSince(current.timestamp) > 300
     }
 
     var body: some View {
@@ -71,302 +71,29 @@ struct ChatView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Messages
-                    ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            // Geçmiş yüklenirken balon iskeletleri (yalnız içerik iskeletlenir).
-                            if viewModel.isLoadingHistory && viewModel.messages.count <= 1 {
-                                ChatHistorySkeleton()
-                            }
+                    messagesArea
 
-                            ForEach(viewModel.messages) { message in
-                                MessageBubble(
-                                    message: message,
-                                    isStreaming: isStreamingMessage(message),
-                                    onNavigateToPage: onNavigateToPage
-                                )
-                                .id(message.id)
-                                .transition(bubbleTransition(for: message))
-                            }
-
-                            if viewModel.isLoading {
-                                TypingIndicator()
-                            }
-                        }
-                        .padding()
-                        .dsAnimation(DSMotion.snappy, value: viewModel.messages.count)
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .onChange(of: viewModel.messages.count) { _ in
-                        if let lastMessage = viewModel.messages.last {
-                            withAnimation(reduceMotion ? nil : .default) {
-                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                    .onChange(of: viewModel.messages.last?.text) { _ in
-                        // Debounce scroll updates during streaming to prevent lag
-                        let now = Date()
-                        guard now.timeIntervalSince(lastScrollTime) >= scrollDebounceInterval else { return }
-                        lastScrollTime = now
-                        
-                        if let lastMessage = viewModel.messages.last {
-                            // No animation for streaming updates to avoid jitter
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
-                    }
-                    }
-
-             // Message Input Area
-            VStack(spacing: 0) {
-                // MARK: - Indexleme Durumu Banner (P0)
-                IndexingStatusBanner(viewModel: viewModel)
-
-                // Soru Önerileri (P4: Smart Suggestions)
-                if viewModel.messages.count <= 1 && !viewModel.isLoading {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(viewModel.currentSuggestions) { suggestion in
-                                Button {
-                                    DSHaptics.lightImpact()
-                                    Task {
-                                        await viewModel.sendMessage(suggestion.prompt)
-                                    }
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: suggestion.icon)
-                                        Text(suggestion.label)
-                                    }
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .frame(minHeight: 44)
-                                    .background(Color(.tertiarySystemFill))
-                                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                                }
-                                .buttonStyle(DSPressableButtonStyle())
-                                .foregroundStyle(.primary)
-                                .accessibilityLabel(suggestion.label)
-                                // Kenardan girerken kademeli belirme (kütüphane kartlarıyla aynı dil).
-                                .scrollTransition(.interactive) { [reduceMotion] view, phase in
-                                    view
-                                        .opacity(!reduceMotion && !phase.isIdentity ? 0.55 : 1)
-                                        .scaleEffect(!reduceMotion && !phase.isIdentity ? 0.92 : 1)
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.bottom, 8)
-                    }
-                }
-
-                // Image Selection Info Bar
-                if viewModel.selectedImage != nil, let uiImage = selectedUIImage {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "photo.fill")
-                                .foregroundStyle(.indigo)
-                            Text("chat.selected_image".localized)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Button {
-                                viewModel.selectedImage = nil
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
-                                    .frame(minWidth: 44, minHeight: 44)
-                            }
-                            .accessibilityLabel("chat.accessibility.clear_selection".localized)
-                        }
-
-                        // Görsel önizlemesi
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 100)
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color(.separator), lineWidth: 1)
-                            )
-                            .accessibilityLabel("chat.selected_image".localized)
-
-                        Button {
-                            UIApplication.shared.sendAction(
-                                #selector(UIResponder.resignFirstResponder),
-                                to: nil,
-                                from: nil,
-                                for: nil
-                            )
-                            Task {
-                                await viewModel.sendMessageWithImage("chat.ask_image_prompt".localized)
-                            }
-                        } label: {
-                            Label("chat.ask_about_image".localized, systemImage: "sparkles")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .frame(minHeight: 44)
-                                .background(Color.indigo.opacity(0.1))
-                                .foregroundStyle(.indigo)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        .accessibilityIdentifier("ask_about_image_button")
-                    }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .overlay(
-                        Rectangle()
-                            .fill(Color(.separator))
-                            .frame(height: 1),
-                        alignment: .top
-                    )
-                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-                }
-
-                // Text Selection Info Bar
-                if let selectedText = viewModel.selectedText, !selectedText.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "text.magnifyingglass")
-                                .foregroundStyle(.indigo)
-                            Text("chat.selected_text".localized)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Button {
-                                viewModel.selectedText = nil
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
-                                    .frame(minWidth: 44, minHeight: 44)
-                            }
-                            .accessibilityLabel("chat.accessibility.clear_selection".localized)
-                        }
-
-                        Text(selectedText)
-                            .font(.caption)
-                            .lineLimit(2)
-                            .foregroundStyle(.primary)
-                            .padding(8)
-                            .background(Color(.secondarySystemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                        Button {
-                            // Prefill or send "Bu metin nedir?"
-                            UIApplication.shared.sendAction(
-                                #selector(UIResponder.resignFirstResponder),
-                                to: nil,
-                                from: nil,
-                                for: nil
-                            )
-                            Task {
-                                let query = "\("chat.ask_text_prompt".localized) \"\(selectedText)\""
-                                await viewModel.sendMessage(query)
-                                viewModel.selectedText = nil
-                            }
-                        } label: {
-                            Label("chat.ask_about_text".localized, systemImage: "sparkles")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .frame(minHeight: 44)
-                                .background(Color.indigo.opacity(0.1))
-                                .foregroundStyle(.indigo)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        .accessibilityIdentifier("ask_about_text_button")
-                    }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .overlay(
-                        Rectangle()
-                            .fill(Color(.separator))
-                            .frame(height: 1),
-                        alignment: .top
-                    )
-                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-                }
-
-                HStack(alignment: .bottom, spacing: 12) {
-                    // Derin Arama Toggle
-                    Button {
-                        withAnimation(DSMotion.resolved(DSMotion.snappy, reduceMotion: reduceMotion)) {
-                            viewModel.isDeepSearchEnabled.toggle()
-                        }
-                    } label: {
-                        deepSearchBrainIcon
-                            .frame(minWidth: 44, minHeight: 44)
-                    }
-                    .dsHaptic(.selection, trigger: viewModel.isDeepSearchEnabled)
-                    .accessibilityLabel("chat.accessibility.deep_search".localized)
-                    .accessibilityValue(
-                        viewModel.isDeepSearchEnabled
-                            ? "chat.accessibility.deep_search.on".localized
-                            : "chat.accessibility.deep_search.off".localized
-                    )
-                    .accessibilityIdentifier("deep_search_toggle")
-
-                    TextField("chat.placeholder".localized, text: $viewModel.inputText)
-                        .textFieldStyle(.plain)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color(.tertiarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 25))
-                        .focused($isInputFocused)
-                        .accessibilityIdentifier("chat_input_field")
-
-                    Button {
-                        // Mikro-uçuşun dokunsal eşi: gönderim anında hafif vuruş.
-                        DSHaptics.lightImpact()
-                        Task {
-                            // Eğer görsel seçiliyse görsel ile gönder
-                            if viewModel.selectedImage != nil {
-                                await viewModel.sendMessageWithImage()
-                            } else {
-                                await viewModel.sendMessage()
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title)
-                            .foregroundStyle(DSColor.brand)
-                            .frame(minWidth: 44, minHeight: 44)
-                    }
-                    .buttonStyle(DSPressableButtonStyle())
-                    .disabled(viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty || !viewModel.canSendMessage)
-                    .accessibilityLabel("chat.accessibility.send".localized)
-                    .accessibilityHint("chat.accessibility.send.hint".localized)
-                    .accessibilityIdentifier("send_message_button")
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-
-                // Derin Arama aktifse bilgi göster
-                if viewModel.isDeepSearchEnabled {
-                    HStack(spacing: 6) {
-                        Image(systemName: "brain.head.profile")
-                            .font(.caption2)
-                        Text("chat.deep_search_active".localized)
-                            .font(.caption2)
-                    }
-                    .foregroundStyle(DSColor.aiAccent)
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                    inputArea
                 }
             }
-                }
             .navigationTitle("chat.title".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    // Sohbeti temizle — yalnız gerçek konuşma varken görünür.
+                    if viewModel.messages.count > 1 {
+                        Button {
+                            showClearConfirmation = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
+                        .accessibilityLabel("chat.clear.title".localized)
+                        .accessibilityIdentifier("clear_chat_button")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         dismiss()
@@ -379,6 +106,16 @@ struct ChatView: View {
                     .accessibilityIdentifier("close_chat_button")
                 }
             }
+            .confirmationDialog(
+                "chat.clear.confirm".localized,
+                isPresented: $showClearConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("chat.clear.title".localized, role: .destructive) {
+                    Task { await viewModel.clearChatHistory() }
+                }
+                Button("common.cancel".localized, role: .cancel) {}
+            }
             // Leaving the chat must tear down the in-flight stream so it
             // doesn't keep mutating the message list in the background.
             .onDisappear {
@@ -389,298 +126,301 @@ struct ChatView: View {
             .task {
                 await viewModel.loadHistoryIfNeeded()
             }
-            }
         }
     }
-}
 
-// MARK: - Message Bubble
-struct MessageBubble: View {
-    let message: ChatMessage
-    var isStreaming: Bool = false
-    let onNavigateToPage: (Int) -> Void
+    // MARK: - Messages Area
 
-    private var isUser: Bool { message.role == .user }
-    private var bubbleColor: Color {
-        isUser ? DSColor.brand : Color(.secondarySystemBackground)
-    }
+    private var messagesArea: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: DSSpacing.sm) {
+                    // Geçmiş yüklenirken balon iskeletleri (yalnız içerik iskeletlenir).
+                    if viewModel.isLoadingHistory && viewModel.messages.count <= 1 {
+                        ChatHistorySkeleton()
+                    }
 
-    var body: some View {
-        HStack {
-            if isUser { Spacer() }
-
-            bubbleBody
-
-            if !isUser { Spacer() }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            isUser
-                ? "chat.accessibility.your_message".localized
-                : "chat.accessibility.ai_response".localized
-        )
-        .accessibilityValue(message.text)
-    }
-
-    // Kural: cam yalnızca navigasyon katmanında — balonlar düz yüzey.
-    // Kullanıcı balonu marka rengi + ince gölgeyle öne çıkar.
-    @ViewBuilder
-    private var bubbleBody: some View {
-        let bubble = VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
-            // Context indicator for user messages
-            if isUser && message.text.hasPrefix("Bağlam:") {
-                Text("chat.context_indicator".localized)
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-
-            // Message content
-            if message.role == .model {
-                // Profesyonel Markdown renderer (tablolar, listeler, başlıklar)
-                MarkdownView(text: message.text, onNavigateToPage: onNavigateToPage)
-            } else {
-                Text(message.text)
-                    .font(.subheadline)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(bubbleColor)
-        .foregroundStyle(isUser ? .white : .primary)
-        .overlay(alignment: .bottom) {
-            // Streaming: son satır sisin içinden çıkar; bitince maske söner.
-            if isStreaming {
-                LinearGradient(
-                    colors: [bubbleColor.opacity(0), bubbleColor],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 22)
-                .allowsHitTesting(false)
-                .transition(.opacity)
-            }
-        }
-        .clipShape(
-            RoundedCorner(
-                radius: 18,
-                corners: isUser
-                    ? [.topLeft, .topRight, .bottomLeft]
-                    : [.topLeft, .topRight, .bottomRight]
-            )
-        )
-        .dsAnimation(DSMotion.smooth, value: isStreaming)
-
-        if isUser {
-            bubble.dsShadow(.subtle, tint: DSColor.brand)
-        } else {
-            bubble
-        }
-    }
-}
-
-// MARK: - Typing Indicator
-struct TypingIndicator: View {
-    @State private var isAnimating = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        HStack {
-            HStack(spacing: 4) {
-                ForEach(0..<3) { index in
-                    Circle()
-                        .fill(DSColor.brand)
-                        .frame(width: 8, height: 8)
-                        .scaleEffect(isAnimating ? 1.0 : 0.5)
-                        .animation(
-                            reduceMotion
-                                ? nil
-                                : .easeInOut(duration: 0.6)
-                                    .repeatForever()
-                                    .delay(Double(index) * 0.2),
-                            value: isAnimating
+                    ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
+                        MessageBubble(
+                            message: message,
+                            isStreaming: isStreamingMessage(message),
+                            showsTimestamp: showsTimestamp(at: index),
+                            onNavigateToPage: onNavigateToPage
                         )
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-
-            Spacer()
-        }
-        .accessibilityLabel("accessibility.loading".localized)
-        .onAppear {
-            isAnimating = true
-        }
-    }
-}
-
-// MARK: - Corner Radius Extension
-extension View {
-    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
-        clipShape(RoundedCorner(radius: radius, corners: corners))
-    }
-}
-
-// MARK: - Indexleme Durumu Banner (P0)
-struct IndexingStatusBanner: View {
-    @ObservedObject var viewModel: ChatViewModel
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        // Sadece belirli durumlarda göster
-        if shouldShowBanner {
-            VStack(spacing: 8) {
-                HStack(spacing: 10) {
-                    statusIcon
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        // Yüzde rakamları akarak sayar (indexleme başlığı).
-                        Text(statusTitle)
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .contentTransition(.numericText(value: Double(viewModel.indexingProgress)))
-                            .dsAnimation(DSMotion.snappy, value: viewModel.indexingProgress)
-
-                        if let subtitle = statusSubtitle {
-                            Text(subtitle)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
+                        .id(message.id)
+                        .transition(bubbleTransition(for: message))
                     }
 
-                    Spacer()
-
-                    // Yenile butonu (hata durumunda)
-                    if case .failed = viewModel.indexingStatus {
-                        Button {
-                            Task { await viewModel.refreshIndexingStatus() }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.caption)
-                                .frame(minWidth: 44, minHeight: 44)
-                        }
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("common.retry".localized)
+                    if viewModel.isLoading {
+                        TypingIndicator()
                     }
+
+                    // Konuşma başlamadıysa öneriler akışın içinde kart olarak
+                    // durur — klavye üstüne sıkışmış çiplerden daha davetkâr.
+                    if viewModel.messages.count <= 1 && !viewModel.isLoading && !viewModel.isLoadingHistory {
+                        suggestionCards
+                    }
+
+                    // Alt sınır nöbetçisi: görünürlüğü "sona git" butonunu
+                    // ve otomatik kaydırma iznini yönetir.
+                    Color.clear
+                        .frame(height: 1)
+                        .id(bottomAnchorID)
+                        .onAppear { isNearBottom = true }
+                        .onDisappear { isNearBottom = false }
                 }
-
-                // Progress bar (indexleme sırasında) — marka gradyanlı dolgu
-                if case .indexing = viewModel.indexingStatus {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(DSColor.brand.opacity(0.15))
-
-                            Capsule()
-                                .fill(DSColor.brandGradient)
-                                .frame(width: max(geo.size.width * CGFloat(viewModel.indexingProgress), 6))
-                        }
-                    }
-                    .frame(height: 6)
-                    .dsAnimation(DSMotion.smooth, value: viewModel.indexingProgress)
-                    .accessibilityHidden(true)
+                .padding()
+                .dsAnimation(DSMotion.snappy, value: viewModel.messages.count)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .overlay(alignment: .bottomTrailing) {
+                if !isNearBottom {
+                    scrollToBottomButton(proxy: proxy)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(backgroundColor)
-            .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
-            .dsAnimation(DSMotion.snappy, value: viewModel.indexingStatus)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(statusTitle)
-        }
-    }
+            .onChange(of: viewModel.messages.count) { _ in
+                guard let lastMessage = viewModel.messages.last else { return }
+                // Kullanıcı yukarıda eski mesajları okuyorsa akış onu aşağı
+                // çekmez; kendi gönderdiği mesaj her zaman görünür kılınır.
+                if isNearBottom || lastMessage.role == .user {
+                    withAnimation(reduceMotion ? nil : .default) {
+                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    }
+                }
+            }
+            .onChange(of: viewModel.messages.last?.text) { _ in
+                // Debounce scroll updates during streaming to prevent lag
+                let now = Date()
+                guard now.timeIntervalSince(lastScrollTime) >= scrollDebounceInterval else { return }
+                lastScrollTime = now
 
-    private var shouldShowBanner: Bool {
-        switch viewModel.indexingStatus {
-        case .unknown, .ready:
-            return false
-        default:
-            return true
-        }
-    }
-
-    private var statusIcon: some View {
-        Group {
-            switch viewModel.indexingStatus {
-            case .checking:
-                ProgressView()
-                    .scaleEffect(0.8)
-            case .indexing:
-                Image(systemName: "doc.text.magnifyingglass")
-                    .foregroundStyle(DSColor.brand)
-            case .notIndexed:
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(DSColor.warning)
-            case .failed:
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(DSColor.danger)
-            default:
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(DSColor.success)
+                if let lastMessage = viewModel.messages.last, isNearBottom {
+                    // No animation for streaming updates to avoid jitter
+                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                }
+            }
+            // Sheet açılışında konuşma en son mesajdan başlar — geçmiş zaten
+            // bellekteyse onChange tetiklenmediği için burada elle kaydırılır.
+            .onAppear {
+                DispatchQueue.main.async {
+                    proxy.scrollTo(bottomAnchorID, anchor: .bottom)
+                }
+            }
+            // Geçmiş Supabase'den ilk kez yüklendiğinde de en alta in.
+            .onChange(of: viewModel.isLoadingHistory) { loading in
+                guard !loading else { return }
+                DispatchQueue.main.async {
+                    proxy.scrollTo(bottomAnchorID, anchor: .bottom)
+                }
             }
         }
-        .font(.body)
-        .accessibilityHidden(true)
     }
 
-    private var statusTitle: String {
-        switch viewModel.indexingStatus {
-        case .checking:
-            return "chat.indexing.checking".localized
-        case .indexing:
-            let percent = Int(viewModel.indexingProgress * 100)
-            return "chat.indexing.indexing".localized(with: percent)
-        case .notIndexed:
-            return "chat.indexing.not_indexed".localized
-        case .failed:
-            return "chat.indexing.failed".localized
-        case .ready:
-            return "chat.indexing.ready".localized
-        case .unknown:
-            return ""
+    private func scrollToBottomButton(proxy: ScrollViewProxy) -> some View {
+        Button {
+            DSHaptics.lightImpact()
+            withAnimation(reduceMotion ? nil : .default) {
+                proxy.scrollTo(bottomAnchorID, anchor: .bottom)
+            }
+        } label: {
+            Image(systemName: "chevron.down")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 40, height: 40)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay {
+                    Circle().stroke(Color(.separator).opacity(0.5), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 3)
         }
+        .buttonStyle(DSPressableButtonStyle())
+        .padding(.trailing, DSSpacing.md)
+        .padding(.bottom, DSSpacing.sm)
+        .transition(.scale(scale: 0.8).combined(with: .opacity))
+        .accessibilityLabel("chat.scroll_to_bottom".localized)
     }
 
-    private var statusSubtitle: String? {
-        switch viewModel.indexingStatus {
-        case .indexing:
-            return "chat.indexing.subtitle.indexing".localized
-        case .notIndexed:
-            return "chat.indexing.subtitle.not_indexed".localized
-        case .failed(let error):
-            return error
-        default:
-            return nil
+    // MARK: - Suggestion Cards (boş sohbet)
+
+    private var suggestionCards: some View {
+        VStack(alignment: .leading, spacing: DSSpacing.xs) {
+            Text("chat.suggestions.header".localized)
+                .font(DSFont.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .padding(.top, DSSpacing.sm)
+                .padding(.leading, DSSpacing.xxs)
+
+            ForEach(viewModel.currentSuggestions) { suggestion in
+                Button {
+                    DSHaptics.lightImpact()
+                    Task {
+                        await viewModel.sendMessage(suggestion.prompt)
+                    }
+                } label: {
+                    HStack(spacing: DSSpacing.sm) {
+                        Image(systemName: suggestion.icon)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(DSColor.brand)
+                            .frame(width: 34, height: 34)
+                            .background(DSColor.brand.opacity(0.10))
+                            .clipShape(RoundedRectangle(cornerRadius: DSRadius.small - 4))
+
+                        Text(suggestion.label)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
+
+                        Spacer(minLength: DSSpacing.xs)
+
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(DSSpacing.sm)
+                    .background(DSColor.surfaceSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: DSRadius.small))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: DSRadius.small)
+                            .stroke(Color(.separator).opacity(0.4), lineWidth: 0.5)
+                    }
+                    .contentShape(RoundedRectangle(cornerRadius: DSRadius.small))
+                }
+                .buttonStyle(DSPressableButtonStyle())
+                .accessibilityLabel(suggestion.label)
+            }
         }
+        .transition(.opacity)
     }
 
-    private var backgroundColor: Color {
-        switch viewModel.indexingStatus {
-        case .failed:
-            return DSColor.danger.opacity(0.1)
-        case .notIndexed:
-            return DSColor.warning.opacity(0.1)
-        case .indexing, .checking:
-            return DSColor.brand.opacity(0.1)
-        default:
-            return DSColor.success.opacity(0.1)
+    // MARK: - Input Area
+
+    private var inputArea: some View {
+        VStack(spacing: 0) {
+            // Indexleme durumu (P0)
+            IndexingStatusBanner(viewModel: viewModel)
+
+            // Image Selection Info Bar
+            if viewModel.selectedImage != nil, let uiImage = selectedUIImage {
+                ChatImageSelectionBar(viewModel: viewModel, uiImage: uiImage)
+            }
+
+            // Text Selection Info Bar
+            if let selectedText = viewModel.selectedText, !selectedText.isEmpty {
+                ChatTextSelectionBar(viewModel: viewModel, selectedText: selectedText)
+            }
+
+            // Derin Arama aktif rozeti — kompozerin üstünde kompakt kapsül.
+            if viewModel.isDeepSearchEnabled {
+                HStack(spacing: 6) {
+                    Image(systemName: "brain.head.profile")
+                        .font(.caption2)
+                    Text("chat.deep_search_active".localized)
+                        .font(.caption2.weight(.medium))
+                }
+                .foregroundStyle(DSColor.aiAccent)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(DSColor.aiAccent.opacity(0.10), in: Capsule())
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+                .padding(.top, DSSpacing.xs)
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            }
+
+            composer
         }
+        .background(.ultraThinMaterial)
     }
-}
 
-struct RoundedCorner: Shape {
-    var radius: CGFloat = .infinity
-    var corners: UIRectCorner = .allCorners
+    // MARK: - Composer
+    /// Modern kompozer: büyüyen çok satırlı alan, gömülü gönder butonu ve
+    /// solda kompakt derin arama anahtarı.
+    private var composer: some View {
+        HStack(alignment: .bottom, spacing: DSSpacing.xs) {
+            // Derin Arama Toggle
+            Button {
+                withAnimation(DSMotion.resolved(DSMotion.snappy, reduceMotion: reduceMotion)) {
+                    viewModel.isDeepSearchEnabled.toggle()
+                }
+            } label: {
+                Image(
+                    systemName: viewModel.isDeepSearchEnabled
+                        ? "brain.head.profile.fill"
+                        : "brain.head.profile"
+                )
+                .font(.body.weight(.medium))
+                .foregroundStyle(viewModel.isDeepSearchEnabled ? DSColor.aiAccent : .secondary)
+                .frame(width: 38, height: 38)
+                .background(
+                    viewModel.isDeepSearchEnabled
+                        ? DSColor.aiAccent.opacity(0.12)
+                        : Color(.tertiarySystemFill),
+                    in: Circle()
+                )
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(DSPressableButtonStyle())
+            .dsHaptic(.selection, trigger: viewModel.isDeepSearchEnabled)
+            .accessibilityLabel("chat.accessibility.deep_search".localized)
+            .accessibilityValue(
+                viewModel.isDeepSearchEnabled
+                    ? "chat.accessibility.deep_search.on".localized
+                    : "chat.accessibility.deep_search.off".localized
+            )
+            .accessibilityIdentifier("deep_search_toggle")
 
-    func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(
-            roundedRect: rect,
-            byRoundingCorners: corners,
-            cornerRadii: CGSize(width: radius, height: radius)
-        )
-        return Path(path.cgPath)
+            // Büyüyen giriş kapsülü + gömülü gönder butonu
+            HStack(alignment: .bottom, spacing: DSSpacing.xxs) {
+                TextField("chat.placeholder".localized, text: $viewModel.inputText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(1...5)
+                    .padding(.leading, DSSpacing.md)
+                    .padding(.vertical, 10)
+                    .focused($isInputFocused)
+                    .accessibilityIdentifier("chat_input_field")
+
+                Button {
+                    // Mikro-uçuşun dokunsal eşi: gönderim anında hafif vuruş.
+                    DSHaptics.lightImpact()
+                    Task {
+                        // Eğer görsel seçiliyse görsel ile gönder
+                        if viewModel.selectedImage != nil {
+                            await viewModel.sendMessageWithImage()
+                        } else {
+                            await viewModel.sendMessage()
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            canSend
+                                ? AnyShapeStyle(DSColor.brandGradient)
+                                : AnyShapeStyle(Color(.systemGray3)),
+                            in: Circle()
+                        )
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(DSPressableButtonStyle())
+                .disabled(!canSend)
+                .dsAnimation(DSMotion.snappy, value: canSend)
+                .accessibilityLabel("chat.accessibility.send".localized)
+                .accessibilityHint("chat.accessibility.send.hint".localized)
+                .accessibilityIdentifier("send_message_button")
+            }
+            .background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22)
+                    .stroke(Color(.separator).opacity(0.4), lineWidth: 0.5)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, DSSpacing.xs + 2)
     }
 }
 

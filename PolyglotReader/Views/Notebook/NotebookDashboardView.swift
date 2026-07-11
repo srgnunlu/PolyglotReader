@@ -10,7 +10,7 @@ struct NotebookDashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: DSSpacing.lg) {
                 // MARK: - Stats Header
                 StatsHeaderView(stats: viewModel.stats)
 
@@ -49,12 +49,12 @@ private struct StatsHeaderView: View {
     let stats: AnnotationStats
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: DSSpacing.sm) {
             StatCard(
                 title: "Toplam",
                 value: "\(stats.total)",
                 icon: "bookmark.fill",
-                color: .indigo
+                color: DSColor.brand
             )
             StatCard(
                 title: "Favoriler",
@@ -65,7 +65,7 @@ private struct StatsHeaderView: View {
             StatCard(
                 title: "Notlar",
                 value: "\(stats.notes)",
-                icon: "note.text",
+                icon: "square.and.pencil",
                 color: .purple
             )
         }
@@ -79,24 +79,37 @@ private struct StatCard: View {
     let color: Color
 
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(color)
+        VStack(spacing: DSSpacing.xs) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.14))
+                    .frame(width: 38, height: 38)
+
+                Image(systemName: icon)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(color)
+            }
+            .accessibilityHidden(true)
 
             Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
+                .font(.title3.bold())
                 .foregroundStyle(.primary)
+                .contentTransition(.numericText())
 
             Text(title)
-                .font(.caption)
+                .font(DSFont.caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, DSSpacing.md)
+        .background(DSColor.surfaceSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.medium))
+        .overlay {
+            RoundedRectangle(cornerRadius: DSRadius.medium)
+                .stroke(color.opacity(0.12), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
     }
 }
 
@@ -107,7 +120,7 @@ private struct RecentFavoritesSection: View {
     let onSeeAll: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DSSpacing.sm) {
             HStack {
                 Label("Son Favoriler", systemImage: "star.fill")
                     .font(.headline)
@@ -118,22 +131,24 @@ private struct RecentFavoritesSection: View {
                 Button("Tümünü Gör") {
                     onSeeAll()
                 }
-                .font(.subheadline)
-                .foregroundStyle(.indigo)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(DSColor.brand)
             }
 
-            VStack(spacing: 8) {
+            VStack(spacing: DSSpacing.xs) {
                 ForEach(favorites) { annotation in
-                    FavoriteAnnotationRow(annotation: annotation)
-                        .onTapGesture {
-                            onSelectAnnotation(annotation)
-                        }
+                    Button {
+                        onSelectAnnotation(annotation)
+                    } label: {
+                        FavoriteAnnotationRow(annotation: annotation)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
         .padding()
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(DSColor.surfaceSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.medium))
     }
 }
 
@@ -174,10 +189,11 @@ private struct FavoriteAnnotationRow: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
+        .padding(.vertical, DSSpacing.xs)
+        .padding(.horizontal, DSSpacing.sm)
         .background(Color(.tertiarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.small))
+        .contentShape(RoundedRectangle(cornerRadius: DSRadius.small))
     }
 }
 
@@ -187,9 +203,10 @@ private struct CategoriesSection: View {
     let onSelectCategory: (NotebookCategory) -> Void
     let onSelectTranslations: () -> Void
 
-    // Gösterilecek ana kategoriler (files hariç)
+    // Gösterilecek ana kategoriler (files hariç). AI Notları kullanılmadığı
+    // için dashboard'dan kaldırıldı — veri modeli ve backend dokunulmadan durur.
     private let mainCategories: [NotebookCategory] = [
-        .favorites, .notes, .aiNotes
+        .favorites, .notes
     ]
 
     private let colorCategories: [NotebookCategory] = [
@@ -197,8 +214,8 @@ private struct CategoriesSection: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Kategoriler")
+        VStack(alignment: .leading, spacing: DSSpacing.md) {
+            Label("Kategoriler", systemImage: "square.grid.2x2.fill")
                 .font(.headline)
                 .foregroundStyle(.primary)
 
@@ -207,7 +224,7 @@ private struct CategoriesSection: View {
                 GridItem(.flexible()),
                 GridItem(.flexible()),
                 GridItem(.flexible())
-            ], spacing: 12) {
+            ], spacing: DSSpacing.sm) {
                 ForEach(mainCategories) { category in
                     CategoryCard(
                         icon: category.icon,
@@ -229,7 +246,7 @@ private struct CategoriesSection: View {
 
             // Renk kategorileri (küçük kartlar)
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
+                HStack(spacing: DSSpacing.xs) {
                     ForEach(colorCategories) { category in
                         ColorCategoryChip(
                             category: category,
@@ -240,8 +257,8 @@ private struct CategoriesSection: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(DSColor.surfaceSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.medium))
     }
 }
 
@@ -254,32 +271,41 @@ private struct CategoryCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 8) {
+            VStack(spacing: DSSpacing.xs) {
                 ZStack {
                     Circle()
-                        .fill(Color(hex: colorHex)?.opacity(0.2) ?? Color.gray.opacity(0.2))
+                        .fill(Color(hex: colorHex)?.opacity(0.16) ?? Color.gray.opacity(0.16))
                         .frame(width: 44, height: 44)
 
                     Image(systemName: icon)
-                        .font(.title3)
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(Color(hex: colorHex) ?? .gray)
                 }
+                .accessibilityHidden(true)
 
                 Text("\(count)")
                     .font(.headline)
                     .foregroundStyle(.primary)
+                    .contentTransition(.numericText())
 
                 Text(title)
-                    .font(.caption2)
+                    .font(DSFont.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+            .padding(.vertical, DSSpacing.sm)
             .background(Color(.tertiarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: DSRadius.small))
+            .overlay {
+                RoundedRectangle(cornerRadius: DSRadius.small)
+                    .stroke((Color(hex: colorHex) ?? .gray).opacity(0.10), lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: DSRadius.small))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(title), \(count)")
     }
 }
 
@@ -300,8 +326,7 @@ private struct ColorCategoryChip: View {
                     .foregroundStyle(.primary)
 
                 Text("\(count)")
-                    .font(.caption)
-                    .fontWeight(.medium)
+                    .font(.caption.weight(.semibold))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Color(.systemFill))
@@ -311,8 +336,10 @@ private struct ColorCategoryChip: View {
             .padding(.vertical, 10)
             .background(Color(.tertiarySystemGroupedBackground))
             .clipShape(Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(category.rawValue), \(count)")
     }
 }
 
@@ -323,27 +350,29 @@ private struct FilesSection: View {
     let onShowAllFiles: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DSSpacing.sm) {
             HStack {
-                Label("Dosyalar", systemImage: "doc.text.fill")
+                Label("Dosyalar", systemImage: "folder.fill")
                     .font(.headline)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(DSColor.brand)
 
                 Spacer()
 
                 Button("Tümünü Gör") {
                     onShowAllFiles()
                 }
-                .font(.subheadline)
-                .foregroundStyle(.indigo)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(DSColor.brand)
             }
 
-            VStack(spacing: 8) {
+            VStack(spacing: DSSpacing.xs) {
                 ForEach(files.prefix(5)) { file in
-                    FileAnnotationRow(file: file)
-                        .onTapGesture {
-                            onSelectFile(file.id)
-                        }
+                    Button {
+                        onSelectFile(file.id)
+                    } label: {
+                        FileAnnotationRow(file: file)
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 if files.count > 5 {
@@ -366,17 +395,17 @@ private struct FilesSection: View {
                                 .foregroundStyle(.indigo)
                             Spacer()
                         }
-                        .padding(.vertical, 8)
+                        .padding(.vertical, DSSpacing.xs)
                         .background(Color(.tertiarySystemGroupedBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .clipShape(RoundedRectangle(cornerRadius: DSRadius.small))
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
         .padding()
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(DSColor.surfaceSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.medium))
     }
 }
 
@@ -384,36 +413,37 @@ private struct FileAnnotationRow: View {
     let file: FileAnnotationInfo
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DSSpacing.sm) {
             Image(systemName: "doc.text.fill")
-                .font(.title3)
-                .foregroundStyle(.blue)
+                .font(.body.weight(.medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(DSColor.brand)
                 .frame(width: 36, height: 36)
-                .background(Color.blue.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(DSColor.brand.opacity(0.10))
+                .clipShape(RoundedRectangle(cornerRadius: DSRadius.small - 4))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(file.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(.subheadline.weight(.medium))
                     .lineLimit(1)
                     .foregroundStyle(.primary)
 
                 Text("\(file.count) not")
-                    .font(.caption)
+                    .font(DSFont.caption)
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
 
             Image(systemName: "chevron.right")
-                .font(.caption)
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 10)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, DSSpacing.sm)
         .background(Color(.tertiarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.small))
+        .contentShape(RoundedRectangle(cornerRadius: DSRadius.small))
     }
 }
 

@@ -184,6 +184,11 @@
 /* Deep Search */
 "chat.deep_search" = "Derin Arama";
 "chat.deep_search_active" = "Derin Arama aktif - Yanıtlar daha yavaş olabilir";
+"chat.copy" = "Kopyala";
+"chat.suggestions.header" = "Başlamak için deneyin";
+"chat.scroll_to_bottom" = "Son mesaja git";
+"chat.clear.title" = "Sohbeti Temizle";
+"chat.clear.confirm" = "Bu dokümanın sohbet geçmişi kalıcı olarak silinsin mi?";
 
 /* Indexing Status */
 "chat.indexing.checking" = "Doküman kontrol ediliyor...";
@@ -315,6 +320,15 @@
 "notebook.translations.empty.title" = "Henüz çeviri yok";
 "notebook.translations.empty.subtitle" = "Okurken bir metni seçip anında çevir; tamamlanan çeviriler burada birikir.";
 "notebook.translations.delete_failed" = "Çeviri silinemedi";
+"notebook.translations.search" = "Çeviri, kaynak metin veya dosya ara";
+"notebook.translations.empty.search" = "Aramanla eşleşen çeviri bulunamadı";
+"notebook.translations.sort" = "Sıralama";
+"notebook.translations.sort.newest" = "En Yeni";
+"notebook.translations.sort.oldest" = "En Eski";
+"notebook.translations.group_by_file" = "Dosyaya Göre Grupla";
+"notebook.translations.options" = "Sıralama ve gruplama seçenekleri";
+"notebook.translations.expand.hint" = "Tam metni görmek için dokun";
+"notebook.translations.collapse.hint" = "Önizlemeye dönmek için dokun";
 
 /* Empty State */
 "notebook.empty.title" = "Henüz Not Yok";
@@ -512,6 +526,8 @@
 "reader.tts.pause" = "Duraklat";
 "reader.tts.resume" = "Devam Et";
 "reader.tts.stop" = "Durdur";
+"reader.tts.rate" = "Okuma hızı";
+"reader.tts.natural_voice_hint" = "Daha doğal ses için: Ayarlar → Erişilebilirlik → Sesli İçerik → Sesler'den geliştirilmiş bir ses indirin.";
 
 /* ===========================================
    MARK: - Design System: Highlight Palette
@@ -561,6 +577,7 @@
 "reader.quick_translation" = "Hızlı çeviri";
 "reader.chat" = "Sohbet";
 "reader.search" = "Ara";
+"reader.show_bars" = "Kontrolleri göster";
 "reader.page_picker.title" = "Sayfa Seç";
 "reader.page_picker.go" = "Git";
 "reader.page_picker.accessibility" = "Sayfa %d / %d, sayfa seç";

@@ -109,24 +109,19 @@ class PDFImageVisionHelper {
             return candidateRects
         }.value
 
-        let filteredRects = candidateRects.filter { Self.isValidImageRegion($0, in: page) }
-        return Self.clusterRects(filteredRects)
+        // Sıra önemli: önce boyut filtresi + KÜMELE, metin filtresi en sona.
+        // Eskiden her parça tek tek metin filtresinden geçiyordu; eksen
+        // etiketli grafik parçaları "metin" sayılıp atılıyor, figür kesik
+        // kalıyordu. Artık parçalar önce bütünleşir, karar bütüne verilir.
+        let sizedRects = candidateRects.filter { $0.width >= 20 && $0.height >= 20 }
+        let threshold = max(30, pageBounds.width * 0.04)
+        let clusters = Self.clusterRects(sizedRects, proximityThreshold: threshold)
+        return clusters.filter { !PDFTextExtractorHelper.isRegionPredominantlyText(rect: $0, in: page) }
     }
 
-    private static func isValidImageRegion(_ rect: CGRect, in page: PDFPage) -> Bool {
-        // Boyut kontrolü
-        if rect.width < 20 || rect.height < 20 { return false }
-
-        // Metin yoğunluğu kontrolü using helper
-        if PDFTextExtractorHelper.isRegionPredominantlyText(rect: rect, in: page) {
-            return false
-        }
-
-        return true
-    }
-
-    // Union-Find ile Kümeleme
-    private static func clusterRects(_ rects: [CGRect]) -> [CGRect] {
+    // Union-Find ile Kümeleme. Eşik çağıran tarafça sayfa genişliğine
+    // oranlanır (panelli figürlerin ara boşlukları köprülensin).
+    static func clusterRects(_ rects: [CGRect], proximityThreshold: CGFloat = 30.0) -> [CGRect] {
         guard !rects.isEmpty else { return [] }
 
         var parent = Array(0..<rects.count)
@@ -144,8 +139,6 @@ class PDFImageVisionHelper {
                 parent[rootI] = rootOther
             }
         }
-
-        let proximityThreshold: CGFloat = 30.0
 
         for i in 0..<rects.count {
             for otherIndex in (i + 1)..<rects.count {
@@ -173,9 +166,17 @@ class PDFImageVisionHelper {
 // MARK: - Text Helper
 // PDFTextExtractor'dan text kontrolünü buraya alabiliriz veya basit bir static func ekleyebiliriz
 struct PDFTextExtractorHelper {
+    /// "Bu bölge ağırlıkla metin mi?" — mutlak karakter sayısı yerine
+    /// YOĞUNLUK ölçülür: eksen etiketli bir grafik 50 karakteri kolay aşar
+    /// ama karakterler geniş alana yayılmıştır; gerçek paragraf bloğu ise
+    /// birim alana çok karakter sığdırır (~10 karakter / 1000pt²).
     static func isRegionPredominantlyText(rect: CGRect, in page: PDFPage) -> Bool {
         guard let selection = page.selection(for: rect) else { return false }
         let text = selection.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return text.count > 50
+        guard text.count > 50 else { return false }
+
+        let area = max(rect.width * rect.height, 1)
+        let charsPerThousandPoints = CGFloat(text.count) / (area / 1000)
+        return charsPerThousandPoints > 6.0
     }
 }

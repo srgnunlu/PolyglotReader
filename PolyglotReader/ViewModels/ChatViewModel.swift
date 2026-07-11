@@ -207,6 +207,25 @@ class ChatViewModel: ObservableObject {
         messages.append(welcome)
     }
 
+    // MARK: - Sohbeti Temizle
+
+    /// Bu dosyanın sohbet geçmişini hem Supabase'den hem ekrandan siler;
+    /// karşılama mesajı ve öneriler geri gelir.
+    func clearChatHistory() async {
+        cancelActiveStream()
+
+        do {
+            try await supabaseService.deleteChats(fileId: fileId)
+            messages.removeAll()
+            addWelcomeMessage()
+            logInfo("ChatViewModel", "Sohbet geçmişi temizlendi", details: "fileId: \(fileId)")
+        } catch {
+            let appError = ErrorHandlingService.mapToAppError(error)
+            errorMessage = "Sohbet temizlenemedi: \(appError.localizedDescription)"
+            logError("ChatViewModel", "Sohbet temizleme hatası", error: error)
+        }
+    }
+
     // MARK: - Indexleme Yönetimi (P0)
 
     /// RAGService'in indexleme durumunu observe et

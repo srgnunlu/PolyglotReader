@@ -18,7 +18,7 @@ enum NotebookCategory: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .favorites: return "star.fill"
-        case .notes: return "note.text"
+        case .notes: return "square.and.pencil"
         case .aiNotes: return "sparkles"
         case .yellow: return "highlighter"
         case .green: return "highlighter"

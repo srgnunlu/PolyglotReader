@@ -22,11 +22,44 @@ final class SpeechService: NSObject, ObservableObject {
         didSet { rate = min(max(rate, AVSpeechUtteranceMinimumSpeechRate), AVSpeechUtteranceMaximumSpeechRate) }
     }
 
+    /// Seçilen ses yalnızca robotik "compact" kaliteyse true — UI, kullanıcıya
+    /// Ayarlar'dan doğal (enhanced/premium) ses indirmesini önerebilir.
+    @Published private(set) var isUsingCompactVoice = false
+
+    /// Hız kademeleri: (AVFoundation rate, kullanıcı etiketi). Değişiklik bir
+    /// sonraki metin bloğundan (sayfadan) itibaren uygulanır.
+    static let ratePresets: [(rate: Float, label: String)] = [
+        (0.45, "0.8x"),
+        (AVSpeechUtteranceDefaultSpeechRate, "1x"),
+        (0.56, "1.2x")
+    ]
+
+    /// Aktif hız kademesinin etiketi ("1x" vb.).
+    var rateLabel: String {
+        Self.ratePresets.min { abs($0.rate - rate) < abs($1.rate - rate) }?.label ?? "1x"
+    }
+
+    /// Sıradaki hız kademesine geçer (0.8x → 1x → 1.2x → 0.8x ...).
+    func cycleRate() {
+        guard let currentIndex = Self.ratePresets.firstIndex(where: { $0.label == rateLabel }) else {
+            rate = AVSpeechUtteranceDefaultSpeechRate
+            return
+        }
+        let next = Self.ratePresets[(currentIndex + 1) % Self.ratePresets.count]
+        rate = next.rate
+    }
+
     /// Bir metin bloğu (sayfa) tamamlandığında çağrılır. Reader bunu bir sonraki
     /// sayfaya geçmek için kullanır.
     var onFinish: (() -> Void)?
 
     private let synthesizer = AVSpeechSynthesizer()
+
+    /// Kullanıcı bilerek durdurdu bayrağı. `stopSpeaking` çağrısı bazı iOS
+    /// sürümlerinde `didCancel` yerine `didFinish` teslim eder; bu durumda
+    /// `onFinish` tetiklenir ve otomatik sayfa ilerletme okumayı YENİDEN
+    /// başlatır ("durdur çalışmıyor" bug'ı). Bayrak bu yolu kesin kapatır.
+    private var wasStoppedByUser = false
 
     override init() {
         super.init()
@@ -54,6 +87,7 @@ final class SpeechService: NSObject, ObservableObject {
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
+        wasStoppedByUser = false
         isPaused = false
         synthesizer.speak(utterance)
     }
@@ -72,25 +106,62 @@ final class SpeechService: NSObject, ObservableObject {
 
     /// Tamamen durdurur. `onFinish` tetiklenmez (kullanıcı bilerek durdurdu).
     func stop() {
+        wasStoppedByUser = true
         synthesizer.stopSpeaking(at: .immediate)
         isSpeaking = false
         isPaused = false
+        deactivateAudioSession()
     }
 
     // MARK: - Helpers
 
-    /// Metnin dilini tespit edip uygun sesi seçer; bulunamazsa sistem varsayılanına düşer.
+    /// Metnin dilini tespit edip o dildeki EN DOĞAL sesi seçer.
+    /// Kalite sırası: premium > enhanced > default (compact). Varsayılan
+    /// compact sesler robotik; kullanıcı Ayarlar'dan geliştirilmiş ses
+    /// indirdiyse otomatik olarak o kullanılır.
     private func preferredVoice(for text: String) -> AVSpeechSynthesisVoice? {
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(text)
-        guard let language = recognizer.dominantLanguage?.rawValue else { return nil }
-
-        // Tam eşleşen sesi dene (örn. "tr-TR"); yoksa dil kodu prefiksiyle eşle (örn. "tr").
-        if let exact = AVSpeechSynthesisVoice(language: language) {
-            return exact
+        guard let language = recognizer.dominantLanguage?.rawValue else {
+            isUsingCompactVoice = false
+            return nil
         }
+
         let prefix = language.split(separator: "-").first.map(String.init) ?? language
-        return AVSpeechSynthesisVoice.speechVoices().first { $0.language.hasPrefix(prefix) }
+        let candidates = AVSpeechSynthesisVoice.speechVoices().filter {
+            $0.language == language || $0.language.hasPrefix(prefix)
+        }
+
+        // Önce kalite, eşitlikte tam dil eşleşmesi (tr-TR > tr-*) kazanır.
+        let best = candidates.max { lhs, rhs in
+            if qualityRank(lhs) != qualityRank(rhs) {
+                return qualityRank(lhs) < qualityRank(rhs)
+            }
+            return (lhs.language == language ? 1 : 0) < (rhs.language == language ? 1 : 0)
+        }
+
+        let chosen = best ?? AVSpeechSynthesisVoice(language: language)
+        isUsingCompactVoice = (chosen.map { qualityRank($0) } ?? 1) <= 1
+        return chosen
+    }
+
+    private func qualityRank(_ voice: AVSpeechSynthesisVoice) -> Int {
+        switch voice.quality {
+        case .premium: return 3
+        case .enhanced: return 2
+        default: return 1
+        }
+    }
+
+    /// Okuma bitince ses oturumunu bırak — başka uygulamaların sesi (müzik,
+    /// podcast) kaldığı yerden devam edebilsin.
+    private func deactivateAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setActive(false, options: [.notifyOthersOnDeactivation])
+        } catch {
+            logWarning("SpeechService", "Audio session kapatılamadı", details: error.localizedDescription)
+        }
     }
 
     private func configureAudioSession() {
@@ -115,6 +186,9 @@ extension SpeechService: AVSpeechSynthesizerDelegate {
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         isSpeaking = false
         isPaused = false
+        // Kullanıcı durdurduysa otomatik ilerletmeyi tetikleme — stopSpeaking
+        // bazı durumlarda didCancel yerine buraya düşer.
+        guard !wasStoppedByUser else { return }
         onFinish?()
     }
 
