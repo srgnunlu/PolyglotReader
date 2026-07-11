@@ -45,7 +45,9 @@ enum Config {
 
     /// Gemini Model Adı
     static var geminiModelName: String {
-        config["GeminiModelName"] as? String ?? "gemini-1.5-pro"
+        // gemini-1.5-* nesli Google tarafından emekliye ayrıldı (404 döner);
+        // varsayılan her zaman yaşayan bir model olmalı.
+        config["GeminiModelName"] as? String ?? "gemini-3-flash-preview"
     }
 
     // MARK: - Supabase Configuration
