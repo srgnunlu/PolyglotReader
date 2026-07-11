@@ -364,6 +364,8 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
     @objc func handleTap(_ gesture: UITapGestureRecognizer) {
         guard let pdfView = pdfView else { return }
         let tapLocation = gesture.location(in: pdfView)
+        // Dokunuşun dikey konumu (0-1) — bar toggle bölge mantığına taşınır.
+        let tapYFraction = tapLocation.y / max(pdfView.bounds.height, 1)
 
         // Note Icon Check
         if let page = pdfView.page(for: tapLocation, nearest: true) {
@@ -398,12 +400,12 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
 
                 DispatchQueue.main.async {
                     self.parent.onSelection?("", CGRect.zero, 0, [])
-                    self.parent.onTap?()
+                    self.parent.onTap?(tapYFraction)
                 }
             }
         } else {
             DispatchQueue.main.async {
-                self.parent.onTap?()
+                self.parent.onTap?(tapYFraction)
             }
         }
     }

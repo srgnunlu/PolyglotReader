@@ -24,7 +24,9 @@ struct PDFKitView: UIViewRepresentable {
     var onSelection: ((String, CGRect, Int, [CGRect]) -> Void)?  // pdfRects added for PDF coordinate system
     var onImageSelection: ((PDFImageInfo) -> Void)?
     var onRenderComplete: (() -> Void)?
-    var onTap: (() -> Void)?
+    /// Boş alana tek dokunuş. Parametre, dokunuşun görünümdeki dikey konumu
+    /// (0 = üst, 1 = alt) — okuyucu bar toggle'ının bölge mantığı için.
+    var onTap: ((CGFloat) -> Void)?
     var onAnnotationTap: ((Annotation) -> Void)?
     /// İki parmak çift dokunuş — okuyucunun odak modu geçişini tetikler.
     var onTwoFingerDoubleTap: (() -> Void)?

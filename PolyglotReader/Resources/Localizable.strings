@@ -570,6 +570,7 @@
 "reader.quick_translation" = "Hızlı çeviri";
 "reader.chat" = "Sohbet";
 "reader.search" = "Ara";
+"reader.show_bars" = "Kontrolleri göster";
 "reader.page_picker.title" = "Sayfa Seç";
 "reader.page_picker.go" = "Git";
 "reader.page_picker.accessibility" = "Sayfa %d / %d, sayfa seç";

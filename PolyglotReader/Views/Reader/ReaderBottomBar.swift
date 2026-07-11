@@ -66,6 +66,9 @@ struct ReaderBottomBar: View {
                 .foregroundStyle(disabled ? Color.secondary.opacity(0.4) : Color.primary)
                 .frame(width: 36, height: 36)
                 .dsGlass(.control, shape: .circle)
+                // Dokunma alanı HIG minimumu 44pt — görsel daire 36pt kalır.
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(disabled)

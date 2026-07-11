@@ -73,7 +73,8 @@ struct PDFReaderView: View {
                                 showAnnotationNote = true
                             }
                         },
-                        onToggleBars: toggleBars,
+                        onPDFTap: { yFraction in handlePDFTap(atYFraction: yFraction) },
+                        onShowBars: showBars,
                         onToggleFocusMode: toggleFocusMode,
                         onToggleTTS: toggleTTS,
                         onClose: closeReader
@@ -144,6 +145,11 @@ struct PDFReaderView: View {
                     hasTable: false,
                     hasImage: false
                 )
+                // Kullanıcı bar üzerinden sayfa çeviriyor demektir — otomatik
+                // gizleme sayacını sıfırla ki bar elinin altından kaybolmasın.
+                if barsVisible {
+                    startAutoHideTimer()
+                }
             }
             .sheet(isPresented: $showQuiz) {
                 QuizView(textContext: viewModel.extractedText)
@@ -243,22 +249,43 @@ struct PDFReaderView: View {
     }
 
     // MARK: - Bar Toggle & Auto-Hide
-    private func toggleBars() {
+
+    /// PDF boşluğuna tek dokunuş. Barlar gizliyken her dokunuş onları getirir;
+    /// barlar açıkken YALNIZ sayfa ortasındaki dokunuş kapatır. Üst/alt bar
+    /// hizasına düşen dokunuşlar yok sayılır — bir bar butonunu milim ıskalamak
+    /// artık barı kapatmaz.
+    private func handlePDFTap(atYFraction fraction: CGFloat) {
         // Odak modundayken tek dokunuş modu kapatır — kullanıcı asla mahsur kalmaz.
         if isFocusMode {
             toggleFocusMode()
             return
         }
 
-        withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
-            barsVisible.toggle()
+        guard barsVisible else {
+            showBars()
+            return
         }
 
-        if barsVisible {
-            startAutoHideTimer()
-        } else {
-            autoHideTimer?.invalidate()
+        // Bar bölgeleri (üst %22, alt %22) kapatma dokunuşuna kapalıdır.
+        guard (0.22...0.78).contains(fraction) else { return }
+
+        withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
+            barsVisible = false
         }
+        autoHideTimer?.invalidate()
+    }
+
+    /// Barları koşulsuz geri getirir (collapsed pill dokunuşu ve orta tap).
+    private func showBars() {
+        if isFocusMode {
+            toggleFocusMode()
+            return
+        }
+
+        withAnimation(DSMotion.resolved(DSMotion.smooth, reduceMotion: reduceMotion)) {
+            barsVisible = true
+        }
+        startAutoHideTimer()
     }
 
     // MARK: - Focus Mode

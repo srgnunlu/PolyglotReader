@@ -20,7 +20,10 @@ struct ReaderDocumentContent: View {
 
     let onSelection: (String, CGRect, Int, [CGRect]) -> Void
     let onAnnotationTap: (Annotation) -> Void
-    let onToggleBars: () -> Void
+    /// PDF boşluğuna tek dokunuş; parametre dikey konum (0 üst – 1 alt).
+    let onPDFTap: (CGFloat) -> Void
+    /// Collapsed pill'e dokunma — barları her koşulda geri getirir.
+    let onShowBars: () -> Void
     let onToggleFocusMode: () -> Void
     let onToggleTTS: () -> Void
     let onClose: () -> Void
@@ -65,9 +68,9 @@ struct ReaderDocumentContent: View {
                     isPDFRendering = false
                 }
             },
-            onTap: {
-                // PDF'e tıklandığında barları toggle et
-                onToggleBars()
+            onTap: { yFraction in
+                // PDF'e tıklandığında bar görünürlüğü bölge mantığıyla yönetilir.
+                onPDFTap(yFraction)
             },
             onAnnotationTap: onAnnotationTap,
             onTwoFingerDoubleTap: onToggleFocusMode
@@ -99,10 +102,11 @@ struct ReaderDocumentContent: View {
                         removal: .move(edge: .top).combined(with: .opacity)
                     ))
                 } else if !isPDFRendering && !isFocusMode {
-                    // Collapsed top indicator
+                    // Collapsed top indicator — dokununca barlar geri gelir.
                     CollapsedBarIndicator(
                         position: .top,
-                        glassMorph: DSGlassMorph("reader.chrome.top", in: chromeGlassNamespace)
+                        glassMorph: DSGlassMorph("reader.chrome.top", in: chromeGlassNamespace),
+                        onTap: onShowBars
                     )
                     .transition(.opacity)
                 }
@@ -136,10 +140,11 @@ struct ReaderDocumentContent: View {
                         removal: .move(edge: .bottom).combined(with: .opacity)
                     ))
                 } else if !isPDFRendering && !isFocusMode {
-                    // Collapsed bottom indicator
+                    // Collapsed bottom indicator — dokununca barlar geri gelir.
                     CollapsedBarIndicator(
                         position: .bottom,
-                        glassMorph: DSGlassMorph("reader.chrome.bottom", in: chromeGlassNamespace)
+                        glassMorph: DSGlassMorph("reader.chrome.bottom", in: chromeGlassNamespace),
+                        onTap: onShowBars
                     )
                     .transition(.opacity)
                 }
