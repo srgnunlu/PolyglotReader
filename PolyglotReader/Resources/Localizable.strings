@@ -187,6 +187,8 @@
 "chat.copy" = "Kopyala";
 "chat.suggestions.header" = "Başlamak için deneyin";
 "chat.scroll_to_bottom" = "Son mesaja git";
+"chat.clear.title" = "Sohbeti Temizle";
+"chat.clear.confirm" = "Bu dokümanın sohbet geçmişi kalıcı olarak silinsin mi?";
 
 /* Indexing Status */
 "chat.indexing.checking" = "Doküman kontrol ediliyor...";

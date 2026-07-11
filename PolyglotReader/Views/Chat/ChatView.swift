@@ -16,6 +16,7 @@ struct ChatView: View {
     /// Alt sınır görünür mü? Kullanıcı eski mesajları okurken akış onu
     /// aşağı çekmesin; ayrıca "sona git" butonunun görünürlüğünü belirler.
     @State private var isNearBottom = true
+    @State private var showClearConfirmation = false
     private let bottomAnchorID = "chat_bottom_anchor"
 
     // MARK: - Computed Properties
@@ -78,6 +79,21 @@ struct ChatView: View {
             .navigationTitle("chat.title".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    // Sohbeti temizle — yalnız gerçek konuşma varken görünür.
+                    if viewModel.messages.count > 1 {
+                        Button {
+                            showClearConfirmation = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
+                        .accessibilityLabel("chat.clear.title".localized)
+                        .accessibilityIdentifier("clear_chat_button")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         dismiss()
@@ -89,6 +105,16 @@ struct ChatView: View {
                     .accessibilityLabel("chat.accessibility.close".localized)
                     .accessibilityIdentifier("close_chat_button")
                 }
+            }
+            .confirmationDialog(
+                "chat.clear.confirm".localized,
+                isPresented: $showClearConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("chat.clear.title".localized, role: .destructive) {
+                    Task { await viewModel.clearChatHistory() }
+                }
+                Button("common.cancel".localized, role: .cancel) {}
             }
             // Leaving the chat must tear down the in-flight stream so it
             // doesn't keep mutating the message list in the background.
@@ -171,6 +197,20 @@ struct ChatView: View {
                 if let lastMessage = viewModel.messages.last, isNearBottom {
                     // No animation for streaming updates to avoid jitter
                     proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                }
+            }
+            // Sheet açılışında konuşma en son mesajdan başlar — geçmiş zaten
+            // bellekteyse onChange tetiklenmediği için burada elle kaydırılır.
+            .onAppear {
+                DispatchQueue.main.async {
+                    proxy.scrollTo(bottomAnchorID, anchor: .bottom)
+                }
+            }
+            // Geçmiş Supabase'den ilk kez yüklendiğinde de en alta in.
+            .onChange(of: viewModel.isLoadingHistory) { loading in
+                guard !loading else { return }
+                DispatchQueue.main.async {
+                    proxy.scrollTo(bottomAnchorID, anchor: .bottom)
                 }
             }
         }

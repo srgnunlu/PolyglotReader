@@ -169,7 +169,7 @@ class GeminiChatService {
         ### 1. Kaynak Kullanımı
         - SADECE yukarıdaki doküman bölümlerini kullan
         - Dış bilgi veya varsayım YAPMA
-        - Her önemli bilgi için kaynak göster: [1], [2] veya [Sayfa X]
+        - Her önemli bilgi için kaynak göster — tıklanabilir link formatıyla: [Sayfa X](jump:X)
 
         ### 2. Yanıt Formatı
         - **Kısa soru** → Öz ve net cevap (1-3 cümle)

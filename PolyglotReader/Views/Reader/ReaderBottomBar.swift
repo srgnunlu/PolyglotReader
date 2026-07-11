@@ -101,6 +101,12 @@ struct ReaderBottomBar: View {
             if viewModel.isQuickTranslationMode {
                 Text("reader.translation_on".localized)
                     .font(DSFont.meta.weight(.semibold))
+                    // Dar dock'ta metin dikey kırılıp "çe-vir-i" olmasın: tek
+                    // satır + gerçek genişliğinde sabitle; sığmazsa harf kırpma
+                    // yerine hafif küçült.
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .minimumScaleFactor(0.8)
             }
         }
         .foregroundStyle(viewModel.isQuickTranslationMode ? .white : .primary)

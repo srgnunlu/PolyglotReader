@@ -18,13 +18,13 @@ struct MarkdownView: View {
     
     private static func cachedParse(_ text: String) -> [BlockType] {
         let key = text.hashValue
-        
+
         if let cached = parseCache[key] {
             return cached
         }
-        
+
         // Parse and cache
-        let blocks = parseBlocksInternal(text)
+        let blocks = parseBlocksInternal(linkifyPageCitations(text))
         
         // Evict old entries if cache is too large
         if parseCache.count >= maxCacheSize {
@@ -56,6 +56,23 @@ struct MarkdownView: View {
 
     /// Custom URL scheme used for in-document page citations.
     static let jumpLinkScheme = "coriojump"
+
+    /// Model her zaman [Sayfa X](jump:X) formatına uymuyor; düz metin kalan
+    /// "Sayfa 12" atıflarını tıklanabilir jump linklerine çevirir. Zaten link
+    /// olan atıflara ("[" ile başlayanlara) dokunmaz.
+    private static let pageCitationRegex = try? NSRegularExpression(
+        pattern: #"(?<!\[)Sayfa\s+(\d{1,4})"#
+    )
+
+    static func linkifyPageCitations(_ text: String) -> String {
+        guard let regex = pageCitationRegex else { return text }
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.stringByReplacingMatches(
+            in: text,
+            range: range,
+            withTemplate: "[Sayfa $1](jump:$1)"
+        )
+    }
 
     // MARK: - Block Types
 

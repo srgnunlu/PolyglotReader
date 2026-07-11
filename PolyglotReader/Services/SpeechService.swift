@@ -28,6 +28,12 @@ final class SpeechService: NSObject, ObservableObject {
 
     private let synthesizer = AVSpeechSynthesizer()
 
+    /// Kullanıcı bilerek durdurdu bayrağı. `stopSpeaking` çağrısı bazı iOS
+    /// sürümlerinde `didCancel` yerine `didFinish` teslim eder; bu durumda
+    /// `onFinish` tetiklenir ve otomatik sayfa ilerletme okumayı YENİDEN
+    /// başlatır ("durdur çalışmıyor" bug'ı). Bayrak bu yolu kesin kapatır.
+    private var wasStoppedByUser = false
+
     override init() {
         super.init()
         synthesizer.delegate = self
@@ -54,6 +60,7 @@ final class SpeechService: NSObject, ObservableObject {
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
+        wasStoppedByUser = false
         isPaused = false
         synthesizer.speak(utterance)
     }
@@ -72,9 +79,11 @@ final class SpeechService: NSObject, ObservableObject {
 
     /// Tamamen durdurur. `onFinish` tetiklenmez (kullanıcı bilerek durdurdu).
     func stop() {
+        wasStoppedByUser = true
         synthesizer.stopSpeaking(at: .immediate)
         isSpeaking = false
         isPaused = false
+        deactivateAudioSession()
     }
 
     // MARK: - Helpers
@@ -91,6 +100,17 @@ final class SpeechService: NSObject, ObservableObject {
         }
         let prefix = language.split(separator: "-").first.map(String.init) ?? language
         return AVSpeechSynthesisVoice.speechVoices().first { $0.language.hasPrefix(prefix) }
+    }
+
+    /// Okuma bitince ses oturumunu bırak — başka uygulamaların sesi (müzik,
+    /// podcast) kaldığı yerden devam edebilsin.
+    private func deactivateAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setActive(false, options: [.notifyOthersOnDeactivation])
+        } catch {
+            logWarning("SpeechService", "Audio session kapatılamadı", details: error.localizedDescription)
+        }
     }
 
     private func configureAudioSession() {
@@ -115,6 +135,9 @@ extension SpeechService: AVSpeechSynthesizerDelegate {
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         isSpeaking = false
         isPaused = false
+        // Kullanıcı durdurduysa otomatik ilerletmeyi tetikleme — stopSpeaking
+        // bazı durumlarda didCancel yerine buraya düşer.
+        guard !wasStoppedByUser else { return }
         onFinish?()
     }
 
