@@ -19,7 +19,10 @@ export async function loadChatHistory(fileId: string): Promise<ChatMessage[]> {
         .from('chats')
         .select('*')
         .eq('file_id', fileId)
-        .order('created_at', { ascending: true });
+        // seq breaks ties when user/model rows share the same timestamp,
+        // which otherwise flips their order on reload.
+        .order('created_at', { ascending: true })
+        .order('seq', { ascending: true });
 
     if (error) {
         console.error('❌ Error loading chat history:', error);

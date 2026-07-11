@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
         : { inlineData: { mimeType: (mimeType as string | undefined) ?? 'image/jpeg', data: image } };
 
     try {
-        const model = getGeminiModel();
+        // system: false — the analyst system instruction would make OCR
+        // summarize/comment instead of returning the raw page text.
+        const model = getGeminiModel({ system: false });
         const result = await model.generateContent([OCR_PROMPT, imagePart]);
         return NextResponse.json({ text: result.response.text() });
     } catch (error) {

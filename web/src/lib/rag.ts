@@ -131,7 +131,8 @@ export async function searchRelevantChunks(
     limit: number = 20
 ): Promise<string> {
     try {
-        console.log(`BM25 search: query="${query}", fileId="${fileId}"`);
+        // Never log query text — user questions are PII.
+        console.log(`BM25 search: fileId="${fileId}"`);
 
         const results = await bm25Search(fileId, query, limit);
         console.log(`BM25 search returned ${results?.length || 0} results`);
@@ -457,11 +458,10 @@ async function bm25Search(
     // Sorguyu ön işleme tabi tut
     const processedQuery = preprocessQueryForBM25(query, queryLanguage);
 
+    // Log only language metadata, never the query text itself (PII).
     console.log(`🔤 BM25 search debug:`);
     console.log(`  Query language: "${queryLanguage}" (detected from query)`);
     console.log(`  Document language: "${documentLanguage}" (from doc content)`);
-    console.log(`  Original query: "${query}"`);
-    console.log(`  Processed query: "${processedQuery}"`);
 
     const attempts: { name: string; params: Record<string, unknown> }[] = [];
 
@@ -588,7 +588,8 @@ export async function searchRelevantChunksHybrid(
     query: string,
     limit: number = 10
 ): Promise<string> {
-    console.log(`🔍 Hybrid search: query="${query.substring(0, 50)}...", fileId="${fileId}"`);
+    // Never log query text — user questions are PII.
+    console.log(`🔍 Hybrid search: fileId="${fileId}"`);
 
     try {
         // Parallel search: Vector + BM25

@@ -28,12 +28,14 @@ async function generateViaApi(prompt: string, imageBase64?: string): Promise<str
 async function* streamViaApi(
     prompt: string,
     history?: ChatHistoryMessage[],
-    imageBase64?: string
+    imageBase64?: string,
+    signal?: AbortSignal
 ): AsyncGenerator<string, void, unknown> {
     const response = await fetch('/api/gemini/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, history, imageBase64 }),
+        signal,
     });
 
     if (!response.ok || !response.body) {
@@ -140,29 +142,26 @@ export async function recognizePageText(imageDataUrl: string): Promise<string> {
 function shouldTranslateQuery(query: string): boolean {
     // Tablo/Şekil/Bölüm referansları asla çevrilmemeli
     // Örnekler: "Tablo 2-1", "Şekil 3.4", "Bölüm 5", "Table 2-1"
+    // NOTE: never log the query text itself — user questions are PII.
     const structuralPatterns = /\b(tablo|şekil|bölüm|sayfa|chapter|table|figure|section)\s*[\d.-]+/i;
     if (structuralPatterns.test(query)) {
-        console.log(`🔒 Query contains structural reference, skipping translation: "${query}"`);
         return false;
     }
 
     // Çok kısa sorguları çevirme (3 kelime veya daha az)
     const wordCount = query.trim().split(/\s+/).length;
     if (wordCount <= 3) {
-        console.log(`🔒 Query too short (${wordCount} words), skipping translation: "${query}"`);
         return false;
     }
 
     // Karmaşık tıbbi/teknik terimler varsa çevir
     const complexTerms = /\b(kardiyovasküler|pulmoner|nörolojik|travma|resüsitasyon|patofizyoloji|farmakoloji)\b/i;
     if (complexTerms.test(query)) {
-        console.log(`🔄 Query contains complex medical terms, will translate: "${query}"`);
         return true;
     }
 
     // Varsayılan: Türkçe karakter varsa ama yapısal referans yoksa çevirme
     // Basit sorular için direkt Türkçe arama daha iyi sonuç verir
-    console.log(`🔒 Using original query without translation: "${query}"`);
     return false;
 }
 
@@ -190,7 +189,6 @@ Kurallar:
 
     try {
         const expandedQuery = (await generateViaApi(prompt)).trim();
-        console.log(`🔄 Query expansion: "${query}" → "${expandedQuery}"`);
         return expandedQuery;
     } catch (error) {
         console.error('Query expansion failed:', error);
@@ -237,13 +235,14 @@ export async function generateSmartNote(text: string): Promise<string> {
 // Stream chat (for real-time responses)
 export async function* streamChat(
     message: string,
-    context?: string
+    context?: string,
+    signal?: AbortSignal
 ): AsyncGenerator<string, void, unknown> {
     const prompt = context
         ? `Context from document:\n${context}\n\nUser question: ${message}\n\nProvide a helpful answer based on the context.`
         : message;
 
-    yield* streamViaApi(prompt);
+    yield* streamViaApi(prompt, undefined, undefined, signal);
 }
 
 // Stream chat with dynamic RAG search (for document-aware responses)
@@ -261,7 +260,8 @@ export async function* streamChatWithRAG(
 export async function* streamChatWithRAGAndHistory(
     message: string,
     fileId: string,
-    history: ChatHistoryMessage[]
+    history: ChatHistoryMessage[],
+    signal?: AbortSignal
 ): AsyncGenerator<string, void, unknown> {
     // Dynamic import to avoid circular dependency
     const { searchRelevantChunksHybrid } = await import('./rag');
@@ -274,13 +274,10 @@ export async function* streamChatWithRAGAndHistory(
     if (hasTurkishChars && shouldTranslateQuery(message)) {
         try {
             searchQuery = await translateAndExpandQuery(message);
-            console.log(`📝 Using expanded query for RAG: "${searchQuery}"`);
         } catch (error) {
             console.warn('Query expansion failed, using original:', error);
             searchQuery = message;
         }
-    } else {
-        console.log(`📝 Using original query for RAG: "${searchQuery}"`);
     }
 
     // Search for relevant chunks using hybrid search
@@ -296,7 +293,7 @@ export async function* streamChatWithRAGAndHistory(
         ? buildEnhancedPrompt(message, formattedContext)
         : message;
 
-    yield* streamViaApi(prompt, history.length > 0 ? history : undefined);
+    yield* streamViaApi(prompt, history.length > 0 ? history : undefined, undefined, signal);
 }
 
 
@@ -338,14 +335,15 @@ ${message}
 export async function* streamLibraryChat(
     message: string,
     files: LibraryFileRef[],
-    history: ChatHistoryMessage[]
+    history: ChatHistoryMessage[],
+    signal?: AbortSignal
 ): AsyncGenerator<string, void, unknown> {
     const { searchLibraryChunks } = await import('./rag');
 
     const context = await searchLibraryChunks(files, message);
     const prompt = context ? buildLibraryPrompt(message, context) : message;
 
-    yield* streamViaApi(prompt, history.length > 0 ? history : undefined);
+    yield* streamViaApi(prompt, history.length > 0 ? history : undefined, undefined, signal);
 }
 
 // Chat with image - for image-based questions
@@ -365,11 +363,12 @@ export async function chatWithImage(
 export async function* streamChatWithImage(
     message: string,
     imageBase64: string,
-    context?: string
+    context?: string,
+    signal?: AbortSignal
 ): AsyncGenerator<string, void, unknown> {
     const textPrompt = context
         ? `Döküman bağlamı:\n${context}\n\nKullanıcı sorusu: ${message}\n\nLütfen görseli analiz ederek soruyu yanıtla.`
         : message;
 
-    yield* streamViaApi(textPrompt, undefined, imageBase64);
+    yield* streamViaApi(textPrompt, undefined, imageBase64, signal);
 }
