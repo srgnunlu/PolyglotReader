@@ -32,6 +32,8 @@ interface ChatPanelProps {
     activeSelection?: string | null;
     onClearInitialMessage?: () => void;
     onClearSelection?: () => void;
+    /** Sayfa atıfına tıklanınca PDF'i o sayfaya kaydırır (iOS eşleniği). */
+    onNavigateToPage?: (page: number) => void;
 }
 
 // Default suggestions for empty state
@@ -45,10 +47,33 @@ const DEFAULT_SUGGESTIONS = [
 // Stable plugin reference — avoids handing react-markdown a fresh array each render.
 const REMARK_PLUGINS = [remarkGfm];
 
+const PAGE_LINK_PREFIX = '#corio-page-';
+
+// Model çıktısındaki düz "Sayfa 12" / "[Sayfa 12]" atıflarını markdown
+// linkine çevirir; custom `a` renderer'ı tıklamayı sayfa navigasyonuna
+// yönlendirir (iOS'taki linkifyPageCitations eşleniği).
+function linkifyPageCitations(text: string): string {
+    return text
+        .replace(/\[Sayfa (\d{1,4})\](?!\()/g, `[Sayfa $1](${PAGE_LINK_PREFIX}$1)`)
+        .replace(/(?<![[\w])Sayfa (\d{1,4})/g, `[Sayfa $1](${PAGE_LINK_PREFIX}$1)`);
+}
+
 // One chat message, memoized. During streaming, setMessages only replaces the
 // active message object; every other message keeps its identity, so this memo
 // skips re-parsing their markdown on every chunk (Phase B perf — P6).
-const ChatMessageItem = memo(function ChatMessageItem({ message }: { message: ChatMessage }) {
+const ChatMessageItem = memo(function ChatMessageItem({
+    message,
+    onNavigateToPage,
+}: {
+    message: ChatMessage;
+    onNavigateToPage?: (page: number) => void;
+}) {
+    const handleCopy = () => {
+        navigator.clipboard?.writeText(message.text).catch(() => {
+            /* clipboard izni yoksa sessizce geç */
+        });
+    };
+
     return (
         <div className={`${styles.message} ${styles[message.role]}`}>
             <div className={styles.messageAvatar}>
@@ -70,8 +95,33 @@ const ChatMessageItem = memo(function ChatMessageItem({ message }: { message: Ch
                 )}
                 {message.text ? (
                     <div className={styles.messageMarkdown}>
-                        <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>
-                            {message.text}
+                        <ReactMarkdown
+                            remarkPlugins={REMARK_PLUGINS}
+                            components={{
+                                a: ({ href, children }) => {
+                                    if (href?.startsWith(PAGE_LINK_PREFIX)) {
+                                        const page = parseInt(href.slice(PAGE_LINK_PREFIX.length), 10);
+                                        return (
+                                            <button
+                                                type="button"
+                                                className={styles.pageLink}
+                                                onClick={() => onNavigateToPage?.(page)}
+                                            >
+                                                {children}
+                                            </button>
+                                        );
+                                    }
+                                    return (
+                                        <a href={href} target="_blank" rel="noopener noreferrer">
+                                            {children}
+                                        </a>
+                                    );
+                                },
+                            }}
+                        >
+                            {message.role === 'model'
+                                ? linkifyPageCitations(message.text)
+                                : message.text}
                         </ReactMarkdown>
                     </div>
                 ) : (
@@ -80,6 +130,17 @@ const ChatMessageItem = memo(function ChatMessageItem({ message }: { message: Ch
                         <span className={styles.typingDot} />
                         <span className={styles.typingDot} />
                     </div>
+                )}
+                {message.text && (
+                    <button
+                        type="button"
+                        className={styles.copyMessageBtn}
+                        onClick={handleCopy}
+                        title="Mesajı kopyala"
+                        aria-label="Mesajı kopyala"
+                    >
+                        ⧉
+                    </button>
                 )}
             </div>
         </div>
@@ -96,6 +157,7 @@ export function ChatPanel({
     activeSelection,
     onClearInitialMessage,
     onClearSelection,
+    onNavigateToPage,
 }: ChatPanelProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
@@ -468,7 +530,11 @@ export function ChatPanel({
                     </div>
                 ) : (
                     messages.map(message => (
-                        <ChatMessageItem key={message.id} message={message} />
+                        <ChatMessageItem
+                            key={message.id}
+                            message={message}
+                            onNavigateToPage={onNavigateToPage}
+                        />
                     ))
                 )}
                 <div ref={messagesEndRef} />

@@ -66,6 +66,8 @@ interface PDFViewerProps {
     onToggleTranslation?: () => void;
     isChatOpen?: boolean;
     onToggleChat?: () => void;
+    /** Exposes the internal goToPage to the parent (chat citation jumps). */
+    onRegisterGoToPage?: (goToPage: (page: number) => void) => void;
 }
 
 export function PDFViewer({
@@ -93,6 +95,7 @@ export function PDFViewer({
     onToggleTranslation,
     isChatOpen = false,
     onToggleChat,
+    onRegisterGoToPage,
 }: PDFViewerProps) {
     const wrapperRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -158,6 +161,11 @@ export function PDFViewer({
     useEffect(() => {
         onScaleChange?.(displayScale);
     }, [onScaleChange, displayScale]);
+
+    // Let the parent (reader page) drive page jumps — used by chat citations.
+    useEffect(() => {
+        onRegisterGoToPage?.(goToPage);
+    }, [onRegisterGoToPage, goToPage]);
 
     const handleLoadSuccess = useCallback((pdf: pdfjs.PDFDocumentProxy) => {
         handleDocumentLoadSuccess(pdf);
