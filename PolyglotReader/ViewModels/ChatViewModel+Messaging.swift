@@ -157,12 +157,23 @@ extension ChatViewModel {
                     content: content
                 )
             } catch {
-                // Log on main actor if needed but don't block
+                // Persist failed (offline or transient): queue the message so
+                // it syncs when connectivity returns instead of being lost.
+                // SyncQueue already knows how to replay .chatMessage payloads.
                 await MainActor.run {
                     logWarning(
                         "ChatViewModel",
-                        "Chat mesajı kaydedilemedi",
+                        "Chat mesajı kaydedilemedi, sync kuyruğuna alındı",
                         details: error.localizedDescription
+                    )
+                    let message = ChatMessage(
+                        role: role == "user" ? .user : .model,
+                        text: content
+                    )
+                    try? SyncQueue.shared.enqueue(
+                        type: .chatMessage,
+                        object: message,
+                        fileId: fileIdCopy
                     )
                 }
             }

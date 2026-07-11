@@ -310,11 +310,19 @@ final class SupabaseDatabaseService {
         let file_id: String
         let page_number: Int?
         let chunk_index: Int
+        let section_title: String?
+        let content_type: String
+        let contains_table: Bool
+        let contains_list: Bool
+        // Write-only for now: read paths don't consume image refs (the image
+        // RAG channel queries image_metadata directly), but persisting them
+        // keeps the chunk row complete for future use.
+        let image_refs: [String]?
     }
 
     func saveDocumentChunks(
         fileId: String,
-        chunks: [(content: String, embedding: [Float], pageNumber: Int?)]
+        chunks: [SupabaseChunkInsert]
     ) async throws {
         // First, delete existing chunks for this file to avoid duplicates
         struct ReindexResult: Decodable {
@@ -343,7 +351,12 @@ final class SupabaseDatabaseService {
                 embedding: chunk.embedding,
                 file_id: fileId,
                 page_number: chunk.pageNumber,
-                chunk_index: index
+                chunk_index: index,
+                section_title: chunk.sectionTitle,
+                content_type: chunk.contentType,
+                contains_table: chunk.containsTable,
+                contains_list: chunk.containsList,
+                image_refs: chunk.imageRefs.isEmpty ? nil : chunk.imageRefs
             )
         }
 

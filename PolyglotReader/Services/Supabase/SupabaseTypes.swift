@@ -21,20 +21,29 @@ struct SupabaseRAGSearchParams: Encodable, @unchecked Sendable {
     }
 }
 
+// NOTE: metadata fields on the RPC result structs are optional so the app
+// keeps working against a database that predates the metadata migration
+// (20260711120000) — they simply decode as nil.
 struct SupabaseRAGSearchResult: Decodable, @unchecked Sendable {
     let id: UUID // Assuming UUID
     let content: String
     let similarity: Float
     let page_number: Int?
+    let chunk_index: Int?
+    let section_title: String?
+    let content_type: String?
+    let contains_table: Bool?
+    let contains_list: Bool?
 }
 
 struct SupabaseBM25Params: Encodable, @unchecked Sendable {
     let search_file_id: String
     let search_query: String
     let match_count: Int
+    let search_language: String
 
     private enum CodingKeys: String, CodingKey {
-        case search_file_id, search_query, match_count
+        case search_file_id, search_query, match_count, search_language
     }
 
     nonisolated func encode(to encoder: Encoder) throws {
@@ -42,6 +51,7 @@ struct SupabaseBM25Params: Encodable, @unchecked Sendable {
         try container.encode(search_file_id, forKey: .search_file_id)
         try container.encode(search_query, forKey: .search_query)
         try container.encode(match_count, forKey: .match_count)
+        try container.encode(search_language, forKey: .search_language)
     }
 }
 
@@ -50,6 +60,11 @@ struct SupabaseBM25Result: Decodable, @unchecked Sendable {
     let content: String
     let rank: Float
     let page_number: Int?
+    let chunk_index: Int?
+    let section_title: String?
+    let content_type: String?
+    let contains_table: Bool?
+    let contains_list: Bool?
 }
 
 struct ChunkVectorSearchResult: Sendable {
@@ -57,6 +72,11 @@ struct ChunkVectorSearchResult: Sendable {
     let content: String
     let similarity: Float
     let pageNumber: Int?
+    let chunkIndex: Int?
+    let sectionTitle: String?
+    let contentType: String?
+    let containsTable: Bool
+    let containsList: Bool
 }
 
 struct ChunkBM25SearchResult: Sendable {
@@ -64,6 +84,25 @@ struct ChunkBM25SearchResult: Sendable {
     let content: String
     let score: Float
     let pageNumber: Int?
+    let chunkIndex: Int?
+    let sectionTitle: String?
+    let contentType: String?
+    let containsTable: Bool
+    let containsList: Bool
+}
+
+/// One chunk row ready for insertion into document_chunks, including the
+/// chunker's metadata (previously computed but never persisted, which left
+/// table/section boosts inert on search results).
+struct SupabaseChunkInsert: Sendable {
+    let content: String
+    let embedding: [Float]
+    let pageNumber: Int?
+    let sectionTitle: String?
+    let contentType: String
+    let containsTable: Bool
+    let containsList: Bool
+    let imageRefs: [String]
 }
 
 struct SupabaseChunkSlice: Decodable, @unchecked Sendable {

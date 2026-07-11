@@ -11,6 +11,22 @@ class GeminiChatService {
     /// first one's context, so the user could end up talking to the wrong PDF.
     private var sessions: [String: Chat] = [:]
 
+    /// LRU order for `sessions`. Sessions hold full conversation histories
+    /// (plus up to 100k chars of PDF text in legacy mode), so without a cap
+    /// they accumulate for every document opened in the app's lifetime.
+    private var sessionAccessOrder: [String] = []
+    private let maxLiveSessions = 5
+
+    private func touchSession(_ fileId: String) {
+        sessionAccessOrder.removeAll { $0 == fileId }
+        sessionAccessOrder.append(fileId)
+        while sessions.count > maxLiveSessions, let oldest = sessionAccessOrder.first {
+            sessionAccessOrder.removeFirst()
+            sessions.removeValue(forKey: oldest)
+            logDebug("GeminiChatService", "LRU session tahliye edildi", details: "File: \(oldest)")
+        }
+    }
+
     // Status properties managed by Facade, but service can expose async methods
     // The Service is NOT ObservableObject, the Facade is.
 
@@ -43,6 +59,7 @@ class GeminiChatService {
         }
 
         sessions[fileId] = model.startChat(history: history)
+        touchSession(fileId)
         #if DEBUG
         let mode = pdfContent == nil ? "RAG" : "Legacy"
         logDebug("GeminiChatService", "Chat oturumu başlatıldı", details: "Mode: \(mode), File: \(fileId)")
@@ -51,10 +68,12 @@ class GeminiChatService {
 
     func resetChatSession(fileId: String) {
         sessions.removeValue(forKey: fileId)
+        sessionAccessOrder.removeAll { $0 == fileId }
     }
 
     func resetAllSessions() {
         sessions.removeAll()
+        sessionAccessOrder.removeAll()
     }
 
     func isSessionInitialized(fileId: String) -> Bool {
@@ -66,6 +85,7 @@ class GeminiChatService {
     /// document isolated and avoids `sessionNotInitialized` race conditions.
     private func session(for fileId: String) -> Chat {
         if let chat = sessions[fileId] {
+            touchSession(fileId)
             return chat
         }
         let history: [ModelContent] = [
@@ -78,6 +98,7 @@ class GeminiChatService {
         ]
         let chat = model.startChat(history: history)
         sessions[fileId] = chat
+        touchSession(fileId)
         return chat
     }
 

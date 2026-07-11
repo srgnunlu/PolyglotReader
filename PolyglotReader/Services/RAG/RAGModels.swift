@@ -118,6 +118,12 @@ struct ScoredChunk {
     var rerankScore: Float?
 
     var finalScore: Float {
-        rerankScore ?? rrfScore
+        // rerankScore is on the LLM's 0-10 scale, rrfScore on RRF's ~0.01-0.05
+        // scale. Normalizing rerank to 0-1 keeps partial reranks on one scale:
+        // a chunk the LLM scored 0 (irrelevant) now sorts BELOW an unranked
+        // chunk's RRF score instead of tying with it, while any chunk scored
+        // >= 1/10 still outranks all unranked ones.
+        if let rerankScore { return rerankScore / 10.0 }
+        return rrfScore
     }
 }
