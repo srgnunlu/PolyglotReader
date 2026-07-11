@@ -94,6 +94,10 @@ class GeminiService: ObservableObject {
         chatService.resetChatSession(fileId: fileId)
     }
 
+    func seedPersistedChatHistory(fileId: String, turns: [(role: String, text: String)]) {
+        chatService.seedPersistedHistory(fileId: fileId, turns: turns)
+    }
+
     func sendMessage(_ message: String) async throws -> String {
         try await executeServiceCall {
             try await chatService.sendMessage(message)

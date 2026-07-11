@@ -81,6 +81,40 @@ class GeminiChatService {
         return chat
     }
 
+    /// Injects previously persisted chat turns into the session history so the
+    /// model remembers earlier conversations after an app restart. Without this,
+    /// the UI shows the old messages but the model starts from a blank session.
+    /// Only runs while the session is still fresh (seed pair only) — once real
+    /// turns exist in memory, they are already the source of truth.
+    func seedPersistedHistory(fileId: String, turns: [(role: String, text: String)]) {
+        guard !turns.isEmpty else { return }
+        let chat = session(for: fileId)
+        guard chat.history.count <= 2 else { return }
+
+        var appended: [ModelContent] = []
+        for turn in turns {
+            let role = turn.role == "user" ? "user" : "model"
+            // The SDK expects strictly alternating roles starting with "user"
+            // after the seed model reply; skip turns that would break that.
+            if appended.isEmpty && role != "user" { continue }
+            if let last = appended.last, last.role == role { continue }
+            appended.append(ModelContent(role: role, parts: [.text(turn.text)]))
+        }
+        // History must end on a model turn before the next user message.
+        if appended.last?.role == "user" { appended.removeLast() }
+        guard !appended.isEmpty else { return }
+
+        chat.history = Self.trimmedHistory(
+            chat.history + appended,
+            maxTokens: GeminiConfig.maxHistoryTokens
+        )
+        logInfo(
+            "GeminiChatService",
+            "Kalıcı chat geçmişi oturuma yüklendi",
+            details: "\(appended.count) mesaj, File: \(fileId)"
+        )
+    }
+
     // MARK: - History Budgeting
 
     /// Word-count based token estimate (same idiom as RAGConfig.tokenMultiplier).

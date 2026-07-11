@@ -52,7 +52,10 @@ final class SupabaseDatabaseService {
             .from("chats")
             .select()
             .eq("file_id", value: fileId)
+            // seq breaks ties when user/model rows land on the same timestamp,
+            // which otherwise flips their order on reload.
             .order("created_at", ascending: true)
+            .order("seq", ascending: true)
             .execute()
             .value
 
@@ -416,26 +419,45 @@ final class SupabaseDatabaseService {
 
     // MARK: - Folder Operations
 
-    func getFolders(userId: String, parentId: UUID? = nil) async throws -> [Folder] {
-        struct FolderRecord: Decodable {
-            let id: String
-            let name: String
-            let color: String?
-            let created_at: String
-            let parent_id: String?
-        }
+    private struct FolderRecord: Decodable {
+        let id: String
+        let name: String
+        let color: String?
+        let created_at: String
+        let parent_id: String?
+        let icon: String?
+        // PostgREST embedded aggregate: `files(count)` returns [{"count": N}]
+        // via the files.folder_id FK — no RPC/migration needed.
+        let files: [FileCountRecord]?
 
+        struct FileCountRecord: Decodable {
+            let count: Int
+        }
+    }
+
+    private func mapFolder(_ record: FolderRecord, userId: String) -> Folder? {
+        guard let uuid = UUID(uuidString: record.id) else { return nil }
+        return Folder(
+            id: uuid,
+            name: record.name,
+            color: record.color ?? "#6366F1",
+            parentId: record.parent_id.flatMap { UUID(uuidString: $0) },
+            userId: userId,
+            fileCount: record.files?.first?.count ?? 0,
+            icon: record.icon
+        )
+    }
+
+    func getFolders(userId: String, parentId: UUID? = nil) async throws -> [Folder] {
         var query = client
             .from("folders")
-            .select()
+            .select("*, files(count)")
             .eq("user_id", value: userId)
 
         if let parentId = parentId {
             query = query.eq("parent_id", value: parentId.uuidString)
         } else {
             // Filter for null parent_id (root folders)
-            // Filter for null parent_id (root folders)
-            // Using match with AnyJSON.null
             query = query.is("parent_id", value: nil)
         }
 
@@ -444,16 +466,50 @@ final class SupabaseDatabaseService {
             .execute()
             .value
 
-        return records.compactMap { record in
-            guard let uuid = UUID(uuidString: record.id) else { return nil }
-            return Folder(
-                id: uuid,
-                name: record.name,
-                color: record.color ?? "#6366F1",
-                parentId: record.parent_id.flatMap { UUID(uuidString: $0) },
-                userId: userId
-            )
+        return records.compactMap { mapFolder($0, userId: userId) }
+    }
+
+    /// Kullanıcının TÜM klasörleri (seviye filtresi yok) — hiyerarşik klasör
+    /// seçici ve taşıma hedef listesi için.
+    func getAllFolders(userId: String) async throws -> [Folder] {
+        let records: [FolderRecord] = try await client
+            .from("folders")
+            .select("*, files(count)")
+            .eq("user_id", value: userId)
+            .order("name", ascending: true)
+            .execute()
+            .value
+
+        return records.compactMap { mapFolder($0, userId: userId) }
+    }
+
+    /// Klasör adını ve rengini günceller. İkon ayrı çağrıyla güncellenir ki
+    /// `folders.icon` kolonu henüz migrate edilmemiş bir ortamda rename bozulmasın.
+    func updateFolder(id: String, name: String, color: String) async throws {
+        struct FolderUpdate: Encodable {
+            let name: String
+            let color: String
         }
+
+        try await client
+            .from("folders")
+            .update(FolderUpdate(name: name, color: color))
+            .eq("id", value: id)
+            .execute()
+    }
+
+    /// Klasör ikonunu (SF Symbol) günceller — kolon yoksa hata fırlatır;
+    /// çağıran taraf sessizce yerel depoya düşer.
+    func updateFolderIcon(id: String, icon: String?) async throws {
+        struct IconUpdate: Encodable {
+            let icon: String?
+        }
+
+        try await client
+            .from("folders")
+            .update(IconUpdate(icon: icon))
+            .eq("id", value: id)
+            .execute()
     }
 
     func createFolder(name: String, userId: String, color: String?, parentId: UUID? = nil) async throws -> Folder {
