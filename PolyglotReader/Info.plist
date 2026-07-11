@@ -31,5 +31,9 @@
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
 	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Sorularınızı sesli sorabilmeniz için mikrofon erişimi gereklidir.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Sesli sorularınızı metne çevirmek için konuşma tanıma kullanılır.</string>
 </dict>
 </plist>

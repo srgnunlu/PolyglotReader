@@ -13,6 +13,13 @@ struct ChatView: View {
     /// bağlanmış hali) — balon menüsünden "Sesli Oku".
     @StateObject private var speech = SpeechService()
 
+    /// Sesli girdi (mikrofon → composer).
+    @StateObject private var speechRecognizer = SpeechRecognitionService()
+
+    // Sohbet içi arama durumu.
+    @State private var isSearchActive = false
+    @State private var searchQuery = ""
+
     // Scroll throttle için debounce state
     @State private var lastScrollTime: Date = .distantPast
     private let scrollDebounceInterval: TimeInterval = 0.1 // 100ms debounce
@@ -32,6 +39,13 @@ struct ChatView: View {
 
     private var canSend: Bool {
         !viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty && viewModel.canSendMessage
+    }
+
+    /// Arama aktifken yalnız eşleşen mesajlar listelenir.
+    private var visibleMessages: [ChatMessage] {
+        let query = searchQuery.trimmingCharacters(in: .whitespaces)
+        guard isSearchActive, !query.isEmpty else { return viewModel.messages }
+        return viewModel.messages.filter { $0.text.localizedCaseInsensitiveContains(query) }
     }
 
     /// Akış hâlâ sürerken son model mesajı "yazılıyor" kabul edilir —
@@ -83,6 +97,18 @@ struct ChatView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
+                    if isSearchActive {
+                        ChatSearchBar(
+                            query: $searchQuery,
+                            matchCount: visibleMessages.count
+                        ) {
+                            withAnimation(DSMotion.snappy) {
+                                isSearchActive = false
+                                searchQuery = ""
+                            }
+                        }
+                    }
+
                     messagesArea
 
                     inputArea
@@ -91,9 +117,32 @@ struct ChatView: View {
             .navigationTitle("chat.title".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    // Sohbeti temizle — yalnız gerçek konuşma varken görünür.
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    // Ara / dışa aktar / temizle — yalnız gerçek konuşma varken.
                     if viewModel.messages.count > 1 {
+                        Button {
+                            withAnimation(DSMotion.snappy) {
+                                isSearchActive.toggle()
+                                if !isSearchActive { searchQuery = "" }
+                            }
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                                .font(.subheadline)
+                                .foregroundStyle(isSearchActive ? DSColor.brand : .secondary)
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
+                        .accessibilityLabel("chat.search".localized)
+                        .accessibilityIdentifier("chat_search_button")
+
+                        ShareLink(item: viewModel.exportTranscript) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
+                        .accessibilityLabel("chat.export".localized)
+                        .accessibilityIdentifier("chat_export_button")
+
                         Button {
                             showClearConfirmation = true
                         } label: {
@@ -133,6 +182,13 @@ struct ChatView: View {
             .onDisappear {
                 viewModel.cancelActiveStream()
                 speech.stop()
+                speechRecognizer.stop()
+            }
+            // Canlı dikte: kayıt sürerken transcript composer'a akar; kayıt
+            // bittikten sonra kullanıcı metni serbestçe düzenleyebilir.
+            .onChange(of: speechRecognizer.transcript) { transcript in
+                guard speechRecognizer.isRecording, !transcript.isEmpty else { return }
+                viewModel.inputText = transcript
             }
             // Persisted history loads once per reader session; the skeleton
             // above covers the fetch window.
@@ -159,11 +215,13 @@ struct ChatView: View {
                         ChatHistorySkeleton()
                     }
 
-                    ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
+                    ForEach(Array(visibleMessages.enumerated()), id: \.element.id) { index, message in
                         MessageBubble(
                             message: message,
                             isStreaming: isStreamingMessage(message),
-                            showsTimestamp: showsTimestamp(at: index),
+                            // Arama modunda indeksler filtreli listeye ait olduğundan
+                            // zaman damgası kırılım hesabı anlamsızlaşır — gizlenir.
+                            showsTimestamp: isSearchActive ? false : showsTimestamp(at: index),
                             onSpeak: { text in
                                 speech.stop()
                                 speech.speak(text)
@@ -178,6 +236,30 @@ struct ChatView: View {
                         )
                         .id(message.id)
                         .transition(bubbleTransition(for: message))
+                        // Arama modunda sonuca dokunmak aramayı kapatıp
+                        // konuşmadaki yerine kaydırır.
+                        .onTapGesture {
+                            guard isSearchActive else { return }
+                            let targetId = message.id
+                            withAnimation(DSMotion.snappy) {
+                                isSearchActive = false
+                                searchQuery = ""
+                            }
+                            DispatchQueue.main.async {
+                                withAnimation(reduceMotion ? nil : .default) {
+                                    proxy.scrollTo(targetId, anchor: .center)
+                                }
+                            }
+                        }
+                    }
+
+                    if isSearchActive,
+                       !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty,
+                       visibleMessages.isEmpty {
+                        Text("chat.search.no_results".localized)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, DSSpacing.lg)
                     }
 
                     if viewModel.isLoading {
@@ -402,17 +484,22 @@ struct ChatView: View {
 
             // Büyüyen giriş kapsülü + gömülü gönder butonu
             HStack(alignment: .bottom, spacing: DSSpacing.xxs) {
+                ChatPhotoPickerButton(viewModel: viewModel)
+                    .padding(.leading, DSSpacing.xxs)
+
                 TextField("chat.placeholder".localized, text: $viewModel.inputText, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(1...5)
-                    .padding(.leading, DSSpacing.md)
                     .padding(.vertical, 10)
                     .focused($isInputFocused)
                     .accessibilityIdentifier("chat_input_field")
 
+                ChatMicButton(recognizer: speechRecognizer)
+
                 Button {
                     // Mikro-uçuşun dokunsal eşi: gönderim anında hafif vuruş.
                     DSHaptics.lightImpact()
+                    speechRecognizer.stop()
                     Task {
                         // Eğer görsel seçiliyse görsel ile gönder
                         if viewModel.selectedImage != nil {

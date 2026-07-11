@@ -189,6 +189,14 @@
 "chat.speak" = "Sesli Oku";
 "chat.regenerate" = "Yanıtı Yeniden Oluştur";
 "chat.code" = "kod";
+"chat.export" = "Sohbeti Dışa Aktar";
+"chat.search" = "Sohbette Ara";
+"chat.search.placeholder" = "Mesajlarda ara...";
+"chat.search.count" = "%d sonuç";
+"chat.search.no_results" = "Eşleşen mesaj bulunamadı";
+"chat.mic" = "Sesli soru sor";
+"chat.mic.stop" = "Kaydı durdur";
+"chat.attach_photo" = "Görsel ekle";
 "chat.suggestions.header" = "Başlamak için deneyin";
 "chat.scroll_to_bottom" = "Son mesaja git";
 "chat.clear.title" = "Sohbeti Temizle";

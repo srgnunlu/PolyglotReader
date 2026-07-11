@@ -231,6 +231,26 @@ class ChatViewModel: ObservableObject {
         }
     }
 
+    /// Konuşmayı paylaşılabilir Markdown'a çevirir (hata balonları hariç) —
+    /// toolbar'daki dışa aktarma (ShareLink) bunu kullanır.
+    var exportTranscript: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMMM yyyy HH:mm"
+        formatter.locale = Locale(identifier: "tr_TR")
+
+        var lines = ["# Corio AI Sohbeti", ""]
+        for message in messages where message.isError != true {
+            let speaker = message.role == .user ? "Sen" : "Corio AI"
+            lines.append("**\(speaker)** · \(formatter.string(from: message.timestamp))")
+            lines.append("")
+            lines.append(message.text)
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+        }
+        return lines.joined(separator: "\n")
+    }
+
     // MARK: - Indexleme Yönetimi (P0)
 
     /// RAGService'in indexleme durumunu observe et
