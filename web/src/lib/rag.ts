@@ -1,13 +1,15 @@
 import { getSupabase } from './supabase';
 
-// MARK: - RAG Configuration (matches mobile RAGConfig.swift v3.0)
+// MARK: - RAG Configuration
+// NOT: Bu değerler iOS RAGConfig.swift ile eşitlendi — iki platform aynı
+// soruya aynı chunk setini getirsin. Birini değiştirirsen diğerini de değiştir.
 const RAG_CONFIG = {
-    similarityThreshold: 0.30,      // 0.30: Cross-lingual search için düşürüldü (Türkçe↔İngilizce)
+    similarityThreshold: 0.35,      // iOS ile aynı (cross-lingual recall bandı)
     bm25Weight: 0.35,               // Keyword matching ağırlığı
     vectorWeight: 0.65,             // Semantic search ağırlığı
     rrfK: 60,                       // RRF k parametresi
-    topK: 15,                       // Aday sayısı (10→15: daha fazla chunk ara)
-    rerankTopK: 8,                  // Context'e dahil edilecek chunk (6→8: AI'a daha fazla context)
+    topK: 12,                       // iOS ile aynı aday sayısı
+    rerankTopK: 8,                  // Context'e dahil edilecek chunk (iOS ile aynı)
 };
 
 type DocumentLanguage = 'turkish' | 'english' | 'simple';
@@ -23,10 +25,6 @@ const englishStopWords = new Set([
     'was', 'were', 'to', 'of', 'in', 'on', 'by', 'as', 'it', 'be', 'not',
     'can', 'may', 'should', 'also', 'more', 'less'
 ]);
-
-function embeddingToText(embedding: number[]): string {
-    return `[${embedding.join(',')}]`;
-}
 
 function estimateLanguage(text: string): DocumentLanguage {
     const normalized = text.toLowerCase();
@@ -297,60 +295,24 @@ async function vectorSearch(
     limit: number
 ): Promise<VectorSearchResult[]> {
     const supabase = getSupabase();
-    const embeddingText = embeddingToText(queryEmbedding);
 
-    const attempts = [
-        {
-            name: 'match_document_chunks',
-            params: {
-                query_embedding: queryEmbedding,
-                match_file_id: fileId,
-                match_count: limit
-            }
-        },
-        {
-            name: 'match_document_chunks_v2',
-            params: {
-                query_embedding: queryEmbedding,
-                match_file_id: fileId,
-                match_count: limit,
-                similarity_threshold: RAG_CONFIG.similarityThreshold
-            }
-        },
-        {
-            name: 'match_document_chunks_v2',
-            params: {
-                query_embedding: embeddingText,
-                match_file_id: fileId,
-                match_count: limit,
-                similarity_threshold: RAG_CONFIG.similarityThreshold
-            }
-        },
-        {
-            name: 'match_chunks',
-            params: {
-                query_embedding: queryEmbedding,
-                match_threshold: RAG_CONFIG.similarityThreshold,
-                match_count: limit,
-                file_id: fileId
-            }
-        }
-    ];
+    // Single RPC — the same one iOS calls. The old 4-attempt fallback chain
+    // (match_document_chunks / _v2 / text-encoded embedding) is gone; those
+    // functions are dropped by migration 20260711120100.
+    const { data, error } = await supabase.rpc('match_chunks', {
+        query_embedding: queryEmbedding,
+        match_threshold: RAG_CONFIG.similarityThreshold,
+        match_count: limit,
+        file_id: fileId,
+    });
 
-    let lastError: unknown = null;
-    for (const attempt of attempts) {
-        const { data, error } = await supabase.rpc(attempt.name, attempt.params);
-        if (!error) {
-            const results = (data || []) as VectorSearchResult[];
-            return results.filter(r => r.similarity >= RAG_CONFIG.similarityThreshold);
-        }
-        lastError = error;
+    if (error) {
+        console.error('Vector search error:', error);
+        return [];
     }
 
-    if (lastError) {
-        console.error('Vector search error:', lastError);
-    }
-    return [];
+    const results = (data || []) as VectorSearchResult[];
+    return results.filter(r => r.similarity >= RAG_CONFIG.similarityThreshold);
 }
 
 /**

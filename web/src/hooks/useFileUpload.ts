@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { generatePdfThumbnail } from '@/lib/pdfThumbnail';
+import { indexDocumentFile } from '@/lib/indexing';
 
 interface UploadResult {
     succeeded: string[];
@@ -54,19 +55,33 @@ export function useFileUpload() {
                     // effort — a null result simply falls back to live rendering.
                     const thumbnailBase64 = await generatePdfThumbnail(file);
 
-                    const { error: insertError } = await supabase.from('files').insert({
-                        user_id: user.id,
-                        name: file.name,
-                        storage_path: storagePath,
-                        file_type: 'pdf',
-                        size: file.size,
-                        thumbnail_base64: thumbnailBase64,
-                    });
+                    const { data: inserted, error: insertError } = await supabase
+                        .from('files')
+                        .insert({
+                            user_id: user.id,
+                            name: file.name,
+                            storage_path: storagePath,
+                            file_type: 'pdf',
+                            size: file.size,
+                            thumbnail_base64: thumbnailBase64,
+                        })
+                        .select('id')
+                        .single();
 
                     if (insertError) {
                         // Don't leave an orphaned object behind if metadata insert fails
                         await supabase.storage.from('user_files').remove([storagePath]);
                         throw insertError;
+                    }
+
+                    // Fire-and-forget RAG indexing so the document is chatable
+                    // without needing to be opened on iOS first. Failure is
+                    // non-fatal: chat falls back to broad context until the
+                    // document gets indexed elsewhere.
+                    if (inserted?.id) {
+                        indexDocumentFile(file, inserted.id).catch(err =>
+                            console.error('Background indexing failed:', err)
+                        );
                     }
 
                     result.succeeded.push(file.name);
