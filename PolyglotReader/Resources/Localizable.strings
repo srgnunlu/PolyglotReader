@@ -184,6 +184,9 @@
 /* Deep Search */
 "chat.deep_search" = "Derin Arama";
 "chat.deep_search_active" = "Derin Arama aktif - Yanıtlar daha yavaş olabilir";
+"chat.copy" = "Kopyala";
+"chat.suggestions.header" = "Başlamak için deneyin";
+"chat.scroll_to_bottom" = "Son mesaja git";
 
 /* Indexing Status */
 "chat.indexing.checking" = "Doküman kontrol ediliyor...";
