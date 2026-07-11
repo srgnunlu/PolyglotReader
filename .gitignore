@@ -29,6 +29,7 @@ xcuserdata/
 *.xcscheme
 !default.xcscheme
 *.plist
+!ExportOptions.plist
 !Info.plist
 
 ## Swift Package Manager
