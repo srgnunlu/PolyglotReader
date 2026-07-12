@@ -7,7 +7,7 @@
 - **Faz 1:** ✅ 12/12 tamam. Migrationlar (HNSW index, chats.seq, RLS) prod'a uygulandı ve doğrulandı.
 - **Faz 2:** ✅ Tamam — 2.7 hariç (normal aramada LLM rerank: mesaj başına gecikme+maliyet nedeniyle bilinçli atlandı; Derin Arama toggle'ı bu işi görüyor). Chunk metadata migration'ı prod'da; tam fayda için dokümanların yeniden indekslenmesi gerekir.
 - **Faz 3:** ✅ Tamam — 3.1 "AttributedString'e tam geçiş" yerine hedefli parser yükseltmesi yapıldı (AttributedString tablo/blok kod render edemiyor; tam geçiş regresyon olurdu).
-- **Faz 4:** 4.1 TTS ✅ (Faz 3'te) · 4.2 regenerate ✅ (Faz 3'te) · 4.3 export ✅ · 4.4 STT ✅ · 4.6 chat arama ✅ · 4.8 composer görsel ✅ · **Kalan:** 4.5 iOS multi-doc chat (+ web LibraryChat persist), 4.7 web deep-search toggle + dinamik öneriler, 4.9 formül desteği (uzun vade).
+- **Faz 4:** 4.1 TTS ✅ (Faz 3'te) · 4.2 regenerate ✅ (Faz 3'te) · 4.3 export ✅ · 4.4 STT ✅ · 4.5 multi-doc chat ✅ (iOS LibraryChatView + web persist; chats.file_id NULL satırlar, cross-file RPC'ler prod'da) · 4.6 chat arama ✅ · 4.8 composer görsel ✅ · **Kalan:** 4.7 web deep-search toggle + dinamik öneriler, 4.9 formül desteği (uzun vade), 2.7 normal aramada rerank (bilinçli kapalı).
 
 ---
 
