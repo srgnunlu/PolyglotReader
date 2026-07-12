@@ -11,6 +11,22 @@ class GeminiChatService {
     /// first one's context, so the user could end up talking to the wrong PDF.
     private var sessions: [String: Chat] = [:]
 
+    /// LRU order for `sessions`. Sessions hold full conversation histories
+    /// (plus up to 100k chars of PDF text in legacy mode), so without a cap
+    /// they accumulate for every document opened in the app's lifetime.
+    private var sessionAccessOrder: [String] = []
+    private let maxLiveSessions = 5
+
+    private func touchSession(_ fileId: String) {
+        sessionAccessOrder.removeAll { $0 == fileId }
+        sessionAccessOrder.append(fileId)
+        while sessions.count > maxLiveSessions, let oldest = sessionAccessOrder.first {
+            sessionAccessOrder.removeFirst()
+            sessions.removeValue(forKey: oldest)
+            logDebug("GeminiChatService", "LRU session tahliye edildi", details: "File: \(oldest)")
+        }
+    }
+
     // Status properties managed by Facade, but service can expose async methods
     // The Service is NOT ObservableObject, the Facade is.
 
@@ -43,6 +59,7 @@ class GeminiChatService {
         }
 
         sessions[fileId] = model.startChat(history: history)
+        touchSession(fileId)
         #if DEBUG
         let mode = pdfContent == nil ? "RAG" : "Legacy"
         logDebug("GeminiChatService", "Chat oturumu başlatıldı", details: "Mode: \(mode), File: \(fileId)")
@@ -51,10 +68,12 @@ class GeminiChatService {
 
     func resetChatSession(fileId: String) {
         sessions.removeValue(forKey: fileId)
+        sessionAccessOrder.removeAll { $0 == fileId }
     }
 
     func resetAllSessions() {
         sessions.removeAll()
+        sessionAccessOrder.removeAll()
     }
 
     func isSessionInitialized(fileId: String) -> Bool {
@@ -66,6 +85,7 @@ class GeminiChatService {
     /// document isolated and avoids `sessionNotInitialized` race conditions.
     private func session(for fileId: String) -> Chat {
         if let chat = sessions[fileId] {
+            touchSession(fileId)
             return chat
         }
         let history: [ModelContent] = [
@@ -78,7 +98,42 @@ class GeminiChatService {
         ]
         let chat = model.startChat(history: history)
         sessions[fileId] = chat
+        touchSession(fileId)
         return chat
+    }
+
+    /// Injects previously persisted chat turns into the session history so the
+    /// model remembers earlier conversations after an app restart. Without this,
+    /// the UI shows the old messages but the model starts from a blank session.
+    /// Only runs while the session is still fresh (seed pair only) — once real
+    /// turns exist in memory, they are already the source of truth.
+    func seedPersistedHistory(fileId: String, turns: [(role: String, text: String)]) {
+        guard !turns.isEmpty else { return }
+        let chat = session(for: fileId)
+        guard chat.history.count <= 2 else { return }
+
+        var appended: [ModelContent] = []
+        for turn in turns {
+            let role = turn.role == "user" ? "user" : "model"
+            // The SDK expects strictly alternating roles starting with "user"
+            // after the seed model reply; skip turns that would break that.
+            if appended.isEmpty && role != "user" { continue }
+            if let last = appended.last, last.role == role { continue }
+            appended.append(ModelContent(role: role, parts: [.text(turn.text)]))
+        }
+        // History must end on a model turn before the next user message.
+        if appended.last?.role == "user" { appended.removeLast() }
+        guard !appended.isEmpty else { return }
+
+        chat.history = Self.trimmedHistory(
+            chat.history + appended,
+            maxTokens: GeminiConfig.maxHistoryTokens
+        )
+        logInfo(
+            "GeminiChatService",
+            "Kalıcı chat geçmişi oturuma yüklendi",
+            details: "\(appended.count) mesaj, File: \(fileId)"
+        )
     }
 
     // MARK: - History Budgeting
@@ -223,6 +278,52 @@ class GeminiChatService {
     ) -> AsyncThrowingStream<String, Error> {
         let fullMessage = buildEnhancedPrompt(message: message, context: context)
         return sendMessageStream(fullMessage, fileId: fileId)
+    }
+
+    // MARK: - Library Chat (multi-document)
+
+    /// Kütüphane sohbeti tek sanal oturumda yaşar (dosya oturumlarıyla
+    /// karışmaz); LRU tahliyesine diğerleri gibi tabidir.
+    static let librarySessionKey = "library_chat"
+
+    func sendLibraryMessageStream(_ message: String, context: String) -> AsyncThrowingStream<String, Error> {
+        let prompt = context.isEmpty
+            ? message
+            : buildLibraryPrompt(message: message, context: context)
+        return sendMessageStream(prompt, fileId: Self.librarySessionKey)
+    }
+
+    func resetLibrarySession() {
+        resetChatSession(fileId: Self.librarySessionKey)
+    }
+
+    /// Web'deki buildLibraryPrompt (web/src/lib/gemini.ts) ile hizalı —
+    /// iki platform kütüphane sorularına aynı kurallarla yanıt versin.
+    private func buildLibraryPrompt(message: String, context: String) -> String {
+        """
+        # Kütüphane Bölümleri
+        Aşağıda kullanıcının sorusuyla ilgili, kütüphanedeki **birden fazla dokümandan** \
+        alınan bölümler yer almaktadır. Her bölümün başında kaynak dosya adı ve sayfası belirtilmiştir.
+
+        \(context)
+
+        ---
+
+        ## Kullanıcı Sorusu
+        \(message)
+
+        ---
+
+        ## Yanıt Kuralları
+        - **SADECE** yukarıdaki doküman bölümlerini kullan; dış bilgi veya varsayım YAPMA
+        - Her önemli bilgi için kaynağı belirt: dosya adı ve sayfa — örn. "(rapor.pdf, Sayfa 4)"
+        - Farklı dokümanlardan gelen bilgileri karşılaştırırken hangi dosyadan geldiğini netleştir
+        - Doküman İngilizce, soru Türkçe olabilir: terimlerin Türkçe karşılığını da ver
+        - Akademik ama anlaşılır Türkçe kullan; gereksiz tekrardan kaçın
+        - Eğer konu hiçbir dokümanda yoksa: "Kütüphanenizdeki dokümanlar bu konuda bilgi içermiyor." de — ASLA uydurma
+
+        Şimdi yukarıdaki kurallara uyarak soruyu yanıtla:
+        """
     }
 
     // MARK: - Image Questions

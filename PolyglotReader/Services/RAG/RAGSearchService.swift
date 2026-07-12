@@ -261,6 +261,15 @@ class RAGSearchService {
         }
     }
 
+    /// FTS dili: sorgu Türkçe karakter içeriyorsa turkish, aksi halde english
+    /// (sorgular aramadan önce İngilizceye çevrildiği için baskın durum bu).
+    /// Bilinmeyen config'ler SQL tarafında 'simple'a düşer.
+    private func ftsLanguage(for query: String) -> String {
+        query.range(of: "[çğıöşüÇĞİÖŞÜ]", options: .regularExpression) != nil
+            ? "turkish"
+            : "english"
+    }
+
     private func fetchVectorResults(
         fileId: UUID,
         embedding: [Float],
@@ -277,10 +286,14 @@ class RAGSearchService {
             DocumentChunk(
                 id: result.id,
                 fileId: fileId,
-                chunkIndex: 0,
+                chunkIndex: result.chunkIndex ?? 0,
                 content: result.content,
                 pageNumber: result.pageNumber,
-                similarity: result.similarity
+                similarity: result.similarity,
+                sectionTitle: result.sectionTitle,
+                contentType: ChunkContentType(rawValue: result.contentType ?? "") ?? .text,
+                containsTable: result.containsTable,
+                containsList: result.containsList
             )
         }
     }
@@ -294,16 +307,21 @@ class RAGSearchService {
             let bm25RawResults = try await SupabaseService.shared.searchChunksBM25(
                 fileId: fileId.uuidString,
                 query: query,
-                limit: topK
+                limit: topK,
+                language: ftsLanguage(for: query)
             )
             return bm25RawResults.map { result in
                 DocumentChunk(
                     id: result.id ?? UUID(),
                     fileId: fileId,
-                    chunkIndex: 0,
+                    chunkIndex: result.chunkIndex ?? 0,
                     content: result.content,
                     pageNumber: result.pageNumber,
-                    similarity: result.score
+                    similarity: result.score,
+                    sectionTitle: result.sectionTitle,
+                    contentType: ChunkContentType(rawValue: result.contentType ?? "") ?? .text,
+                    containsTable: result.containsTable,
+                    containsList: result.containsList
                 )
             }
         } catch {

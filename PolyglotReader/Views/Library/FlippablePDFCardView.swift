@@ -2,13 +2,18 @@ import SwiftUI
 
 // MARK: - Flippable PDF Card View
 /// PDF kartı için 3D flip animasyonlu wrapper
-/// Long press + drag ile kartı çevirerek AI özetini gösterir
+/// Sağ üstteki sparkle butonuyla kart çevrilir ve AI özeti gösterilir
 struct FlippablePDFCardView: View {
     let file: PDFDocumentMetadata
     let onTap: () -> Void
     let onDelete: () -> Void
-    let onGenerateSummary: (_ force: Bool) -> Void
+    /// Async: kart, üretim bitene (veya hata alana) kadar spinner gösterir,
+    /// sonra durumu sıfırlar — başarısızlıkta sonsuz "hazırlanıyor" kalmaz.
+    let onGenerateSummary: (_ force: Bool) async -> Void
     var onMoveToFolder: ((Folder?) -> Void)?
+    var onRename: (() -> Void)?
+    var onShare: (() -> Void)?
+    var onToggleFavorite: (() -> Void)?
     var availableFolders: [Folder] = []
     var isThumbnailLoading: Bool = false
 
@@ -41,9 +46,17 @@ struct FlippablePDFCardView: View {
         .compositingGroup() // Opacity ve blending optimizasyonu
         .onChange(of: isFlipped) { newValue in
             if newValue && file.summary == nil && !isGeneratingSummary {
-                isGeneratingSummary = true
-                onGenerateSummary(false)
+                generateSummary(force: false)
             }
+        }
+    }
+
+    /// Üretimi başlatır ve tamamlanınca (başarı ya da hata) spinner durumunu kapatır.
+    private func generateSummary(force: Bool) {
+        isGeneratingSummary = true
+        Task {
+            await onGenerateSummary(force)
+            isGeneratingSummary = false
         }
     }
 
@@ -54,6 +67,9 @@ struct FlippablePDFCardView: View {
             onTap: onTap,
             onDelete: onDelete,
             onMoveToFolder: onMoveToFolder,
+            onRename: onRename,
+            onShare: onShare,
+            onToggleFavorite: onToggleFavorite,
             availableFolders: availableFolders,
             isThumbnailLoading: isThumbnailLoading
         )
@@ -166,8 +182,7 @@ struct FlippablePDFCardView: View {
 
                         // Yeniden oluştur butonu
                         Button {
-                            isGeneratingSummary = true
-                            onGenerateSummary(true)
+                            generateSummary(force: true)
                         } label: {
                             Image(systemName: "arrow.trianglehead.2.clockwise")
                                 .font(.system(size: 10, weight: .semibold))
@@ -210,7 +225,7 @@ struct FlippablePDFCardView: View {
                 sparklePulse
             }
 
-            Text("Özet hazırlanıyor...")
+            Text("pdf_card.summary.loading".localized)
                 .font(Font.system(.caption, design: .rounded).weight(.medium))
                 .foregroundStyle(.secondary)
         }
@@ -257,18 +272,17 @@ struct FlippablePDFCardView: View {
                     )
                 )
 
-            Text("Henüz özet yok")
+            Text("pdf_card.summary.empty".localized)
                 .font(.system(size: 12, weight: .medium, design: .rounded))
                 .foregroundStyle(.secondary)
 
             Button {
-                isGeneratingSummary = true
-                onGenerateSummary(false)
+                generateSummary(force: false)
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "sparkle")
                         .font(.system(size: 10, weight: .bold))
-                    Text("Oluştur")
+                    Text("pdf_card.summary.generate".localized)
                         .font(.system(size: 11, weight: .semibold))
                 }
                 .foregroundStyle(.white)
@@ -345,11 +359,11 @@ enum DocumentCategory {
 
     var displayName: String {
         switch self {
-        case .medical: return "Tıbbi"
-        case .legal: return "Hukuki"
-        case .finance: return "Finansal"
-        case .academic: return "Akademik"
-        case .technical: return "Teknik"
+        case .medical: return "pdf_card.category.medical".localized
+        case .legal: return "pdf_card.category.legal".localized
+        case .finance: return "pdf_card.category.finance".localized
+        case .academic: return "pdf_card.category.academic".localized
+        case .technical: return "pdf_card.category.technical".localized
         }
     }
 

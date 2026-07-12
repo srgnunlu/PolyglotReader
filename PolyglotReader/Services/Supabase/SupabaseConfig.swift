@@ -123,6 +123,17 @@ struct FileRecord: Decodable {
     let summary: String?
     let folder_id: String?
     let ai_category: String?
+    let is_favorite: Bool?
+    let page_count: Int?
+    let deleted_at: String?
+    /// Embedded via `reading_progress(page, updated_at)` — RLS nedeniyle en
+    /// fazla kullanıcının kendi tek satırı gelir.
+    let reading_progress: [ReadingProgressEmbed]?
+
+    struct ReadingProgressEmbed: Decodable {
+        let page: Int
+        let updated_at: String?
+    }
 }
 
 /// File insert payload

@@ -59,6 +59,8 @@ function ReaderContent({ documentId }: { documentId: string }) {
   const supabase = getSupabase();
   const viewerRef = useRef<HTMLDivElement>(null);
   const mouseIdleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Chat citation'ları PDF'te sayfaya atlatır; PDFViewer register eder.
+  const goToPageRef = useRef<((page: number) => void) | null>(null);
   const {
     annotations, selectedColor, setSelectedColor, addAnnotation,
     loadFileAnnotations, reset: resetAnnotations,
@@ -396,6 +398,7 @@ function ReaderContent({ documentId }: { documentId: string }) {
             onTextSelect={handleTextSelect}
             onImageSelect={handleImageSelect}
             onPageChange={(page: number) => setCurrentPage(page)}
+            onRegisterGoToPage={(fn: (page: number) => void) => { goToPageRef.current = fn; }}
             onTotalPagesChange={setTotalPages}
             onScaleChange={setPdfScale}
             onProgressChange={handleProgressChange}
@@ -441,7 +444,8 @@ function ReaderContent({ documentId }: { documentId: string }) {
           initialMessage={chatInitialMessage} initialImage={chatInitialImage}
           activeSelection={chatSelectedText}
           onClearInitialMessage={() => { setChatInitialMessage(undefined); setChatInitialImage(undefined); }}
-          onClearSelection={handleClearChatSelection} />
+          onClearSelection={handleClearChatSelection}
+          onNavigateToPage={(page: number) => goToPageRef.current?.(page)} />
       </div>
 
       {/* Bottom bar — reading progress summary */}

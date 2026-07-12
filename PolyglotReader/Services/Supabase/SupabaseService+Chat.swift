@@ -38,4 +38,27 @@ extension SupabaseService {
             try await database.deleteChats(fileId: fileId)
         }
     }
+
+    // MARK: - Library Chat (multi-document)
+
+    func saveLibraryChatMessage(role: String, content: String) async throws {
+        guard let userId = currentUser?.id else { throw authenticationRequiredError() }
+        try await perform(category: .database) {
+            try await database.saveLibraryChat(userId: userId, role: role, content: content)
+        }
+    }
+
+    func getLibraryChatHistory() async throws -> [ChatMessage] {
+        guard let userId = currentUser?.id else { throw authenticationRequiredError() }
+        return try await perform(category: .database) {
+            try await database.getLibraryChats(userId: userId)
+        }
+    }
+
+    func deleteLibraryChats() async throws {
+        guard let userId = currentUser?.id else { throw authenticationRequiredError() }
+        try await perform(category: .database) {
+            try await database.deleteLibraryChats(userId: userId)
+        }
+    }
 }

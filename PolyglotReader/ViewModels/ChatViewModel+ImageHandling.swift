@@ -75,6 +75,10 @@ extension ChatViewModel {
             let history = try await supabaseService.getChatHistory(fileId: fileId)
             if !history.isEmpty {
                 messages = history
+                // Feed the persisted turns into the Gemini session so the model
+                // also remembers the conversation, not just the UI.
+                let turns = history.map { (role: $0.role.rawValue, text: $0.text) }
+                geminiService.seedPersistedChatHistory(fileId: fileId, turns: turns)
             }
         } catch {
             logWarning("ChatViewModel", "Chat geçmişi yüklenemedi", details: error.localizedDescription)

@@ -131,6 +131,36 @@ final class SupabaseStorageService {
         return "\(userId.lowercased())/\(timestamp)_\(sanitizedName)"
     }
 
+    // MARK: - Thumbnail Operations
+
+    /// PDF'in yanında saklanan küçük kapak görselinin yolu.
+    /// Uzantı ekleme yaklaşımı parse gerektirmez ve çakışma üretmez.
+    static func thumbnailPath(forFileStoragePath storagePath: String) -> String {
+        storagePath + ".thumb.jpg"
+    }
+
+    /// Kapak JPEG'ini PDF'in yanına yükler. `upsert: true` — legacy backfill
+    /// tekrar denendiğinde 409 üretmesin.
+    func uploadThumbnail(_ data: Data, forFileStoragePath storagePath: String) async throws {
+        try await client.storage
+            .from(Self.bucketName)
+            .upload(
+                Self.thumbnailPath(forFileStoragePath: storagePath),
+                data: data,
+                options: .init(contentType: "image/jpeg", upsert: true)
+            )
+    }
+
+    /// Kapak JPEG'ini indirir; yoksa hata fırlatır (çağıran taraf tam PDF'e düşer).
+    func downloadThumbnail(forFileStoragePath storagePath: String) async throws -> Data {
+        try await downloadFile(path: Self.thumbnailPath(forFileStoragePath: storagePath))
+    }
+
+    /// Kapak JPEG'ini siler (dosya silme temizliği; yoksa hata önemsizdir).
+    func deleteThumbnail(forFileStoragePath storagePath: String) async throws {
+        try await deleteFile(path: Self.thumbnailPath(forFileStoragePath: storagePath))
+    }
+
     // MARK: - Download Operations
 
     /// Get a signed URL for file download

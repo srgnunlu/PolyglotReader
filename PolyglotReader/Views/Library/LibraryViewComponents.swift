@@ -111,9 +111,54 @@ struct EmptyLibraryView: View {
     }
 }
 
+// MARK: - Library Skeleton Grid
+/// İlk yüklemede spinner yerine kart iskeletleri — algılanan hız artar,
+/// içerik geldiğinde yerleşim zıplamaz.
+struct LibrarySkeletonGrid: View {
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: [
+                GridItem(.adaptive(minimum: 160), spacing: 16)
+            ], spacing: 16) {
+                ForEach(0..<6, id: \.self) { _ in
+                    VStack(alignment: .leading, spacing: 0) {
+                        SkeletonBlock()
+                            .frame(height: 130)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            SkeletonBlock()
+                                .frame(height: 14)
+                                .clipShape(Capsule())
+
+                            SkeletonBlock()
+                                .frame(width: 110, height: 10)
+                                .clipShape(Capsule())
+                        }
+                        .padding(14)
+                    }
+                    .background {
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color(.secondarySystemBackground).opacity(0.6))
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
+        .scrollIndicators(.hidden)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("accessibility.loading".localized)
+    }
+}
+
 // MARK: - Uploading Overlay
 struct UploadingOverlay: View {
     let progress: Double
+    /// Çoklu yükleme kuyruğu (1-bazlı). `queueTotal > 1` ise "3/10" satırı görünür.
+    var queueIndex: Int = 0
+    var queueTotal: Int = 0
     @State private var isAnimating = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -143,6 +188,14 @@ struct UploadingOverlay: View {
                     }
                 }
                 .accessibilityHidden(true)
+
+                if queueTotal > 1 {
+                    Text("library.upload.queue".localized(with: queueIndex, queueTotal))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText(value: Double(queueIndex)))
+                        .dsAnimation(DSMotion.snappy, value: queueIndex)
+                }
 
                 Text(
                     isFinishing
@@ -192,5 +245,42 @@ struct UploadingOverlay: View {
                 )
         }
         .onAppear { isAnimating = true }
+    }
+}
+
+// MARK: - Undo Snackbar
+/// Taşıma sonrası alttan beliren "Geri Al" çubuğu; 5 sn sonra VM kendiliğinden kapatır.
+struct UndoSnackbar: View {
+    let message: String
+    var onUndo: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "folder.fill")
+                .font(.subheadline)
+                .foregroundStyle(DSColor.brand)
+
+            Text(message)
+                .font(.subheadline)
+                .lineLimit(1)
+                .foregroundStyle(.primary)
+
+            Spacer(minLength: 8)
+
+            Button("library.undo".localized, action: onUndo)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(DSColor.brand)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(.white.opacity(0.2), lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 4)
+        .padding(.horizontal, 20)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("library.undo.accessibility".localized(with: message))
     }
 }

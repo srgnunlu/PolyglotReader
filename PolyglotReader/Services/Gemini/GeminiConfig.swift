@@ -38,7 +38,7 @@ enum GeminiConfig {
     ## KALİTE STANDARTLARI:
     - Spekülasyon yapma, sadece dokümandaki bilgilere dayan
     - İstatistiksel verileri doğru aktar (p-değeri, güven aralığı vb.)
-    - Metodolojik detayları atla
+    - Metodolojik detayları atlama
     - Karmaşık kavramları basitçe açıkla
     """
     private static var systemInstruction: ModelContent {

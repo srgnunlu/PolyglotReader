@@ -43,6 +43,28 @@ extension SupabaseService {
         }
     }
 
+    /// Kullanıcının tüm klasörleri (hiyerarşik seçici için, seviye filtresiz).
+    func listAllFolders() async throws -> [Folder] {
+        guard let userId = currentUser?.id else {
+            throw authenticationRequiredError()
+        }
+        return try await perform(category: .database) {
+            try await database.getAllFolders(userId: userId)
+        }
+    }
+
+    func updateFolder(id: String, name: String, color: String) async throws {
+        try await perform(category: .database) {
+            try await database.updateFolder(id: id, name: name, color: color)
+        }
+    }
+
+    func updateFolderIcon(id: String, icon: String?) async throws {
+        try await perform(category: .database) {
+            try await database.updateFolderIcon(id: id, icon: icon)
+        }
+    }
+
     // MARK: - Tag Operations
 
     func getFileTags(fileId: String) async throws -> [Tag] {

@@ -7,7 +7,7 @@ extension SupabaseService {
 
     func saveDocumentChunks(
         fileId: String,
-        chunks: [(content: String, embedding: [Float], pageNumber: Int?)]
+        chunks: [SupabaseChunkInsert]
     ) async throws {
         try await perform(category: .database) {
             try await database.saveDocumentChunks(fileId: fileId, chunks: chunks)
@@ -34,7 +34,12 @@ extension SupabaseService {
                 id: $0.id,
                 content: $0.content,
                 similarity: $0.similarity,
-                pageNumber: $0.page_number
+                pageNumber: $0.page_number,
+                chunkIndex: $0.chunk_index,
+                sectionTitle: $0.section_title,
+                contentType: $0.content_type,
+                containsTable: $0.contains_table ?? false,
+                containsList: $0.contains_list ?? false
             )
         }
     }
@@ -42,13 +47,15 @@ extension SupabaseService {
     func searchChunksBM25(
         fileId: String,
         query: String,
-        limit: Int
+        limit: Int,
+        language: String = "simple"
     ) async throws -> [ChunkBM25SearchResult] {
         let results = try await perform(category: .database) {
             try await executeBM25Search(
                 fileId: fileId,
                 query: query,
-                limit: limit
+                limit: limit,
+                language: language
             )
         }
 
@@ -57,7 +64,12 @@ extension SupabaseService {
                 id: $0.id,
                 content: $0.content,
                 score: $0.rank,
-                pageNumber: $0.page_number
+                pageNumber: $0.page_number,
+                chunkIndex: $0.chunk_index,
+                sectionTitle: $0.section_title,
+                contentType: $0.content_type,
+                containsTable: $0.contains_table ?? false,
+                containsList: $0.contains_list ?? false
             )
         }
     }
@@ -91,6 +103,46 @@ extension SupabaseService {
         }
     }
 
+    // MARK: - Library (multi-document) search
+
+    func searchLibraryChunksVector(
+        fileIds: [String],
+        embedding: [Float],
+        limit: Int,
+        similarityThreshold: Float
+    ) async throws -> [SupabaseLibraryVectorResult] {
+        try await perform(category: .database) {
+            try await self.client
+                .rpc("match_chunks_library", params: SupabaseLibraryVectorParams(
+                    query_embedding: embedding,
+                    match_threshold: similarityThreshold,
+                    match_count: limit,
+                    file_ids: fileIds
+                ))
+                .execute()
+                .value
+        }
+    }
+
+    func searchLibraryChunksBM25(
+        fileIds: [String],
+        query: String,
+        limit: Int,
+        language: String
+    ) async throws -> [SupabaseLibraryBM25Result] {
+        try await perform(category: .database) {
+            try await self.client
+                .rpc("search_chunks_bm25_library", params: SupabaseLibraryBM25Params(
+                    search_query: query,
+                    file_ids: fileIds,
+                    match_count: limit,
+                    search_language: language
+                ))
+                .execute()
+                .value
+        }
+    }
+
     // MARK: - Private Helpers
 
     private func executeMatchChunks(
@@ -115,12 +167,14 @@ extension SupabaseService {
     private func executeBM25Search(
         fileId: String,
         query: String,
-        limit: Int
+        limit: Int,
+        language: String
     ) async throws -> [SupabaseBM25Result] {
         let params = SupabaseBM25Params(
             search_file_id: fileId,
             search_query: query,
-            match_count: limit
+            match_count: limit,
+            search_language: language
         )
 
         return try await client

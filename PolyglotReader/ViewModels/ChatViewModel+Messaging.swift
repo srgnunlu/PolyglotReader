@@ -44,10 +44,15 @@ extension ChatViewModel {
 
     private func handleStandardMessage(_ userText: String) async {
         enqueueUserMessage(userText)
-        isLoading = true
+        await runTrackedStream(for: userText)
+    }
 
-        // Run the stream inside a tracked task so cancelActiveStream() can
-        // tear it down (new message sent, or the chat sheet is dismissed).
+    /// Runs the response stream inside a tracked task so cancelActiveStream()
+    /// can tear it down (new message sent, or the chat sheet is dismissed).
+    /// Does NOT enqueue the user message — callers decide (send enqueues,
+    /// retry/regenerate reuse the bubble already on screen).
+    private func runTrackedStream(for userText: String) async {
+        isLoading = true
         let task = Task { [weak self] in
             guard let self else { return }
             await self.streamAndPersistResponse(for: userText)
@@ -57,6 +62,33 @@ extension ChatViewModel {
         if activeStreamTask == task {
             activeStreamTask = nil
         }
+    }
+
+    /// Inline retry from the error bubble: drops the error bubble and streams
+    /// again without re-appending the user message.
+    func retryLastFailedMessage() async {
+        guard !isLoading, let userText = pendingRetryText else { return }
+        pendingRetryText = nil
+        if let last = messages.last, last.isError == true {
+            messages.removeLast()
+        }
+        await runTrackedStream(for: userText)
+    }
+
+    /// Regenerates the answer to the most recent user message. Model bubbles
+    /// after that message are removed from the UI; the previously persisted
+    /// answer stays in the chats table (no single-row delete path), so a
+    /// reload can show both answers — accepted limitation.
+    func regenerateLastResponse() async {
+        guard !isLoading else { return }
+        guard let lastUserIndex = messages.lastIndex(where: { $0.role == .user }) else { return }
+
+        cancelActiveStream()
+        let userText = messages[lastUserIndex].text
+        if lastUserIndex + 1 < messages.count {
+            messages.removeSubrange((lastUserIndex + 1)...)
+        }
+        await runTrackedStream(for: userText)
     }
 
     private func streamAndPersistResponse(for userText: String) async {
@@ -74,8 +106,9 @@ extension ChatViewModel {
                 isLoading = false
                 return
             }
+            pendingRetryText = userText
             let retryAction = { [weak self] in
-                Task { await self?.handleStandardMessage(userText) }
+                Task { await self?.retryLastFailedMessage() }
                 return
             }
             handleError(error, retryAction: retryAction)
@@ -157,12 +190,23 @@ extension ChatViewModel {
                     content: content
                 )
             } catch {
-                // Log on main actor if needed but don't block
+                // Persist failed (offline or transient): queue the message so
+                // it syncs when connectivity returns instead of being lost.
+                // SyncQueue already knows how to replay .chatMessage payloads.
                 await MainActor.run {
                     logWarning(
                         "ChatViewModel",
-                        "Chat mesajı kaydedilemedi",
+                        "Chat mesajı kaydedilemedi, sync kuyruğuna alındı",
                         details: error.localizedDescription
+                    )
+                    let message = ChatMessage(
+                        role: role == "user" ? .user : .model,
+                        text: content
+                    )
+                    try? SyncQueue.shared.enqueue(
+                        type: .chatMessage,
+                        object: message,
+                        fileId: fileIdCopy
                     )
                 }
             }
@@ -183,7 +227,7 @@ extension ChatViewModel {
         )
         let prefix = NSLocalizedString("chat.error.prefix", comment: "")
         let errorText = "\(prefix) \(appError.localizedDescription)"
-        let errorMsg = ChatMessage(role: .model, text: errorText)
+        let errorMsg = ChatMessage(role: .model, text: errorText, isError: true)
         messages.append(errorMsg)
     }
 

@@ -6,18 +6,23 @@ import SwiftUI
 struct MarkdownView: View {
     let text: String
     let onNavigateToPage: (Int) -> Void
-    
+
+    /// Tablo sütun genişliği Dynamic Type ile ölçeklenir — sabit 130pt büyük
+    /// yazı boyutlarında hücre metnini kırpıyordu.
+    @ScaledMetric(relativeTo: .caption) private var tableColumnWidth: CGFloat = 130
+
     // Cached parsed blocks to avoid re-parsing on every render
     private var parsedBlocks: [BlockType] {
         Self.cachedParse(text)
     }
-    
-    // Simple in-memory cache for parsed markdown
-    private static var parseCache: [Int: [BlockType]] = [:]
+
+    // Simple in-memory cache for parsed markdown. Keyed by the full text —
+    // hashValue keys could silently collide and render the wrong message.
+    private static var parseCache: [String: [BlockType]] = [:]
     private static let maxCacheSize = 50
-    
+
     private static func cachedParse(_ text: String) -> [BlockType] {
-        let key = text.hashValue
+        let key = text
 
         if let cached = parseCache[key] {
             return cached
@@ -58,10 +63,11 @@ struct MarkdownView: View {
     static let jumpLinkScheme = "coriojump"
 
     /// Model her zaman [Sayfa X](jump:X) formatına uymuyor; düz metin kalan
-    /// "Sayfa 12" atıflarını tıklanabilir jump linklerine çevirir. Zaten link
-    /// olan atıflara ("[" ile başlayanlara) dokunmaz.
+    /// "Sayfa 12" / "Page 12" atıflarını tıklanabilir jump linklerine çevirir.
+    /// Zaten link olan atıflara ("[" ile başlayanlara) dokunmaz.
     private static let pageCitationRegex = try? NSRegularExpression(
-        pattern: #"(?<!\[)Sayfa\s+(\d{1,4})"#
+        pattern: #"(?<!\[)(Sayfa|Page)\s+(\d{1,4})"#,
+        options: [.caseInsensitive]
     )
 
     static func linkifyPageCitations(_ text: String) -> String {
@@ -70,7 +76,7 @@ struct MarkdownView: View {
         return regex.stringByReplacingMatches(
             in: text,
             range: range,
-            withTemplate: "[Sayfa $1](jump:$1)"
+            withTemplate: "[$1 $2](jump:$2)"
         )
     }
 
@@ -82,7 +88,7 @@ struct MarkdownView: View {
         case table(headers: [String], rows: [[String]])
         case bulletList(items: [String])
         case numberedList(items: [String])
-        case codeBlock(code: String)
+        case codeBlock(code: String, language: String?)
         case blockquote(text: String)
         case divider
 
@@ -93,7 +99,7 @@ struct MarkdownView: View {
             case .table(let headers, let rows): return "t_\(headers.joined().hashValue)_\(rows.count)"
             case .bulletList(let items): return "bl_\(items.joined().hashValue)"
             case .numberedList(let items): return "nl_\(items.joined().hashValue)"
-            case .codeBlock(let code): return "cb_\(code.hashValue)"
+            case .codeBlock(let code, _): return "cb_\(code.hashValue)"
             case .blockquote(let text): return "bq_\(text.hashValue)"
             case .divider: return "div_static"
             }
@@ -182,7 +188,9 @@ struct MarkdownView: View {
     }
 
     private static func parseHeading(_ line: String) -> BlockType? {
-        if line.hasPrefix("### ") {
+        if line.hasPrefix("#### ") {
+            return .heading(level: 4, text: String(line.dropFirst(5)))
+        } else if line.hasPrefix("### ") {
             return .heading(level: 3, text: String(line.dropFirst(4)))
         } else if line.hasPrefix("## ") {
             return .heading(level: 2, text: String(line.dropFirst(3)))
@@ -279,6 +287,11 @@ struct MarkdownView: View {
         var code = ""
         var consumed = 1 // opening ```
 
+        // ```swift gibi açılış çitindeki dil etiketi başlıkta gösterilir.
+        let fence = lines[0].trimmingCharacters(in: .whitespaces)
+        let languageTag = String(fence.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+        let language = languageTag.isEmpty ? nil : languageTag
+
         for i in 1..<lines.count {
             let line = lines[i]
             if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
@@ -289,7 +302,7 @@ struct MarkdownView: View {
             consumed += 1
         }
 
-        return (.codeBlock(code: code), consumed)
+        return (.codeBlock(code: code, language: language), consumed)
     }
 
     private static func parseBlockquote(lines: [String]) -> (BlockType, Int) {
@@ -330,8 +343,8 @@ struct MarkdownView: View {
         case .numberedList(let items):
             renderNumberedList(items)
 
-        case .codeBlock(let code):
-            renderCodeBlock(code)
+        case .codeBlock(let code, let language):
+            renderCodeBlock(code, language: language)
 
         case .blockquote(let text):
             renderBlockquote(text)
@@ -346,7 +359,7 @@ struct MarkdownView: View {
         HStack(spacing: 6) {
             if level <= 2 {
                 Rectangle()
-                    .fill(Color.indigo)
+                    .fill(DSColor.brand)
                     .frame(width: 3)
             }
             renderInlineText(text)
@@ -367,8 +380,10 @@ struct MarkdownView: View {
         var remaining = text
 
         while !remaining.isEmpty {
-            // Check for page links [Sayfa X](jump:X)
-            if let linkMatch = remaining.range(of: #"\[([^\]]+)\]\(jump:(\d+)\)"#, options: .regularExpression) {
+            // Any markdown link: [label](jump:N) page citations AND standard
+            // [label](https://…) web links — the latter previously rendered
+            // as dead plain text.
+            if let linkMatch = remaining.range(of: #"\[([^\]]+)\]\(([^)\s]+)\)"#, options: .regularExpression) {
                 let before = String(remaining[..<linkMatch.lowerBound])
                 if !before.isEmpty {
                     result = result + parseBasicFormatting(before)
@@ -376,19 +391,28 @@ struct MarkdownView: View {
 
                 let linkText = String(remaining[linkMatch])
                 if let labelRange = linkText.range(of: #"\[([^\]]+)\]"#, options: .regularExpression),
-                   let pageRange = linkText.range(of: #"jump:(\d+)"#, options: .regularExpression) {
+                   let targetRange = linkText.range(of: #"\(([^)\s]+)\)$"#, options: .regularExpression) {
                     let label = String(linkText[labelRange]).dropFirst().dropLast()
-                    let pageString = String(linkText[pageRange]).replacingOccurrences(of: "jump:", with: "")
+                    let target = String(linkText[targetRange]).dropFirst().dropLast()
 
-                    // Build a tappable link; the OpenURLAction on `body` handles navigation.
                     var attributed = AttributedString(String(label))
-                    attributed.foregroundColor = .indigo
-                    attributed.underlineStyle = Text.LineStyle.single
-                    if let page = Int(pageString),
-                       let url = URL(string: "\(Self.jumpLinkScheme)://\(page)") {
+                    if target.hasPrefix("jump:"), let page = Int(target.dropFirst(5)) {
+                        // Page citation; OpenURLAction on `body` handles navigation.
+                        attributed.foregroundColor = DSColor.brand
+                        attributed.underlineStyle = Text.LineStyle.single
+                        attributed.link = URL(string: "\(Self.jumpLinkScheme)://\(page)")
+                        result = result + Text(attributed)
+                    } else if target.hasPrefix("http://") || target.hasPrefix("https://"),
+                              let url = URL(string: String(target)) {
+                        // Standard web link; falls through OpenURLAction to Safari.
+                        attributed.foregroundColor = DSColor.brand
+                        attributed.underlineStyle = Text.LineStyle.single
                         attributed.link = url
+                        result = result + Text(attributed)
+                    } else {
+                        // Unknown scheme: keep readable plain label.
+                        result = result + parseBasicFormatting(String(label))
                     }
-                    result = result + Text(attributed)
                 }
 
                 remaining = String(remaining[linkMatch.upperBound...])
@@ -408,6 +432,21 @@ struct MarkdownView: View {
         var remaining = text
 
         while !remaining.isEmpty {
+            // Strikethrough: ~~text~~
+            if let strikeRange = remaining.range(of: #"~~([^~]+)~~"#, options: .regularExpression) {
+                let before = String(remaining[..<strikeRange.lowerBound])
+                if !before.isEmpty {
+                    result = result + Text(before)
+                }
+
+                let strikeText = String(remaining[strikeRange])
+                    .replacingOccurrences(of: "~~", with: "")
+                result = result + Text(strikeText).strikethrough()
+
+                remaining = String(remaining[strikeRange.upperBound...])
+                continue
+            }
+
             // Bold: **text**
             if let boldRange = remaining.range(of: #"\*\*([^\*]+)\*\*"#, options: .regularExpression) {
                 let before = String(remaining[..<boldRange.lowerBound])
@@ -449,7 +488,7 @@ struct MarkdownView: View {
                     .replacingOccurrences(of: "`", with: "")
                 result = result + Text(codeText)
                     .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(.indigo)
+                    .foregroundColor(DSColor.brand)
 
                 remaining = String(remaining[codeRange.upperBound...])
                 continue
@@ -468,8 +507,8 @@ struct MarkdownView: View {
     private func renderTable(headers: [String], rows: [[String]]) -> some View {
         // Fixed-width columns inside a horizontal ScrollView: wide academic tables
         // (drug/dose grids) scroll instead of clipping, and equal widths keep the
-        // header aligned with every data row.
-        let columnWidth: CGFloat = 130
+        // header aligned with every data row. Width scales with Dynamic Type.
+        let columnWidth = tableColumnWidth
 
         return ScrollView(.horizontal, showsIndicators: true) {
             VStack(spacing: 0) {
@@ -483,14 +522,14 @@ struct MarkdownView: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 6)
-                            .background(Color.indigo.opacity(0.15))
+                            .background(DSColor.brand.opacity(0.15))
 
                         if index < headers.count - 1 {
                             Divider()
                         }
                     }
                 }
-                .background(Color.indigo.opacity(0.1))
+                .background(DSColor.brand.opacity(0.1))
 
                 Divider()
 
@@ -531,7 +570,7 @@ struct MarkdownView: View {
             ForEach(items.indices, id: \.self) { index in
                 HStack(alignment: .top, spacing: 8) {
                     Circle()
-                        .fill(Color.indigo)
+                        .fill(DSColor.brand)
                         .frame(width: 5, height: 5)
                         .padding(.top, 6)
 
@@ -549,7 +588,7 @@ struct MarkdownView: View {
                 HStack(alignment: .top, spacing: 8) {
                     Text("\(index + 1).")
                         .font(.subheadline.bold())
-                        .foregroundColor(.indigo)
+                        .foregroundColor(DSColor.brand)
                         .frame(width: 20, alignment: .trailing)
 
                     renderInlineText(items[index])
@@ -560,19 +599,51 @@ struct MarkdownView: View {
         }
     }
 
-    private func renderCodeBlock(_ code: String) -> some View {
-        Text(code)
-            .font(.system(.caption, design: .monospaced))
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
+    /// Kod bloğu: dil etiketi + kopyala butonu başlığı, uzun satırlar için
+    /// yatay scroll (satır sarma kod hizasını bozuyordu).
+    private func renderCodeBlock(_ code: String, language: String?) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(language ?? "chat.code".localized)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.lowercase)
+
+                Spacer()
+
+                Button {
+                    UIPasteboard.general.string = code
+                    DSHaptics.lightImpact()
+                } label: {
+                    Label("chat.copy".localized, systemImage: "doc.on.doc")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityLabel("chat.copy".localized)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color(.tertiarySystemBackground))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(code)
+                    .font(.system(.caption, design: .monospaced))
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(.separator).opacity(0.5), lineWidth: 0.5)
+        )
     }
 
     private func renderBlockquote(_ text: String) -> some View {
         HStack(spacing: 8) {
             Rectangle()
-                .fill(Color.indigo.opacity(0.5))
+                .fill(DSColor.brand.opacity(0.5))
                 .frame(width: 3)
 
             renderInlineText(text)

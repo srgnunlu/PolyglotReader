@@ -11,12 +11,15 @@ enum RAGConfig {
     static let overlapSentences = 2         // 3→2: Büyük chunk = daha az overlap gerekli
 
     // MARK: - Search Settings (Precision-Focused)
-    static let topK = 10                    // 8→10: Daha fazla aday, reranking ile filtrelenir
+    // NOT: topK / rerankTopK / similarityThreshold web ile eşitlendi
+    // (web/src/lib/rag.ts RAG_CONFIG) — iki platform aynı soruya aynı chunk
+    // setini getirsin. Birini değiştirirsen diğerini de değiştir.
+    static let topK = 12                    // 10→12: web (15) ile orta noktada eşitlendi
     /// Derin arama aday havuzu: geniş havuz + LLM rerank = gerçek "derin" mod.
-    /// Normal modda 10 aday yeterli; derin modda 24 aday çekilip yeniden sıralanır.
+    /// Normal modda 12 aday yeterli; derin modda 24 aday çekilip yeniden sıralanır.
     static let deepSearchTopK = 24
-    static let rerankTopK = 6               // Context'e dahil edilecek chunk sayısı
-    static let similarityThreshold: Float = 0.45  // 0.30→0.45: Alakasız chunk'ları filtrele
+    static let rerankTopK = 8               // 6→8: Context'e dahil edilecek chunk (web ile aynı)
+    static let similarityThreshold: Float = 0.35  // 0.45→0.35: cross-lingual (TR soru↔EN doküman) recall
     static let minAnswerSimilarity: Float = 0.55  // 0.50→0.55: Daha yüksek güven eşiği
     static let bm25Weight: Float = 0.35     // Keyword matching ağırlığı
     static let vectorWeight: Float = 0.65   // Semantic search ağırlığı

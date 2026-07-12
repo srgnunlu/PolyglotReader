@@ -17,6 +17,11 @@ class ChatViewModel: ObservableObject {
     @Published var isDeepSearchEnabled = false  // Derin Arama (Reranking + Query Expansion)
     @Published var cachedImageMetadata: [PDFImageMetadata] = []  // Dosyadaki görseller
 
+    /// Son başarısız gönderimin kullanıcı metni — hata balonundaki inline
+    /// "Tekrar Dene" butonu bunu yeniden gönderir (kullanıcı balonu zaten
+    /// listede olduğundan tekrar eklenmez).
+    var pendingRetryText: String?
+
     // MARK: - Smart Suggestions (P4)
     @Published var smartSuggestions: [ChatSuggestion] = []
     @Published var currentPageNumber: Int = 1
@@ -224,6 +229,26 @@ class ChatViewModel: ObservableObject {
             errorMessage = "Sohbet temizlenemedi: \(appError.localizedDescription)"
             logError("ChatViewModel", "Sohbet temizleme hatası", error: error)
         }
+    }
+
+    /// Konuşmayı paylaşılabilir Markdown'a çevirir (hata balonları hariç) —
+    /// toolbar'daki dışa aktarma (ShareLink) bunu kullanır.
+    var exportTranscript: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMMM yyyy HH:mm"
+        formatter.locale = Locale(identifier: "tr_TR")
+
+        var lines = ["# Corio AI Sohbeti", ""]
+        for message in messages where message.isError != true {
+            let speaker = message.role == .user ? "Sen" : "Corio AI"
+            lines.append("**\(speaker)** · \(formatter.string(from: message.timestamp))")
+            lines.append("")
+            lines.append(message.text)
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+        }
+        return lines.joined(separator: "\n")
     }
 
     // MARK: - Indexleme Yönetimi (P0)

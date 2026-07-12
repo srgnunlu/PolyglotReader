@@ -275,7 +275,18 @@ class RAGService: ObservableObject {
             throw AppError.ai(reason: .unavailable, underlying: RAGError.embeddingFailed)
         }
 
-        let records = chunksWithEmbeddings.map { ($0.chunk.content, $0.embedding, $0.chunk.pageNumber) }
+        let records = chunksWithEmbeddings.map { item in
+            SupabaseChunkInsert(
+                content: item.chunk.content,
+                embedding: item.embedding,
+                pageNumber: item.chunk.pageNumber,
+                sectionTitle: item.chunk.sectionTitle,
+                contentType: item.chunk.contentType.rawValue,
+                containsTable: item.chunk.containsTable,
+                containsList: item.chunk.containsList,
+                imageRefs: item.chunk.imageReferences.map { $0.uuidString }
+            )
+        }
         do {
             try await SupabaseService.shared.saveDocumentChunks(fileId: fileId.uuidString, chunks: records)
         } catch {

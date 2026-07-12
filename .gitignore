@@ -80,3 +80,4 @@ PolyglotReader/Config.plist
 
 ## MCP config — contains the Supabase access token, must stay local
 .mcp.json
+supabase/.temp/

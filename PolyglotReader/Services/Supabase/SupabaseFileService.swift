@@ -1,6 +1,17 @@
 import Foundation
 import Supabase
 
+// RPC payload'ları sınıf dışında: @MainActor izolasyonuna takılmadan Sendable
+// Encodable/Decodable uyumu sağlanır.
+private nonisolated struct ContentSearchParams: Encodable, Sendable {
+    let search_query: String
+    let match_count: Int
+}
+
+private nonisolated struct ContentSearchMatch: Decodable, Sendable {
+    let file_id: UUID
+}
+
 // MARK: - File Service
 
 /// Handles file metadata CRUD operations in the database
@@ -69,16 +80,53 @@ final class SupabaseFileService {
 
     // MARK: - Read
 
-    /// List all files for current user
+    /// List all files for current user, with per-user reading progress embedded
+    /// (RLS keeps the embed to the caller's own row). Trashed files are excluded.
     func listFiles() async throws -> [PDFDocumentMetadata] {
         let files: [FileRecord] = try await client
             .from("files")
-            .select()
+            .select("*, reading_progress(page, updated_at)")
+            .is("deleted_at", value: nil)
             .order("created_at", ascending: false)
             .execute()
             .value
 
         return files.map { mapToMetadata(from: $0, storagePath: $0.storage_path) }
+    }
+
+    /// Files in the trash ("Son Silinenler"), newest deletion first.
+    func listTrashedFiles() async throws -> [PDFDocumentMetadata] {
+        let files: [FileRecord] = try await client
+            .from("files")
+            .select()
+            .not("deleted_at", operator: .is, value: "null")
+            .order("deleted_at", ascending: false)
+            .execute()
+            .value
+
+        return files.map { mapToMetadata(from: $0, storagePath: $0.storage_path) }
+    }
+
+    /// Soft delete: stamp deleted_at; storage/chunks/tags survive for restore.
+    func softDeleteFile(id: String) async throws {
+        struct SoftDelete: Encodable {
+            let deleted_at: String
+        }
+
+        try await client
+            .from("files")
+            .update(SoftDelete(deleted_at: ISO8601DateFormatter().string(from: Date())))
+            .eq("id", value: id)
+            .execute()
+    }
+
+    /// Restore from trash: clear deleted_at (explicit NULL via AnyJSON).
+    func restoreFile(id: String) async throws {
+        try await client
+            .from("files")
+            .update(["deleted_at": AnyJSON.null])
+            .eq("id", value: id)
+            .execute()
     }
 
     /// Get a single file by ID
@@ -100,6 +148,59 @@ final class SupabaseFileService {
     }
 
     // MARK: - Update
+
+    /// Toggle favorite flag
+    func updateFavorite(fileId: String, isFavorite: Bool) async throws {
+        struct FavoriteUpdate: Encodable {
+            let is_favorite: Bool
+        }
+
+        try await client
+            .from("files")
+            .update(FavoriteUpdate(is_favorite: isFavorite))
+            .eq("id", value: fileId)
+            .execute()
+    }
+
+    /// Persist total page count (set at upload, backfilled for legacy files)
+    func updatePageCount(fileId: String, pageCount: Int) async throws {
+        struct PageCountUpdate: Encodable {
+            let page_count: Int
+        }
+
+        try await client
+            .from("files")
+            .update(PageCountUpdate(page_count: pageCount))
+            .eq("id", value: fileId)
+            .execute()
+    }
+
+    /// Library-wide content search: returns IDs of files whose chunks match
+    /// the query (Turkish + English BM25 via `search_files_by_content` RPC).
+    func searchFileIdsByContent(query: String, limit: Int = 20) async throws -> [String] {
+        let matches: [ContentSearchMatch] = try await client
+            .rpc(
+                "search_files_by_content",
+                params: ContentSearchParams(search_query: query, match_count: limit)
+            )
+            .execute()
+            .value
+
+        return matches.map { $0.file_id.uuidString.lowercased() }
+    }
+
+    /// Update file display name
+    func updateName(fileId: String, name: String) async throws {
+        struct NameUpdate: Encodable {
+            let name: String
+        }
+
+        try await client
+            .from("files")
+            .update(NameUpdate(name: name))
+            .eq("id", value: fileId)
+            .execute()
+    }
 
     /// Update file summary
     func updateSummary(fileId: String, summary: String) async throws {
@@ -166,7 +267,8 @@ final class SupabaseFileService {
         from record: FileRecord,
         storagePath: String
     ) -> PDFDocumentMetadata {
-        PDFDocumentMetadata(
+        let progress = record.reading_progress?.first
+        return PDFDocumentMetadata(
             id: record.id,
             name: record.name,
             size: record.size,
@@ -174,7 +276,12 @@ final class SupabaseFileService {
             storagePath: storagePath,
             summary: record.summary,
             folderId: record.folder_id.flatMap { UUID(uuidString: $0) },
-            aiCategory: record.ai_category
+            aiCategory: record.ai_category,
+            isFavorite: record.is_favorite ?? false,
+            pageCount: record.page_count,
+            lastReadPage: progress?.page,
+            lastOpenedAt: progress?.updated_at.map { DateFormatting.date(from: $0) },
+            deletedAt: record.deleted_at.map { DateFormatting.date(from: $0) }
         )
     }
 }

@@ -19,7 +19,10 @@ export async function loadChatHistory(fileId: string): Promise<ChatMessage[]> {
         .from('chats')
         .select('*')
         .eq('file_id', fileId)
-        .order('created_at', { ascending: true });
+        // seq breaks ties when user/model rows share the same timestamp,
+        // which otherwise flips their order on reload.
+        .order('created_at', { ascending: true })
+        .order('seq', { ascending: true });
 
     if (error) {
         console.error('❌ Error loading chat history:', error);
@@ -57,6 +60,62 @@ export async function saveChatMessage(
 
     if (error) {
         console.error('❌ Error saving chat message:', error.message || JSON.stringify(error));
+        throw error;
+    }
+}
+
+// MARK: - Library chat (file_id IS NULL — migration 20260712100000)
+// Kütüphane geneli sohbet kullanıcıya aittir; RLS user_id ile izole eder.
+
+export async function loadLibraryChatHistory(): Promise<ChatMessage[]> {
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+        .from('chats')
+        .select('*')
+        .is('file_id', null)
+        .order('created_at', { ascending: true })
+        .order('seq', { ascending: true });
+
+    if (error) {
+        console.error('❌ Error loading library chat history:', error);
+        return [];
+    }
+
+    return data || [];
+}
+
+export async function saveLibraryChatMessage(
+    role: 'user' | 'model',
+    content: string
+): Promise<void> {
+    const supabase = getSupabase();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        throw new Error('No authenticated user');
+    }
+
+    const { error } = await supabase
+        .from('chats')
+        .insert({ user_id: user.id, role, content });
+
+    if (error) {
+        console.error('❌ Error saving library chat message:', error.message);
+        throw error;
+    }
+}
+
+export async function clearLibraryChatHistory(): Promise<void> {
+    const supabase = getSupabase();
+
+    const { error } = await supabase
+        .from('chats')
+        .delete()
+        .is('file_id', null);
+
+    if (error) {
+        console.error('❌ Error clearing library chat history:', error);
         throw error;
     }
 }

@@ -5,6 +5,8 @@ import {
     getGeminiModel,
     historyToGeminiFormat,
     toImagePart,
+    trimHistoryToBudget,
+    withGeminiRetry,
 } from '@/lib/server/gemini';
 import { AI_STREAM_LIMIT, enforceRateLimit } from '@/lib/server/rateLimit';
 
@@ -50,12 +52,15 @@ export async function POST(req: NextRequest) {
 
         let stream: AsyncGenerator<{ text: () => string }>;
         if (history && history.length > 0) {
-            const chat = model.startChat({ history: historyToGeminiFormat(history) });
-            stream = (await chat.sendMessageStream(prompt)).stream;
+            const trimmed = trimHistoryToBudget(history);
+            const chat = model.startChat({ history: historyToGeminiFormat(trimmed) });
+            stream = (await withGeminiRetry(() => chat.sendMessageStream(prompt))).stream;
         } else if (imageBase64) {
-            stream = (await model.generateContentStream([prompt, toImagePart(imageBase64)])).stream;
+            stream = (await withGeminiRetry(() =>
+                model.generateContentStream([prompt, toImagePart(imageBase64)])
+            )).stream;
         } else {
-            stream = (await model.generateContentStream(prompt)).stream;
+            stream = (await withGeminiRetry(() => model.generateContentStream(prompt))).stream;
         }
 
         const encoder = new TextEncoder();
@@ -63,6 +68,9 @@ export async function POST(req: NextRequest) {
             async start(controller) {
                 try {
                     for await (const chunk of stream) {
+                        // Client went away (panel closed / new message sent):
+                        // stop pumping instead of generating into the void.
+                        if (req.signal.aborted) break;
                         controller.enqueue(encoder.encode(chunk.text()));
                     }
                     controller.close();

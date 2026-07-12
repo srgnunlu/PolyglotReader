@@ -372,6 +372,49 @@
     border-radius: 16px;
     font-size: 0.9375rem;
     line-height: 1.55;
+    position: relative;
+}
+
+/* Copy button — appears on bubble hover, sits in the top-right corner. */
+.copyMessageBtn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    line-height: 1;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    opacity: 0;
+    cursor: pointer;
+    transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.messageBubble:hover .copyMessageBtn {
+    opacity: 0.6;
+}
+
+.copyMessageBtn:hover {
+    opacity: 1 !important;
+    background: rgba(127, 127, 127, 0.15);
+}
+
+/* Tappable page citation inside AI answers. */
+.pageLink {
+    display: inline;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    color: var(--color-primary-500);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.pageLink:hover {
+    color: var(--color-primary-600);
 }
 
 .message.user .messageBubble {

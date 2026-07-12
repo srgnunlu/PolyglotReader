@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUserId, getGeminiModel, toImagePart } from '@/lib/server/gemini';
+import { getAuthenticatedUserId, getGeminiModel, toImagePart, withGeminiRetry } from '@/lib/server/gemini';
 import { AI_GENERATE_LIMIT, enforceRateLimit } from '@/lib/server/rateLimit';
 
 // Non-streaming Gemini generation (translation, summary, smart note, image Q&A).
@@ -29,9 +29,11 @@ export async function POST(req: NextRequest) {
 
     try {
         const model = getGeminiModel();
-        const result = imageBase64
-            ? await model.generateContent([prompt, toImagePart(imageBase64)])
-            : await model.generateContent(prompt);
+        const result = await withGeminiRetry(() =>
+            imageBase64
+                ? model.generateContent([prompt, toImagePart(imageBase64)])
+                : model.generateContent(prompt)
+        );
 
         return NextResponse.json({ text: result.response.text() });
     } catch (error) {

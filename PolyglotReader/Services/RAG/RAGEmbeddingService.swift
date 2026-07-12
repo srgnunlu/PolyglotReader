@@ -16,6 +16,13 @@ class RAGEmbeddingService {
     private var cacheMisses: Int = 0
     private var diskCacheHits: Int = 0
 
+    // MARK: - In-flight request coalescing
+    // Chunk search and image-caption search embed the same query in parallel;
+    // without coalescing both miss the cache simultaneously and pay for two
+    // identical API calls. The lock only guards the dictionary, not the await.
+    private let inFlightLock = NSLock()
+    private var inFlightRequests: [String: Task<[Float], Error>] = [:]
+
     // MARK: - P3.2: Disk Cache
     private let diskCacheEnabled = true
     private lazy var diskCacheURL: URL? = {
@@ -60,11 +67,30 @@ class RAGEmbeddingService {
             return embedding
         }
 
-        // 3. Cache miss - yeni embedding oluştur
+        // 3. Cache miss - yeni embedding oluştur (aynı metin için eşzamanlı
+        // ikinci istek varsa onun sonucunu bekle, ikinci API çağrısı yapma)
         cacheMisses += 1
-        let embedding = try await ErrorHandlingService.retry {
-            try await createEmbeddingFromAPI(for: text)
+
+        inFlightLock.lock()
+        if let existing = inFlightRequests[key] {
+            inFlightLock.unlock()
+            return try await existing.value
         }
+        let request = Task {
+            try await ErrorHandlingService.retry {
+                try await self.createEmbeddingFromAPI(for: text)
+            }
+        }
+        inFlightRequests[key] = request
+        inFlightLock.unlock()
+
+        defer {
+            inFlightLock.lock()
+            inFlightRequests[key] = nil
+            inFlightLock.unlock()
+        }
+
+        let embedding = try await request.value
 
         // 4. Her iki cache'e de ekle
         addToCache(key: key, embedding: embedding)
