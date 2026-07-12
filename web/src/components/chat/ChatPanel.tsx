@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect, memo } from 'react';
 import { ChatMessage } from '@/types/models';
-import { streamChat, streamChatWithImage, streamChatWithRAGAndHistory, ChatHistoryMessage } from '@/lib/gemini';
+import { streamChat, streamChatWithImage, streamChatWithRAGAndHistory } from '@/lib/gemini';
 import { searchRelevantChunks } from '@/lib/rag';
 import { loadChatHistory, saveChatMessage, clearChatHistory } from '@/lib/chatSync';
+import { toChatHistory } from '@/lib/chatHistory';
 import styles from './ChatPanel.module.css';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -293,11 +294,7 @@ export function ChatPanel({
 
         try {
             let fullResponse = '';
-            const historyMessages = messages.slice(0, -2);
-            const chatHistory: ChatHistoryMessage[] = historyMessages.map(m => ({
-                role: m.role as 'user' | 'model',
-                text: m.text
-            }));
+            const chatHistory = toChatHistory(messages);
 
             let stream: AsyncGenerator<string, void, unknown>;
 
