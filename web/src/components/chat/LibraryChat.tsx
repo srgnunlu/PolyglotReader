@@ -9,6 +9,11 @@ import remarkGfm from 'remark-gfm';
 import { Send, Sparkles, Library, Check, FileText, Loader2, RotateCcw } from 'lucide-react';
 import { useDocuments } from '@/hooks/useDocuments';
 import { streamLibraryChat, ChatHistoryMessage } from '@/lib/gemini';
+import {
+  loadLibraryChatHistory,
+  saveLibraryChatMessage,
+  clearLibraryChatHistory,
+} from '@/lib/chatSync';
 import { ChatMessage } from '@/types/models';
 
 const REMARK_PLUGINS = [remarkGfm];
@@ -61,10 +66,35 @@ export function LibraryChat() {
   const [selectedIds, setSelectedIds] = useState<Set<string> | null>(null); // null = all
   const [showPicker, setShowPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Kalıcı geçmişi yükle (chats tablosu, file_id NULL satırlar) ve
+  // unmount'ta akan yanıtı iptal et.
+  useEffect(() => {
+    let isMounted = true;
+    loadLibraryChatHistory()
+      .then(history => {
+        if (!isMounted || history.length === 0) return;
+        setMessages(
+          history.map(h => ({
+            id: h.id || `${h.created_at}-${h.role}`,
+            role: h.role,
+            text: h.content,
+            timestamp: h.created_at ? new Date(h.created_at) : new Date(),
+          }))
+        );
+      })
+      .catch(err => console.error('Failed to load library chat history:', err));
+
+    return () => {
+      isMounted = false;
+      abortRef.current?.abort();
+    };
+  }, []);
 
   // Resolve the active set of files: null means "all documents".
   const activeFiles = useMemo(
@@ -107,6 +137,16 @@ export function LibraryChat() {
       const aiMessageId = (Date.now() + 1).toString();
       setMessages(prev => [...prev, { id: aiMessageId, role: 'model', text: '', timestamp: new Date() }]);
 
+      // Yeni mesaj önceki akışı iptal eder; soru hemen persist edilir ki
+      // model hatası olsa da kaybolmasın (ChatPanel ile aynı davranış).
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      saveLibraryChatMessage('user', text).catch(err =>
+        console.error('Failed to save library user message:', err)
+      );
+
       try {
         const chatHistory: ChatHistoryMessage[] = messages.map(m => ({
           role: m.role,
@@ -114,32 +154,52 @@ export function LibraryChat() {
         }));
 
         let fullResponse = '';
-        for await (const chunk of streamLibraryChat(text, activeFiles, chatHistory)) {
+        for await (const chunk of streamLibraryChat(text, activeFiles, chatHistory, controller.signal)) {
           fullResponse += chunk;
           setMessages(prev => prev.map(m => (m.id === aiMessageId ? { ...m, text: fullResponse } : m)));
         }
         if (!fullResponse) {
+          fullResponse = 'Kütüphanenizdeki dokümanlar bu konuda bilgi içermiyor.';
+          setMessages(prev =>
+            prev.map(m => (m.id === aiMessageId ? { ...m, text: fullResponse } : m))
+          );
+        }
+        saveLibraryChatMessage('model', fullResponse).catch(err =>
+          console.error('Failed to save library model message:', err)
+        );
+      } catch (err) {
+        if (controller.signal.aborted) {
+          setMessages(prev => prev.filter(m => !(m.id === aiMessageId && !m.text)));
+        } else {
+          console.error('Library chat error:', err);
           setMessages(prev =>
             prev.map(m =>
-              m.id === aiMessageId
-                ? { ...m, text: 'Kütüphanenizdeki dokümanlar bu konuda bilgi içermiyor.' }
-                : m
+              m.id === aiMessageId ? { ...m, text: 'Bir hata oluştu. Lütfen tekrar deneyin.' } : m
             )
           );
         }
-      } catch (err) {
-        console.error('Library chat error:', err);
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === aiMessageId ? { ...m, text: 'Bir hata oluştu. Lütfen tekrar deneyin.' } : m
-          )
-        );
       } finally {
         setIsLoading(false);
       }
     },
     [input, isLoading, activeFiles, messages]
   );
+
+  // Kalıcı silme — onaysız tek tık veri kaybı riskiydi (ChatPanel ile aynı).
+  const handleClear = useCallback(async () => {
+    if (messages.length === 0) return;
+    const confirmed = window.confirm(
+      'Kütüphane sohbeti kalıcı olarak silinecek. Devam etmek istiyor musunuz?'
+    );
+    if (!confirmed) return;
+    abortRef.current?.abort();
+    setMessages([]);
+    try {
+      await clearLibraryChatHistory();
+    } catch (err) {
+      console.error('Failed to clear library chat history:', err);
+    }
+  }, [messages.length]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -164,7 +224,7 @@ export function LibraryChat() {
           <div className="flex items-center gap-2">
             {messages.length > 0 && (
               <button
-                onClick={() => setMessages([])}
+                onClick={handleClear}
                 className="flex items-center gap-1.5 rounded-xl border border-corio-border px-3 py-2 text-xs font-medium text-corio-fg/70 transition-colors hover:bg-corio-surface-2"
                 title="Sohbeti temizle"
               >
