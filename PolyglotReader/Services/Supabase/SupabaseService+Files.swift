@@ -37,6 +37,48 @@ extension SupabaseService {
         }
     }
 
+    func renameFile(fileId: String, name: String) async throws {
+        try await perform(category: .database) {
+            try await files.updateName(fileId: fileId, name: name)
+        }
+    }
+
+    func listTrashedFiles() async throws -> [PDFDocumentMetadata] {
+        try await perform(category: .database) {
+            try await files.listTrashedFiles()
+        }
+    }
+
+    func softDeleteFile(id: String) async throws {
+        try await perform(category: .database) {
+            try await files.softDeleteFile(id: id)
+        }
+    }
+
+    func restoreFile(id: String) async throws {
+        try await perform(category: .database) {
+            try await files.restoreFile(id: id)
+        }
+    }
+
+    func updateFileFavorite(fileId: String, isFavorite: Bool) async throws {
+        try await perform(category: .database) {
+            try await files.updateFavorite(fileId: fileId, isFavorite: isFavorite)
+        }
+    }
+
+    func updateFilePageCount(fileId: String, pageCount: Int) async throws {
+        try await perform(category: .database) {
+            try await files.updatePageCount(fileId: fileId, pageCount: pageCount)
+        }
+    }
+
+    func searchFileIdsByContent(query: String, limit: Int = 20) async throws -> [String] {
+        try await perform(category: .database) {
+            try await files.searchFileIdsByContent(query: query, limit: limit)
+        }
+    }
+
     func updateFileSummary(fileId: String, summary: String) async throws {
         try await perform(category: .database) {
             try await files.updateSummary(fileId: fileId, summary: summary)
@@ -66,6 +108,26 @@ extension SupabaseService {
     func deleteFile(id: String, storagePath: String) async throws {
         try await perform(category: .storage) {
             try await files.deleteFile(id: id, storagePath: storagePath)
+        }
+    }
+
+    // MARK: - Thumbnails (Storage)
+
+    func uploadThumbnail(_ data: Data, forFileStoragePath storagePath: String) async throws {
+        try await perform(category: .storage) {
+            try await storage.uploadThumbnail(data, forFileStoragePath: storagePath)
+        }
+    }
+
+    func downloadThumbnail(forFileStoragePath storagePath: String) async throws -> Data {
+        try await perform(category: .storage) {
+            try await storage.downloadThumbnail(forFileStoragePath: storagePath)
+        }
+    }
+
+    func deleteThumbnail(forFileStoragePath storagePath: String) async throws {
+        try await perform(category: .storage) {
+            try await storage.deleteThumbnail(forFileStoragePath: storagePath)
         }
     }
 }

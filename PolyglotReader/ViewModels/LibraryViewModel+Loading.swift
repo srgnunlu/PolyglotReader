@@ -30,9 +30,11 @@ extension LibraryViewModel {
             for index in files.indices {
                 loadThumbnailIfNeeded(for: files[index])
             }
+
+            // Çöp kutusu: "Son Silinenler" girişi + 30 gün süre dolumu taraması
+            await loadTrash()
         } catch {
             let appError = ErrorHandlingService.mapToAppError(error)
-            errorMessage = appError.localizedDescription
             ErrorHandlingService.shared.handle(
                 appError,
                 context: .init(
@@ -54,6 +56,9 @@ extension LibraryViewModel {
 
             // Mevcut klasörün alt klasörlerini yükle
             folders = try await supabaseService.listFolders(parentId: currentFolder?.id)
+
+            // Hiyerarşik seçici için tüm klasörler (taşıma/oluşturma hedefleri)
+            allFolders = try await supabaseService.listAllFolders()
 
             logInfo(
                 "LibraryViewModel",

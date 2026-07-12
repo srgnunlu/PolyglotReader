@@ -23,12 +23,27 @@ struct PolyglotReaderApp: App {
                 .environmentObject(errorHandlingService)
                 .preferredColorScheme(settingsViewModel.colorScheme)
                 .onOpenURL { url in
-                    // Handle OAuth callback
-                    Task {
-                        await handleOAuthCallback(url: url)
+                    if url.isFileURL {
+                        // "Open in / Corio Docs'a kopyala" ile gelen PDF
+                        handleIncomingFile(url: url)
+                    } else {
+                        // OAuth callback (coriodocs:// şeması)
+                        Task {
+                            await handleOAuthCallback(url: url)
+                        }
                     }
                 }
         }
+    }
+
+    private func handleIncomingFile(url: URL) {
+        guard url.pathExtension.lowercased() == "pdf" else {
+            logWarning("App", "Desteklenmeyen dosya türü açıldı", details: url.lastPathComponent)
+            return
+        }
+        PendingFileImportStore.shared.enqueue(url)
+        // Kütüphane sekmesine geç ki kullanıcı yükleme ilerlemesini görsün
+        NotificationCenter.default.post(name: .switchToLibraryTab, object: nil)
     }
 
     private func handleOAuthCallback(url: URL) async {

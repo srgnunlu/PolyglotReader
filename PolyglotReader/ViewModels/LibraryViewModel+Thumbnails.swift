@@ -15,6 +15,7 @@ extension LibraryViewModel {
         // Zaten thumbnail varsa veya yükleme devam ediyorsa atla
         guard file.thumbnailData == nil else { return }
         guard thumbnailLoadingTasks[file.id] == nil else { return }
+        guard !thumbnailWaitQueue.contains(where: { $0.id == file.id }) else { return }
 
         // CacheService'ten kontrol et (memory cache)
         if let cachedData = CacheService.shared.getThumbnail(forFileId: file.id) {
@@ -29,37 +30,77 @@ extension LibraryViewModel {
             return
         }
 
-        // Arka planda thumbnail yükle
-        let task = Task {
-            await generateThumbnail(for: file)
-        }
-        thumbnailLoadingTasks[file.id] = task
+        // Kuyruğa al — aynı anda en fazla `maxConcurrentThumbnailTasks` indirme
         pendingThumbnailIds.insert(file.id)
+        thumbnailWaitQueue.append(file)
+        processThumbnailQueue()
     }
 
-    private func generateThumbnail(for file: PDFDocumentMetadata) async {
-        defer {
-            thumbnailLoadingTasks[file.id] = nil
-            pendingThumbnailIds.remove(file.id)
+    /// Kuyruktan boş slot sayısı kadar iş başlatır; her iş bitişinde tekrar çağrılır.
+    private func processThumbnailQueue() {
+        while activeThumbnailTaskCount < maxConcurrentThumbnailTasks, !thumbnailWaitQueue.isEmpty {
+            let file = thumbnailWaitQueue.removeFirst()
+
+            // Kuyrukta beklerken silinmiş/yüklenmiş olabilir
+            guard thumbnailLoadingTasks[file.id] == nil,
+                  files.contains(where: { $0.id == file.id && $0.thumbnailData == nil }) else {
+                pendingThumbnailIds.remove(file.id)
+                continue
+            }
+
+            activeThumbnailTaskCount += 1
+            let task = Task { [weak self] in
+                await self?.fetchOrGenerateThumbnail(for: file)
+                guard let self else { return }
+                self.thumbnailLoadingTasks[file.id] = nil
+                self.pendingThumbnailIds.remove(file.id)
+                self.activeThumbnailTaskCount -= 1
+                self.processThumbnailQueue()
+            }
+            thumbnailLoadingTasks[file.id] = task
+        }
+    }
+
+    private func fetchOrGenerateThumbnail(for file: PDFDocumentMetadata) async {
+        // 1) Hızlı yol: yükleme anında Storage'a konan küçük JPEG'i indir
+        //    (~50 KB; tam PDF indirmeye kıyasla kat kat ucuz).
+        if let thumbData = try? await supabaseService.downloadThumbnail(
+            forFileStoragePath: file.storagePath
+        ), !thumbData.isEmpty {
+            CacheService.shared.setThumbnail(thumbData, forFileId: file.id)
+            saveThumbnailToDisk(thumbData, fileId: file.id)
+            updateFileThumbnail(fileId: file.id, thumbnailData: thumbData)
+            return
         }
 
+        // 2) Legacy yol: Storage'da kapak yok (eski yüklemeler) — tam PDF'ten
+        //    üret ve bir defalık Storage'a geri yaz (backfill).
         do {
-            // PDF'i indir
             let url = try await supabaseService.getFileURL(storagePath: file.storagePath)
-
-            // URL'den veri oku
             let (data, _) = try await SecurityManager.shared.secureSession.data(from: url)
 
-            // PDFDocument oluştur ve thumbnail üret
             let document = try pdfService.loadPDF(from: data)
             let thumbnailData = try pdfService.generateThumbnailData(for: document)
 
-            // CacheService'e ekle (memory cache)
             CacheService.shared.setThumbnail(thumbnailData, forFileId: file.id)
             saveThumbnailToDisk(thumbnailData, fileId: file.id)
-
-            // Dosyayı güncelle
             updateFileThumbnail(fileId: file.id, thumbnailData: thumbnailData)
+
+            try? await supabaseService.uploadThumbnail(
+                thumbnailData,
+                forFileStoragePath: file.storagePath
+            )
+
+            // Fırsatçı backfill: PDF zaten elimizdeyken eksik sayfa sayısını yaz
+            if file.pageCount == nil, document.pageCount > 0 {
+                try? await supabaseService.updateFilePageCount(
+                    fileId: file.id,
+                    pageCount: document.pageCount
+                )
+                if let index = files.firstIndex(where: { $0.id == file.id }) {
+                    files[index].pageCount = document.pageCount
+                }
+            }
         } catch {
             let appError = ErrorHandlingService.mapToAppError(error)
             logError("LibraryViewModel", "Thumbnail oluşturulamadı: \(file.name)", error: appError)
@@ -83,6 +124,9 @@ extension LibraryViewModel {
         // (CacheService.shared.clearAllCaches() memory warning'de otomatik çağrılır)
         thumbnailLoadingTasks.values.forEach { $0.cancel() }
         thumbnailLoadingTasks.removeAll()
+        thumbnailWaitQueue.removeAll()
+        activeThumbnailTaskCount = 0
+        pendingThumbnailIds.removeAll()
 
         if let cacheDirectory = thumbnailCacheDirectoryURL() {
             do {

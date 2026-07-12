@@ -154,6 +154,7 @@ struct PDFDocumentMetadata: Codable, Identifiable {
     var pageCount: Int?         // files.page_count — eski kayıtlarda nil, lazy backfill
     var lastReadPage: Int?      // reading_progress.page
     var lastOpenedAt: Date?     // reading_progress.updated_at → "Son Açılan" sıralaması
+    var deletedAt: Date?        // Soft delete: dolu ise dosya çöp kutusunda
 
     /// 0...1 arası okuma ilerlemesi; sayfa sayısı bilinmiyorsa nil.
     var readingProgress: Double? {
@@ -189,7 +190,8 @@ struct PDFDocumentMetadata: Codable, Identifiable {
         isFavorite: Bool = false,
         pageCount: Int? = nil,
         lastReadPage: Int? = nil,
-        lastOpenedAt: Date? = nil
+        lastOpenedAt: Date? = nil,
+        deletedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -205,6 +207,7 @@ struct PDFDocumentMetadata: Codable, Identifiable {
         self.pageCount = pageCount
         self.lastReadPage = lastReadPage
         self.lastOpenedAt = lastOpenedAt
+        self.deletedAt = deletedAt
     }
 }
 

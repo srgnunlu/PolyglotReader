@@ -23,7 +23,7 @@ struct FolderCardView: View {
                     .foregroundStyle(.primary)
 
                 // Dosya sayısı
-                Text("\(folder.fileCount) dosya")
+                Text("library.file_count".localized(with: folder.fileCount))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -38,7 +38,7 @@ struct FolderCardView: View {
         .contextMenu {
             if let onDelete = onDelete {
                 Button(role: .destructive, action: onDelete) {
-                    Label("Sil", systemImage: "trash")
+                    Label("common.delete".localized, systemImage: "trash")
                 }
             }
         }
@@ -50,6 +50,7 @@ struct FolderCardView: View {
 struct CollapsibleFolderSection: View {
     @ObservedObject var viewModel: LibraryViewModel
     @AppStorage("areFoldersCollapsed") private var isCollapsed: Bool = false
+    @State private var folderToEdit: Folder?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -71,7 +72,7 @@ struct CollapsibleFolderSection: View {
                             .foregroundStyle(.indigo)
                     }
 
-                    Text("Klasörler")
+                    Text("library.folders".localized)
                         .font(.subheadline)
                         .fontWeight(.semibold)
 
@@ -103,6 +104,10 @@ struct CollapsibleFolderSection: View {
                             viewModel.navigateToFolder(folder)
                         } onDelete: {
                             Task { await viewModel.deleteFolder(folder) }
+                        } onEdit: {
+                            folderToEdit = folder
+                        } onDropFiles: { fileIds in
+                            Task { await viewModel.moveFilesByIds(fileIds, to: folder) }
                         }
                     }
                 }
@@ -124,6 +129,10 @@ struct CollapsibleFolderSection: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
         .padding(.horizontal)
+        .sheet(item: $folderToEdit) { folder in
+            FolderEditorSheet(viewModel: viewModel, folderToEdit: folder)
+                .presentationCornerRadius(DSRadius.popup)
+        }
     }
 }
 
@@ -133,6 +142,12 @@ struct LiquidGlassFolderCard: View {
     let folder: Folder
     var onTap: () -> Void
     var onDelete: (() -> Void)?
+    var onEdit: (() -> Void)?
+    /// Dosya kartından sürüklenen dosya ID'leri bu klasöre bırakıldığında çağrılır.
+    var onDropFiles: (([String]) -> Void)?
+
+    @State private var showDeleteConfirmation = false
+    @State private var isDropTargeted = false
 
     private var folderColor: Color {
         Color(hex: folder.color) ?? .indigo
@@ -194,7 +209,7 @@ struct LiquidGlassFolderCard: View {
                         .foregroundStyle(.primary)
 
                     // Dosya sayısı
-                    Text("\(folder.fileCount) dosya")
+                    Text("library.file_count".localized(with: folder.fileCount))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -257,12 +272,52 @@ struct LiquidGlassFolderCard: View {
         }
         .buttonStyle(LiquidGlassFolderButtonStyle())
         .contextMenu {
-            if let onDelete = onDelete {
-                Button(role: .destructive, action: onDelete) {
-                    Label("Sil", systemImage: "trash")
+            if let onEdit = onEdit {
+                Button(action: onEdit) {
+                    Label("common.edit".localized, systemImage: "pencil")
+                }
+            }
+
+            if onDelete != nil {
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Label("common.delete".localized, systemImage: "trash")
                 }
             }
         }
+        .confirmationDialog(
+            "folder.delete.title".localized(with: folder.name),
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("common.delete".localized, role: .destructive) {
+                onDelete?()
+            }
+            Button("common.cancel".localized, role: .cancel) {}
+        } message: {
+            Text(
+                folder.fileCount > 0
+                    ? "folder.delete.message.files".localized(with: folder.fileCount)
+                    : "common.irreversible".localized
+            )
+        }
+        // Sürüklenen dosya kartını kabul et; hedefken kartı vurgula
+        .dropDestination(for: String.self) { fileIds, _ in
+            guard let onDropFiles else { return false }
+            onDropFiles(fileIds)
+            return true
+        } isTargeted: { targeted in
+            isDropTargeted = targeted
+        }
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(folderColor, lineWidth: 2)
+            }
+        }
+        .scaleEffect(isDropTargeted ? 1.04 : 1.0)
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isDropTargeted)
     }
 }
 
@@ -290,7 +345,7 @@ struct BreadcrumbView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "house.fill")
-                        Text("Ana Klasör")
+                        Text("library.root_folder".localized)
                     }
                     .foregroundStyle(viewModel.currentFolder == nil ? Color.primary : Color.indigo)
                 }
@@ -302,11 +357,7 @@ struct BreadcrumbView: View {
                         .foregroundStyle(.secondary)
 
                     Button(folder.name) {
-                        // Bu klasöre kadar git
-                        while let last = viewModel.folderPath.last, last.id != folder.id {
-                            viewModel.folderPath.removeLast()
-                        }
-                        viewModel.currentFolder = folder
+                        viewModel.navigateToPathFolder(folder)
                     }
                     .foregroundStyle(folder.id == viewModel.currentFolder?.id ? .primary : .secondary)
                 }
@@ -317,16 +368,20 @@ struct BreadcrumbView: View {
     }
 }
 
-// MARK: - Create Folder Sheet
-/// Yeni klasör oluşturma sheet'i
-struct CreateFolderSheet: View {
+// MARK: - Folder Editor Sheet
+/// Klasör oluşturma VE düzenleme sheet'i — `folderToEdit` verilirse düzenleme
+/// modunda açılır (üst klasör seçici gizlenir; taşıma ayrı bir işlemdir).
+struct FolderEditorSheet: View {
     @ObservedObject var viewModel: LibraryViewModel
+    var folderToEdit: Folder?
     @Environment(\.dismiss) private var dismiss
 
     @State private var folderName = ""
     @State private var selectedColor = "#6366F1"
     @State private var selectedIcon = "folder.fill"
     @State private var selectedParentId: UUID?
+
+    private var isEditing: Bool { folderToEdit != nil }
 
     private let colors = [
         "#6366F1", // indigo
@@ -342,21 +397,27 @@ struct CreateFolderSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Klasör Adı") {
-                    TextField("Klasör adı girin", text: $folderName)
+                Section("folder.editor.name_section".localized) {
+                    TextField("folder.editor.name_placeholder".localized, text: $folderName)
                 }
 
-                Section("Üst Klasör") {
-                    Picker("Konum", selection: $selectedParentId) {
-                        Text("Ana Klasör").tag(UUID?.none)
-                        ForEach(viewModel.folders) { folder in
-                            Label(folder.name, systemImage: folder.sfSymbol)
-                                .tag(UUID?.some(folder.id))
+                if !isEditing {
+                    Section("folder.editor.parent_section".localized) {
+                        Picker("folder.editor.location".localized, selection: $selectedParentId) {
+                            Text("library.root_folder".localized).tag(UUID?.none)
+                            // Tüm hiyerarşi, em-space girintisiyle
+                            ForEach(viewModel.folderTree, id: \.folder.id) { item in
+                                Label(
+                                    String(repeating: "\u{2003}", count: item.depth) + item.folder.name,
+                                    systemImage: item.folder.sfSymbol
+                                )
+                                .tag(UUID?.some(item.folder.id))
+                            }
                         }
                     }
                 }
 
-                Section("İkon") {
+                Section("folder.editor.icon_section".localized) {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 14) {
                         ForEach(FolderIconStore.availableIcons, id: \.self) { icon in
                             Image(systemName: icon)
@@ -378,7 +439,7 @@ struct CreateFolderSheet: View {
                     .padding(.vertical, 8)
                 }
 
-                Section("Renk") {
+                Section("folder.editor.color_section".localized) {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 12) {
                         ForEach(colors, id: \.self) { color in
                             Circle()
@@ -400,42 +461,60 @@ struct CreateFolderSheet: View {
                 }
 
                 // Önizleme
-                Section("Önizleme") {
+                Section("folder.editor.preview_section".localized) {
                     HStack {
                         Image(systemName: selectedIcon)
                             .font(.system(size: 32))
                             .foregroundStyle(Color(hex: selectedColor) ?? .indigo)
 
-                        Text(folderName.isEmpty ? "Klasör Adı" : folderName)
+                        Text(folderName.isEmpty ? "folder.editor.name_section".localized : folderName)
                             .foregroundStyle(folderName.isEmpty ? .secondary : .primary)
                     }
                 }
             }
-            .navigationTitle("Yeni Klasör")
+            .navigationTitle(
+                isEditing ? "folder.editor.edit_title".localized : "folder.create.title".localized
+            )
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                if selectedParentId == nil {
+                if let folder = folderToEdit {
+                    folderName = folder.name
+                    selectedColor = folder.color
+                    selectedIcon = folder.sfSymbol
+                } else if selectedParentId == nil {
                     selectedParentId = viewModel.currentFolder?.id
                 }
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("İptal") {
+                    Button("common.cancel".localized) {
                         dismiss()
                     }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Oluştur") {
-                        let parentId = selectedParentId
+                    Button(isEditing ? "common.save".localized : "folder.create.button".localized) {
+                        let name = folderName
+                        let color = selectedColor
                         let icon = selectedIcon
+                        let parentId = selectedParentId
+                        let folder = folderToEdit
                         Task {
-                            await viewModel.createFolder(
-                                name: folderName,
-                                color: selectedColor,
-                                icon: icon,
-                                parentId: parentId
-                            )
+                            if let folder {
+                                await viewModel.updateFolder(
+                                    folder,
+                                    name: name,
+                                    color: color,
+                                    icon: icon
+                                )
+                            } else {
+                                await viewModel.createFolder(
+                                    name: name,
+                                    color: color,
+                                    icon: icon,
+                                    parentId: parentId
+                                )
+                            }
                             dismiss()
                         }
                     }
@@ -443,6 +522,63 @@ struct CreateFolderSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Folder Picker Sheet
+/// Hiyerarşik klasör seçici — toplu taşıma hedefi için tüm ağacı girintili listeler.
+struct FolderPickerSheet: View {
+    let destinations: [(folder: Folder, depth: Int)]
+    var onSelect: (Folder?) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Button {
+                    onSelect(nil)
+                    dismiss()
+                } label: {
+                    Label("library.root_folder".localized, systemImage: "house.fill")
+                        .foregroundStyle(.primary)
+                }
+
+                ForEach(destinations, id: \.folder.id) { item in
+                    Button {
+                        onSelect(item.folder)
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: item.folder.sfSymbol)
+                                .foregroundStyle(Color(hex: item.folder.color) ?? .indigo)
+                                .frame(width: 24)
+
+                            Text(item.folder.name)
+                                .foregroundStyle(.primary)
+
+                            Spacer()
+
+                            Text("\(item.folder.fileCount)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.leading, CGFloat(item.depth) * 20)
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .navigationTitle("pdf_card.move_to_folder".localized)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("common.cancel".localized) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 

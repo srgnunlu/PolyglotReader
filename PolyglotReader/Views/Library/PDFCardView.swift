@@ -6,6 +6,9 @@ struct PDFCardView: View {
     let onTap: () -> Void
     let onDelete: () -> Void
     var onMoveToFolder: ((Folder?) -> Void)?
+    var onRename: (() -> Void)?
+    var onShare: (() -> Void)?
+    var onToggleFavorite: (() -> Void)?
     var availableFolders: [Folder] = []
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
@@ -13,6 +16,7 @@ struct PDFCardView: View {
 
     @State private var showDeleteConfirmation = false
     @State private var isPressed = false
+    @State private var showInfoSheet = false
 
     var body: some View {
         if isSelectionMode {
@@ -20,13 +24,44 @@ struct PDFCardView: View {
             cardButton
         } else {
             cardButton
+                // Karttan klasör kartına sürükle-bırak taşıma
+                .draggable(file.id)
                 .contextMenu {
+                    Button {
+                        showInfoSheet = true
+                    } label: {
+                        Label("file_info.action".localized, systemImage: "info.circle")
+                    }
+
+                    if let onToggleFavorite = onToggleFavorite {
+                        Button(action: onToggleFavorite) {
+                            Label(
+                                file.isFavorite
+                                    ? "library.favorite.remove".localized
+                                    : "library.favorite.add".localized,
+                                systemImage: file.isFavorite ? "star.slash" : "star"
+                            )
+                        }
+                    }
+
+                    if let onRename = onRename {
+                        Button(action: onRename) {
+                            Label("library.action.rename".localized, systemImage: "pencil")
+                        }
+                    }
+
+                    if let onShare = onShare {
+                        Button(action: onShare) {
+                            Label("common.share".localized, systemImage: "square.and.arrow.up")
+                        }
+                    }
+
                     if let onMoveToFolder = onMoveToFolder, !availableFolders.isEmpty {
                         Menu {
                             Button {
                                 onMoveToFolder(nil)
                             } label: {
-                                Label("Ana Klasör", systemImage: "house")
+                                Label("library.root_folder".localized, systemImage: "house")
                             }
 
                             ForEach(availableFolders) { folder in
@@ -37,7 +72,7 @@ struct PDFCardView: View {
                                 }
                             }
                         } label: {
-                            Label("Klasöre Taşı", systemImage: "folder")
+                            Label("pdf_card.move_to_folder".localized, systemImage: "folder")
                         }
 
                         Divider()
@@ -46,16 +81,19 @@ struct PDFCardView: View {
                     Button(role: .destructive) {
                         showDeleteConfirmation = true
                     } label: {
-                        Label("Sil", systemImage: "trash")
+                        Label("common.delete".localized, systemImage: "trash")
                     }
                 }
                 .confirmationDialog(
-                    "Bu dosyayı silmek istediğinizden emin misiniz?",
+                    "library.delete.confirm".localized,
                     isPresented: $showDeleteConfirmation,
                     titleVisibility: .visible
                 ) {
-                    Button("Sil", role: .destructive, action: onDelete)
-                    Button("İptal", role: .cancel) {}
+                    Button("common.delete".localized, role: .destructive, action: onDelete)
+                    Button("common.cancel".localized, role: .cancel) {}
+                }
+                .sheet(isPresented: $showInfoSheet) {
+                    FileInfoSheet(file: file)
                 }
         }
     }
@@ -93,6 +131,14 @@ struct PDFCardView: View {
                         .background(Circle().fill(.ultraThinMaterial))
                         .padding(8)
                         .accessibilityHidden(true)
+                } else if file.isFavorite {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.yellow)
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(.ultraThinMaterial))
+                        .padding(8)
+                        .accessibilityLabel("library.favorite".localized)
                 }
             }
             .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
@@ -197,6 +243,23 @@ struct PDFCardView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
+            // Okuma ilerlemesi (sayfa sayısı biliniyorsa)
+            if let progress = file.readingProgress {
+                HStack(spacing: 6) {
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                        .tint(progress >= 0.999 ? .green : .indigo)
+
+                    Text("library.progress.percent".localized(with: Int(progress * 100)))
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("library.accessibility.reading_progress".localized(with: Int(progress * 100)))
+            }
+
             // Etiketler
             if !file.tags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -217,7 +280,7 @@ struct PDFCardView: View {
                         }
 
                         if file.tags.count > 3 {
-                            Text("+\(file.tags.count - 3)")
+                            Text("library.tags.more".localized(with: file.tags.count - 3))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
@@ -235,31 +298,92 @@ struct PDFListRowView: View {
     let file: PDFDocumentMetadata
     let onTap: () -> Void
     let onDelete: () -> Void
+    var onMoveToFolder: ((Folder?) -> Void)?
+    var onRename: (() -> Void)?
+    var onShare: (() -> Void)?
+    var onToggleFavorite: (() -> Void)?
+    var availableFolders: [Folder] = []
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     var isThumbnailLoading: Bool = false
 
     @State private var showDeleteConfirmation = false
+    @State private var showInfoSheet = false
 
     var body: some View {
         if isSelectionMode {
             rowButton
         } else {
             rowButton
+                .draggable(file.id)
                 .contextMenu {
+                    Button {
+                        showInfoSheet = true
+                    } label: {
+                        Label("file_info.action".localized, systemImage: "info.circle")
+                    }
+
+                    if let onToggleFavorite = onToggleFavorite {
+                        Button(action: onToggleFavorite) {
+                            Label(
+                                file.isFavorite
+                                    ? "library.favorite.remove".localized
+                                    : "library.favorite.add".localized,
+                                systemImage: file.isFavorite ? "star.slash" : "star"
+                            )
+                        }
+                    }
+
+                    if let onRename = onRename {
+                        Button(action: onRename) {
+                            Label("library.action.rename".localized, systemImage: "pencil")
+                        }
+                    }
+
+                    if let onShare = onShare {
+                        Button(action: onShare) {
+                            Label("common.share".localized, systemImage: "square.and.arrow.up")
+                        }
+                    }
+
+                    if let onMoveToFolder = onMoveToFolder, !availableFolders.isEmpty {
+                        Menu {
+                            Button {
+                                onMoveToFolder(nil)
+                            } label: {
+                                Label("library.root_folder".localized, systemImage: "house")
+                            }
+
+                            ForEach(availableFolders) { folder in
+                                Button {
+                                    onMoveToFolder(folder)
+                                } label: {
+                                    Label(folder.name, systemImage: folder.sfSymbol)
+                                }
+                            }
+                        } label: {
+                            Label("pdf_card.move_to_folder".localized, systemImage: "folder")
+                        }
+
+                        Divider()
+                    }
+
                     Button(role: .destructive) {
                         showDeleteConfirmation = true
                     } label: {
-                        Label("Sil", systemImage: "trash")
+                        Label("common.delete".localized, systemImage: "trash")
                     }
                 }
                 .confirmationDialog(
-                    "Bu dosyayı silmek istediğinizden emin misiniz?",
+                    "library.delete.confirm".localized,
                     isPresented: $showDeleteConfirmation,
                     titleVisibility: .visible
                 ) {
-                    Button("Sil", role: .destructive, action: onDelete)
-                    Button("İptal", role: .cancel) {}
+                    Button("common.delete".localized, role: .destructive, action: onDelete)
+                    Button("common.cancel".localized, role: .cancel) {}
+                }
+                .sheet(isPresented: $showInfoSheet) {
+                    FileInfoSheet(file: file)
                 }
         }
     }
@@ -279,11 +403,20 @@ struct PDFListRowView: View {
 
                 // Info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(file.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
-                        .foregroundStyle(.primary)
+                    HStack(spacing: 4) {
+                        if file.isFavorite {
+                            Image(systemName: "star.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.yellow)
+                                .accessibilityLabel("library.favorite".localized)
+                        }
+
+                        Text(file.name)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .lineLimit(1)
+                            .foregroundStyle(.primary)
+                    }
 
                     HStack(spacing: 6) {
                         Text(file.formattedSize)
@@ -294,9 +427,54 @@ struct PDFListRowView: View {
                             .frame(width: 3, height: 3)
 
                         Text(file.formattedDate)
+
+                        if let progress = file.readingProgress {
+                            Circle()
+                                .fill(.secondary)
+                                .frame(width: 3, height: 3)
+
+                            Text("library.progress.percent".localized(with: Int(progress * 100)))
+                                .fontWeight(.medium)
+                                .foregroundStyle(progress >= 0.999 ? .green : .indigo)
+                                .monospacedDigit()
+                        }
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                    if let progress = file.readingProgress {
+                        ProgressView(value: progress)
+                            .progressViewStyle(.linear)
+                            .tint(progress >= 0.999 ? .green : .indigo)
+                            .accessibilityLabel("library.accessibility.reading_progress".localized(with: Int(progress * 100)))
+                    }
+
+                    // Etiketler — grid kartıyla bilgi eşitliği (satırda kompakt: 2 + sayaç)
+                    if !file.tags.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(file.tags.prefix(2)) { tag in
+                                HStack(spacing: 2) {
+                                    Circle()
+                                        .fill(Color(hex: tag.color) ?? .green)
+                                        .frame(width: 4, height: 4)
+                                    Text(tag.name)
+                                        .lineLimit(1)
+                                }
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background((Color(hex: tag.color) ?? .green).opacity(0.15))
+                                .foregroundStyle(Color(hex: tag.color) ?? .green)
+                                .clipShape(Capsule())
+                            }
+
+                            if file.tags.count > 2 {
+                                Text("library.tags.more".localized(with: file.tags.count - 2))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 }
 
                 Spacer()

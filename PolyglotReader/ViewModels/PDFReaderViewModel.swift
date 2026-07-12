@@ -225,6 +225,7 @@ class PDFReaderViewModel: ObservableObject {
         pdfData = data
         document = pdfDocument
         totalPages = pdfDocument.pageCount
+        backfillPageCountIfMissing(pdfDocument.pageCount)
     }
 
     private func loadAnnotationsAsync() {
@@ -682,5 +683,21 @@ class PDFReaderViewModel: ObservableObject {
         pagePreRenderingTask?.cancel()
         CacheService.shared.removePDFPages(forFileId: fileMetadata.id)
         logDebug("PDFReaderVM", "Sayfa cache temizlendi")
+    }
+}
+
+// MARK: - Library Metadata Backfill
+extension PDFReaderViewModel {
+    /// Backfill: eski dosyalarda `files.page_count` boş — kütüphanedeki okuma
+    /// ilerlemesi çubuğu için doküman elimizdeyken bir defalık yazılır.
+    func backfillPageCountIfMissing(_ pageCount: Int) {
+        guard fileMetadata.pageCount == nil, pageCount > 0 else { return }
+        let fileId = fileMetadata.id
+        Task {
+            try? await SupabaseService.shared.updateFilePageCount(
+                fileId: fileId,
+                pageCount: pageCount
+            )
+        }
     }
 }

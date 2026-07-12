@@ -11,12 +11,18 @@ struct CompactFilterBar: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            // Sol taraf: Sıralama butonları
-            sortingButtons
+            // Sol taraf: Sıralama butonları (4 pill dar ekrana sığmayabilir → kaydırılabilir)
+            ScrollView(.horizontal, showsIndicators: false) {
+                sortingButtons
+            }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            // Sağ taraf: Etiket filtre butonu
+            // Sağ taraf: İstatistik + favori + etiket filtre butonları
+            LibraryStatsButton(viewModel: viewModel)
+
+            favoriteFilterButton
+
             if !viewModel.visibleTags.isEmpty {
                 tagFilterButton
             }
@@ -40,6 +46,40 @@ struct CompactFilterBar: View {
                 }
             }
         }
+    }
+
+    // MARK: - Favorite Filter Button
+    private var favoriteFilterButton: some View {
+        Button {
+            DSHaptics.selection()
+            withAnimation(DSMotion.resolved(DSMotion.snappy, reduceMotion: reduceMotion)) {
+                viewModel.showFavoritesOnly.toggle()
+            }
+        } label: {
+            Image(systemName: viewModel.showFavoritesOnly ? "star.fill" : "star")
+                .font(.caption.weight(.medium))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background {
+                    Capsule()
+                        .fill(viewModel.showFavoritesOnly ?
+                              Color.yellow.opacity(0.2) :
+                              Color(.tertiarySystemBackground))
+                        .overlay {
+                            Capsule()
+                                .stroke(viewModel.showFavoritesOnly ?
+                                       Color.yellow.opacity(0.5) :
+                                       Color.clear, lineWidth: 1)
+                        }
+                }
+        }
+        .buttonStyle(DSPressableButtonStyle())
+        .foregroundStyle(viewModel.showFavoritesOnly ? Color.yellow : Color.secondary)
+        .accessibilityLabel(
+            viewModel.showFavoritesOnly
+                ? "library.filter.favorites_off".localized
+                : "library.filter.favorites_on".localized
+        )
     }
 
     // MARK: - Tag Filter Button
@@ -137,7 +177,7 @@ struct TagSelectionPopover: View {
                         Image(systemName: "tag.slash")
                             .font(.system(size: 40))
                             .foregroundStyle(.secondary)
-                        Text("Etiket Yok")
+                        Text("library.tags.none".localized)
                             .font(.headline)
                         Text(NSLocalizedString("library.no_tagged_files", comment: "No tagged files in folder"))
                             .font(.subheadline)
@@ -161,12 +201,12 @@ struct TagSelectionPopover: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle("Etiketler")
+            .navigationTitle("library.tags".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     if !viewModel.selectedTags.isEmpty {
-                        Button("Temizle") {
+                        Button("common.clear".localized) {
                             withAnimation {
                                 viewModel.clearTagFilters()
                             }
@@ -176,7 +216,7 @@ struct TagSelectionPopover: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Tamam") {
+                    Button("common.done".localized) {
                         dismiss()
                     }
                     .fontWeight(.semibold)

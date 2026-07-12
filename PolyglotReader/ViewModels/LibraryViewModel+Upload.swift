@@ -6,6 +6,14 @@ extension LibraryViewModel {
     // MARK: - Upload File
 
     func uploadFile(url: URL, userId: String) async {
+        await uploadFiles(urls: [url], userId: userId)
+    }
+
+    /// Birden çok PDF'i sırayla yükler; overlay "3/10" kuyruğunu gösterir.
+    /// Bir dosyanın hatası kuyruğun kalanını durdurmaz.
+    func uploadFiles(urls: [URL], userId: String) async {
+        guard !urls.isEmpty else { return }
+
         // Phase 6: Check network before upload
         guard NetworkMonitor.shared.isConnected else {
             errorMessage = "📤 Çevrimdışısınız. Dosya yüklemek için internet bağlantısı gerekli."
@@ -14,12 +22,22 @@ extension LibraryViewModel {
         }
 
         isUploading = true
-        uploadProgress = 0.0
+        uploadQueueTotal = urls.count
         defer {
             isUploading = false
             uploadProgress = 0.0
+            uploadQueueIndex = 0
+            uploadQueueTotal = 0
         }
 
+        for (index, url) in urls.enumerated() {
+            uploadQueueIndex = index + 1
+            uploadProgress = 0.0
+            await uploadSingleFile(url: url, userId: userId)
+        }
+    }
+
+    private func uploadSingleFile(url: URL, userId: String) async {
         do {
             let data = try fetchFileData(from: url)
             let fileName = url.lastPathComponent
@@ -54,15 +72,16 @@ extension LibraryViewModel {
         }
     }
 
-    private enum UploadError: Error {
-        case accessDenied
-    }
-
     private func fetchFileData(from url: URL) throws -> Data {
-        guard url.startAccessingSecurityScopedResource() else {
-            throw UploadError.accessDenied
+        // Dosya seçiciden gelen URL'ler security-scoped erişim ister; "Open in"
+        // ile app'in kendi Inbox'ına kopyalanan dosyalarda ise startAccessing
+        // false döner ama okuma serbesttir. false'u hata sayma — okumayı dene.
+        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
         }
-        defer { url.stopAccessingSecurityScopedResource() }
         return try Data(contentsOf: url)
     }
 
@@ -106,6 +125,25 @@ extension LibraryViewModel {
         await loadFoldersAndTags()
 
         Task {
+            // Kapağı Storage'a yaz: diğer cihazlar/yeni kurulumlar tam PDF
+            // indirmeden küçük JPEG ile listelenir.
+            if let thumbnailData = metadata.thumbnailData {
+                try? await supabaseService.uploadThumbnail(
+                    thumbnailData,
+                    forFileStoragePath: metadata.storagePath
+                )
+            }
+
+            // Sayfa sayısı: okuma ilerlemesi yüzdesi için gerekli.
+            if let document = PDFDocument(data: pdfData), document.pageCount > 0 {
+                try? await supabaseService.updateFilePageCount(
+                    fileId: metadata.id,
+                    pageCount: document.pageCount
+                )
+                if let index = files.firstIndex(where: { $0.id == metadata.id }) {
+                    files[index].pageCount = document.pageCount
+                }
+            }
             await generateSummary(for: metadata, force: true)
             await generateAndAssignTags(for: metadata, pdfData: pdfData)
             await indexDocumentForRAG(metadata: metadata, pdfData: pdfData)
@@ -145,13 +183,7 @@ extension LibraryViewModel {
     }
 
     private func handleUploadError(_ error: Error, url: URL, userId: String) {
-        let appError: AppError
-        if error is UploadError {
-            appError = AppError.storage(reason: .accessDenied, underlying: error)
-        } else {
-            appError = ErrorHandlingService.mapToAppError(error)
-        }
-        errorMessage = appError.localizedDescription
+        let appError = ErrorHandlingService.mapToAppError(error)
         ErrorHandlingService.shared.handle(
             appError,
             context: .init(
