@@ -12,6 +12,7 @@ struct LibraryView: View {
     @State private var searchInput = ""  // Local state for immediate input
     @State private var showBulkDeleteConfirm = false
     @State private var showBulkMoveDialog = false
+    @State private var showLibraryChat = false
     // İlk PDF yüklemesi kazanılmış bir an — kutlama bir kez, checkmark anında.
     @AppStorage("hasCelebratedFirstUpload") private var hasCelebratedFirstUpload = false
     @State private var showFirstUploadConfetti = false
@@ -24,6 +25,27 @@ struct LibraryView: View {
                 .navigationTitle(viewModel.currentFolder?.name ?? "library.title".localized)
                 .toolbar {
                     libraryToolbar
+                }
+                // Kütüphane geneli AI sohbeti — ayrı toolbar bloğu, mevcut
+                // libraryToolbar'a dokunmadan eklenir (SwiftUI birleştirir).
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        if !viewModel.files.isEmpty {
+                            Button {
+                                DSHaptics.lightImpact()
+                                showLibraryChat = true
+                            } label: {
+                                Image(systemName: "sparkles.rectangle.stack")
+                                    .font(.subheadline)
+                            }
+                            .accessibilityLabel("library_chat.open".localized)
+                            .accessibilityIdentifier("library_chat_button")
+                        }
+                    }
+                }
+                .sheet(isPresented: $showLibraryChat) {
+                    LibraryChatView(documents: viewModel.files)
+                        .presentationCornerRadius(DSRadius.popup)
                 }
                 .fileImporter(
                     isPresented: $showFileImporter,

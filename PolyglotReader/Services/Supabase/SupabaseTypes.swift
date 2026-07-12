@@ -91,6 +91,64 @@ struct ChunkBM25SearchResult: Sendable {
     let containsList: Bool
 }
 
+// MARK: - Library (multi-document) search
+
+struct SupabaseLibraryVectorParams: Encodable, @unchecked Sendable {
+    let query_embedding: [Float]
+    let match_threshold: Float
+    let match_count: Int
+    let file_ids: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case query_embedding, match_threshold, match_count, file_ids
+    }
+
+    nonisolated func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(query_embedding, forKey: .query_embedding)
+        try container.encode(match_threshold, forKey: .match_threshold)
+        try container.encode(match_count, forKey: .match_count)
+        try container.encode(file_ids, forKey: .file_ids)
+    }
+}
+
+struct SupabaseLibraryBM25Params: Encodable, @unchecked Sendable {
+    let search_query: String
+    let file_ids: [String]
+    let match_count: Int
+    let search_language: String
+
+    private enum CodingKeys: String, CodingKey {
+        case search_query, file_ids, match_count, search_language
+    }
+
+    nonisolated func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(search_query, forKey: .search_query)
+        try container.encode(file_ids, forKey: .file_ids)
+        try container.encode(match_count, forKey: .match_count)
+        try container.encode(search_language, forKey: .search_language)
+    }
+}
+
+struct SupabaseLibraryVectorResult: Decodable, @unchecked Sendable {
+    let id: UUID
+    let file_id: UUID
+    let content: String
+    let similarity: Float
+    let page_number: Int?
+    let section_title: String?
+    let contains_table: Bool?
+}
+
+struct SupabaseLibraryBM25Result: Decodable, @unchecked Sendable {
+    let id: UUID
+    let file_id: UUID
+    let content: String
+    let rank: Float
+    let page_number: Int?
+}
+
 /// One chunk row ready for insertion into document_chunks, including the
 /// chunker's metadata (previously computed but never persisted, which left
 /// table/section boosts inert on search results).

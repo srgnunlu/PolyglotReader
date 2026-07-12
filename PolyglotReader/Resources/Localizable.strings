@@ -22,6 +22,10 @@
 "common.previous" = "Önceki";
 "common.finish" = "Bitir";
 "common.search" = "Ara";
+"common.share" = "Paylaş";
+"common.apply" = "Uygula";
+"common.clear" = "Temizle";
+"common.irreversible" = "Bu işlem geri alınamaz.";
 
 /* ===========================================
    MARK: - Auth Module
@@ -107,6 +111,92 @@
 "library.accessibility.create_folder.hint" = "Yeni bir klasör oluşturun";
 "library.accessibility.upload" = "PDF yükle";
 "library.accessibility.upload.hint" = "Yeni bir PDF dosyası yükleyin";
+"library.accessibility.selection_start" = "Çoklu seçim";
+"library.accessibility.selection_end" = "Seçimi bitir";
+"library.accessibility.reading_progress" = "Okuma ilerlemesi yüzde %d";
+
+/* Selection Mode */
+"library.selection.all" = "Tümü";
+"library.selection.count" = "%d seçili";
+"library.selection.move" = "Klasöre taşı";
+"library.selection.delete" = "Seçilenleri sil";
+"library.selection.add_tags" = "Seçilenlere etiket ekle";
+
+/* File Actions & Dialogs */
+"library.delete.confirm" = "Bu dosyayı silmek istediğinizden emin misiniz?";
+"library.bulk_delete.confirm" = "Seçili %d dosya silinsin mi?";
+"library.rename.placeholder" = "Dosya adı";
+"library.rename.hint" = "Uzantı (.pdf) otomatik korunur.";
+"library.share.preparing" = "Paylaşım hazırlanıyor…";
+"library.undo" = "Geri Al";
+"library.undo.accessibility" = "%@. Geri almak için çift dokunun.";
+"library.upload.queue" = "Dosya %d/%d";
+
+/* Favorites */
+"library.favorite" = "Favori";
+"library.favorite.add" = "Favorilere Ekle";
+"library.favorite.remove" = "Favorilerden Çıkar";
+"library.favorite.remove_short" = "Favoriden Çıkar";
+"library.filter.favorites_on" = "Sadece favorileri göster";
+"library.filter.favorites_off" = "Favori filtresini kaldır";
+
+/* Folders & Navigation */
+"library.folders" = "Klasörler";
+"library.root_folder" = "Ana Klasör";
+"library.file_count" = "%d dosya";
+
+/* Reading Progress & Continue Strip */
+"library.progress.percent" = "%%%d";
+"library.page_of" = "Sayfa %d/%d";
+"library.continue_reading" = "Kaldığın yerden devam";
+"library.continue_reading.accessibility" = "%@, kaldığın yerden devam et";
+"library.tags.more" = "+%d";
+
+/* Tag Filter & Assignment */
+"library.tags" = "Etiketler";
+"library.tags.none" = "Etiket Yok";
+"library.tags.assign_title" = "Etiket Ekle";
+"library.tags.assign_footer" = "Seçilen etiketler %d dosyanın tümüne eklenir.";
+
+/* Trash (Son Silinenler) */
+"library.trash.title" = "Son Silinenler";
+"library.trash.accessibility" = "Son Silinenler, %d dosya";
+"library.trash.empty.title" = "Çöp kutusu boş";
+"library.trash.empty.subtitle" = "Silinen dosyalar 30 gün burada saklanır.";
+"library.trash.empty_action" = "Boşalt";
+"library.trash.empty_confirm" = "Çöp kutusundaki %d dosya kalıcı olarak silinsin mi?";
+"library.trash.delete_all" = "Tümünü Kalıcı Sil";
+"library.trash.purge" = "Kalıcı Sil";
+"library.trash.purge_confirm" = "\"%@\" kalıcı olarak silinsin mi?";
+"library.trash.restore" = "Geri Yükle";
+
+/* Library Stats */
+"library.stats.title" = "İstatistikler";
+"library.stats.accessibility" = "Kütüphane istatistikleri";
+"library.stats.total_files" = "Toplam Dosya";
+"library.stats.total_size" = "Toplam Boyut";
+"library.stats.total_pages" = "Toplam Sayfa";
+"library.stats.tag_count" = "Etiket";
+"library.stats.reading" = "Okuma";
+"library.stats.pages_read" = "Okunan Sayfa";
+"library.stats.completed" = "Bitirilen";
+"library.stats.in_progress" = "Devam Eden";
+"library.stats.opened_this_week" = "Bu Hafta Açılan";
+"library.stats.recently_read" = "Son Okunanlar";
+
+/* File Info Sheet */
+"file_info.title" = "Dosya Bilgisi";
+"file_info.action" = "Bilgi";
+"file_info.section.general" = "Genel";
+"file_info.size" = "Boyut";
+"file_info.page_count" = "Sayfa Sayısı";
+"file_info.ai_category" = "AI Kategorisi";
+"file_info.section.dates" = "Tarihler";
+"file_info.added" = "Eklendi";
+"file_info.last_opened" = "Son Açılma";
+"file_info.section.reading" = "Okuma İlerlemesi";
+"file_info.page_progress" = "Sayfa %d/%d — %%%d";
+"file_info.section.summary" = "AI Özeti";
 
 /* ===========================================
    MARK: - PDF Card
@@ -118,6 +208,14 @@
 "pdf_card.summary" = "Özet";
 "pdf_card.regenerate_summary" = "Özeti Yenile";
 "pdf_card.move_to_folder" = "Klasöre Taşı";
+"pdf_card.summary.loading" = "Özet hazırlanıyor...";
+"pdf_card.summary.empty" = "Henüz özet yok";
+"pdf_card.summary.generate" = "Oluştur";
+"pdf_card.category.medical" = "Tıbbi";
+"pdf_card.category.legal" = "Hukuki";
+"pdf_card.category.finance" = "Finansal";
+"pdf_card.category.academic" = "Akademik";
+"pdf_card.category.technical" = "Teknik";
 
 /* ===========================================
    MARK: - Reader Module
@@ -197,6 +295,11 @@
 "chat.mic" = "Sesli soru sor";
 "chat.mic.stop" = "Kaydı durdur";
 "chat.attach_photo" = "Görsel ekle";
+"library_chat.title" = "Kütüphane Sohbeti";
+"library_chat.placeholder" = "Tüm dokümanlarına sor...";
+"library_chat.empty.title" = "Kütüphanenle Sohbet Et";
+"library_chat.empty.subtitle" = "%d doküman üzerinde arama yaparak yanıtlar. Kaynaklar dosya adı ve sayfayla belirtilir.";
+"library_chat.open" = "Kütüphane sohbeti";
 "chat.suggestions.header" = "Başlamak için deneyin";
 "chat.scroll_to_bottom" = "Son mesaja git";
 "chat.clear.title" = "Sohbeti Temizle";
@@ -409,6 +512,16 @@
 "folder.create.placeholder" = "Klasör adı";
 "folder.create.button" = "Oluştur";
 "folder.delete.confirm" = "Bu klasörü silmek istediğinizden emin misiniz?";
+"folder.delete.title" = "\"%@\" klasörü silinsin mi?";
+"folder.delete.message.files" = "İçindeki %d dosya ana klasöre taşınacak.";
+"folder.editor.edit_title" = "Klasörü Düzenle";
+"folder.editor.name_section" = "Klasör Adı";
+"folder.editor.name_placeholder" = "Klasör adı girin";
+"folder.editor.parent_section" = "Üst Klasör";
+"folder.editor.location" = "Konum";
+"folder.editor.icon_section" = "İkon";
+"folder.editor.color_section" = "Renk";
+"folder.editor.preview_section" = "Önizleme";
 
 /* ===========================================
    MARK: - Error Messages

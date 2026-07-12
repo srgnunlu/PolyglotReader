@@ -280,6 +280,52 @@ class GeminiChatService {
         return sendMessageStream(fullMessage, fileId: fileId)
     }
 
+    // MARK: - Library Chat (multi-document)
+
+    /// Kütüphane sohbeti tek sanal oturumda yaşar (dosya oturumlarıyla
+    /// karışmaz); LRU tahliyesine diğerleri gibi tabidir.
+    static let librarySessionKey = "library_chat"
+
+    func sendLibraryMessageStream(_ message: String, context: String) -> AsyncThrowingStream<String, Error> {
+        let prompt = context.isEmpty
+            ? message
+            : buildLibraryPrompt(message: message, context: context)
+        return sendMessageStream(prompt, fileId: Self.librarySessionKey)
+    }
+
+    func resetLibrarySession() {
+        resetChatSession(fileId: Self.librarySessionKey)
+    }
+
+    /// Web'deki buildLibraryPrompt (web/src/lib/gemini.ts) ile hizalı —
+    /// iki platform kütüphane sorularına aynı kurallarla yanıt versin.
+    private func buildLibraryPrompt(message: String, context: String) -> String {
+        """
+        # Kütüphane Bölümleri
+        Aşağıda kullanıcının sorusuyla ilgili, kütüphanedeki **birden fazla dokümandan** \
+        alınan bölümler yer almaktadır. Her bölümün başında kaynak dosya adı ve sayfası belirtilmiştir.
+
+        \(context)
+
+        ---
+
+        ## Kullanıcı Sorusu
+        \(message)
+
+        ---
+
+        ## Yanıt Kuralları
+        - **SADECE** yukarıdaki doküman bölümlerini kullan; dış bilgi veya varsayım YAPMA
+        - Her önemli bilgi için kaynağı belirt: dosya adı ve sayfa — örn. "(rapor.pdf, Sayfa 4)"
+        - Farklı dokümanlardan gelen bilgileri karşılaştırırken hangi dosyadan geldiğini netleştir
+        - Doküman İngilizce, soru Türkçe olabilir: terimlerin Türkçe karşılığını da ver
+        - Akademik ama anlaşılır Türkçe kullan; gereksiz tekrardan kaçın
+        - Eğer konu hiçbir dokümanda yoksa: "Kütüphanenizdeki dokümanlar bu konuda bilgi içermiyor." de — ASLA uydurma
+
+        Şimdi yukarıdaki kurallara uyarak soruyu yanıtla:
+        """
+    }
+
     // MARK: - Image Questions
 
     func askAboutImage(_ imageData: Data, question: String, fileId: String) async throws -> String {

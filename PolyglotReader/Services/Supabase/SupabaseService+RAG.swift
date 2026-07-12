@@ -103,6 +103,46 @@ extension SupabaseService {
         }
     }
 
+    // MARK: - Library (multi-document) search
+
+    func searchLibraryChunksVector(
+        fileIds: [String],
+        embedding: [Float],
+        limit: Int,
+        similarityThreshold: Float
+    ) async throws -> [SupabaseLibraryVectorResult] {
+        try await perform(category: .database) {
+            try await self.client
+                .rpc("match_chunks_library", params: SupabaseLibraryVectorParams(
+                    query_embedding: embedding,
+                    match_threshold: similarityThreshold,
+                    match_count: limit,
+                    file_ids: fileIds
+                ))
+                .execute()
+                .value
+        }
+    }
+
+    func searchLibraryChunksBM25(
+        fileIds: [String],
+        query: String,
+        limit: Int,
+        language: String
+    ) async throws -> [SupabaseLibraryBM25Result] {
+        try await perform(category: .database) {
+            try await self.client
+                .rpc("search_chunks_bm25_library", params: SupabaseLibraryBM25Params(
+                    search_query: query,
+                    file_ids: fileIds,
+                    match_count: limit,
+                    search_language: language
+                ))
+                .execute()
+                .value
+        }
+    }
+
     // MARK: - Private Helpers
 
     private func executeMatchChunks(

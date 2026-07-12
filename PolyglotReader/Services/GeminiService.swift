@@ -130,6 +130,21 @@ class GeminiService: ObservableObject {
         return wrapStream(stream)
     }
 
+    func sendLibraryMessageStream(
+        _ message: String,
+        context: String
+    ) -> AsyncThrowingStream<String, Error> {
+        isProcessing = true
+        lastError = nil
+
+        let stream = chatService.sendLibraryMessageStream(message, context: context)
+        return wrapStream(stream)
+    }
+
+    func resetLibraryChatSession() {
+        chatService.resetLibrarySession()
+    }
+
     /// Re-emits a chat stream while mapping failures to AppError and keeping
     /// `isProcessing` accurate. Consumer cancellation is forwarded to the
     /// underlying stream so the network request is torn down promptly.

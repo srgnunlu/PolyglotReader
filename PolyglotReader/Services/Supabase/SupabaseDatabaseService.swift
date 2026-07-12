@@ -629,7 +629,8 @@ final class SupabaseDatabaseService {
 
     // MARK: - Private Helpers
 
-    private func mapRole(_ role: String) -> ChatMessage.MessageRole {
+    // Internal: +LibraryChat extension'ı da kullanır.
+    func mapRole(_ role: String) -> ChatMessage.MessageRole {
         switch role.lowercased() {
         case "user":
             return .user
