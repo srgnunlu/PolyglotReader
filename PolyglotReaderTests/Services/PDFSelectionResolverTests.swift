@@ -1,4 +1,5 @@
 import PDFKit
+import SwiftUI
 import UIKit
 import XCTest
 @testable import PolyglotReader
@@ -91,6 +92,40 @@ final class PDFSelectionResolverTests: XCTestCase {
         )
     }
 
+    func testSelectionAnchorIsRestoredBeforeTheCurrentRunLoopCanRenderWrongPage() throws {
+        let document = try makeDocument(pages: [
+            ["First page"],
+            ["Target table row"],
+            ["Incorrect last page"]
+        ])
+        let targetPage = try XCTUnwrap(document.page(at: 1))
+        let lastPage = try XCTUnwrap(document.page(at: 2))
+        let pdfView = CustomPDFView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        pdfView.displayMode = .singlePageContinuous
+        pdfView.document = document
+        pdfView.layoutDocumentView()
+        pdfView.go(to: targetPage)
+        pdfView.layoutIfNeeded()
+
+        let targetPoint = CGPoint(
+            x: targetPage.bounds(for: .mediaBox).midX,
+            y: targetPage.bounds(for: .mediaBox).midY
+        )
+        pdfView.beginSelectionInteraction(at: pdfView.convert(targetPoint, from: targetPage))
+        let anchorOffset = try XCTUnwrap(pdfView.selectionAnchorContentOffset)
+
+        pdfView.go(to: lastPage)
+        XCTAssertFalse(offsetsAreEqual(pdfView.scrollView?.contentOffset, anchorOffset))
+
+        let coordinator = PDFKitCoordinator(
+            PDFKitView(document: document, currentPage: .constant(2))
+        )
+        coordinator.pdfView = pdfView
+        coordinator.restoreSelectionAnchorPosition(in: pdfView)
+
+        XCTAssertTrue(offsetsAreEqual(pdfView.scrollView?.contentOffset, anchorOffset))
+    }
+
     private func makeDocument(pages: [[String]]) throws -> PDFDocument {
         let bounds = CGRect(x: 0, y: 0, width: 612, height: 792)
         let renderer = UIGraphicsPDFRenderer(bounds: bounds)
@@ -110,5 +145,10 @@ final class PDFSelectionResolverTests: XCTestCase {
 
     private func wholePageSelection(on page: PDFPage) throws -> PDFSelection {
         try XCTUnwrap(page.selection(for: page.bounds(for: .mediaBox)))
+    }
+
+    private func offsetsAreEqual(_ lhs: CGPoint?, _ rhs: CGPoint, accuracy: CGFloat = 0.5) -> Bool {
+        guard let lhs else { return false }
+        return abs(lhs.x - rhs.x) <= accuracy && abs(lhs.y - rhs.y) <= accuracy
     }
 }

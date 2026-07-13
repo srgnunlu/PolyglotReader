@@ -49,19 +49,21 @@ extension PDFKitCoordinator {
         )
     }
 
-    /// Restores the exact pre-selection scroll offset rather than merely going
-    /// to the page top, so protecting against a bad table range is visually
-    /// stable for the reader.
+    /// Restores the exact pre-selection scroll offset in the current run-loop.
+    /// Deferring this work lets PDFKit commit one frame at its erroneous target
+    /// page, which presents as a visible last-page flash before snapping back.
     func restoreSelectionAnchorPosition(in view: CustomPDFView) {
         guard let anchorPage = view.selectionAnchorPage else { return }
-        let contentOffset = view.selectionAnchorContentOffset
-
-        DispatchQueue.main.async {
-            if let contentOffset, let scrollView = view.scrollView {
+        UIView.performWithoutAnimation {
+            if let contentOffset = view.selectionAnchorContentOffset,
+               let scrollView = view.scrollView {
+                scrollView.layer.removeAllAnimations()
                 scrollView.setContentOffset(contentOffset, animated: false)
+                scrollView.layoutIfNeeded()
             } else {
                 view.go(to: anchorPage)
             }
+            view.layoutIfNeeded()
         }
     }
 

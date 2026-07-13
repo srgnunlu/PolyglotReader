@@ -170,7 +170,7 @@ class CustomPDFView: PDFView {
         selectionCurrentPoint = nil
     }
 
-    private func beginSelectionInteraction(at location: CGPoint) {
+    func beginSelectionInteraction(at location: CGPoint) {
         releaseManagedSelectionReference()
         guard let page = page(for: location, nearest: true),
               let document else {
