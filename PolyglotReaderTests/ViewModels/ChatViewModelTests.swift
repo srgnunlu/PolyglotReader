@@ -99,6 +99,13 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertEqual(welcomeMessage.role, .model)
         XCTAssertFalse(welcomeMessage.text.isEmpty)
     }
+
+    func testExportTranscriptOmitsSyntheticWelcomeMessage() {
+        XCTAssertFalse(sut.exportTranscript.contains("sorularınızı yanıtlamaya hazırım"))
+
+        sut.messages.append(ChatMessage(role: .user, text: "Ana fikir nedir?"))
+        XCTAssertTrue(sut.exportTranscript.contains("Ana fikir nedir?"))
+    }
     
     // MARK: - Input Text Tests
     
@@ -111,6 +118,23 @@ final class ChatViewModelTests: XCTestCase {
         
         // Then
         XCTAssertEqual(sut.inputText, testInput)
+    }
+
+    func testValidatedInputTrimsWhitespaceAndNewlines() {
+        sut.inputText = "  Dokümanı özetle.\n"
+
+        XCTAssertEqual(sut.validatedUserInput(nil), "Dokümanı özetle.")
+    }
+
+    func testImageCanBeSubmittedWithoutTypedPrompt() {
+        sut.selectedImage = Data([0x01])
+        sut.inputText = "   "
+
+        XCTAssertTrue(sut.canSubmitMessage)
+        XCTAssertEqual(
+            sut.validatedImageInput(nil),
+            "chat.image_default_prompt".localized
+        )
     }
     
     // MARK: - Streaming Lifecycle Tests
@@ -130,12 +154,14 @@ final class ChatViewModelTests: XCTestCase {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
         }
         sut.activeStreamTask = task
+        sut.isLoading = true
 
         // When
         sut.cancelActiveStream()
 
         // Then
         XCTAssertNil(sut.activeStreamTask)
+        XCTAssertFalse(sut.isLoading)
         await task.value
         XCTAssertTrue(task.isCancelled)
     }

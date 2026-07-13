@@ -5,9 +5,13 @@ import GoogleGenerativeAI
 @MainActor
 class GeminiAnalysisService {
     private let model: GenerativeModel
+    private let translationModel: GenerativeModel
+    private let detailedTranslationModel: GenerativeModel
 
     init() {
         self.model = GeminiConfig.createModel()
+        self.translationModel = GeminiConfig.createTranslationModel(detailed: false)
+        self.detailedTranslationModel = GeminiConfig.createTranslationModel(detailed: true)
     }
 
     // MARK: - Translation
@@ -17,20 +21,17 @@ class GeminiAnalysisService {
             return TranslationResult(original: text, translated: "", detectedLanguage: "Unknown")
         }
 
-        // Prompt below only sees the first 2000 chars, so cache on the same slice.
-        let cappedText = String(text.prefix(2000))
-
         // Cache first: repeated selections resolve instantly instead of a ~2s Gemini round trip.
-        if let cached = await TranslationCacheService.shared.cachedTranslation(for: cappedText) {
-            return TranslationResult(original: cappedText, translated: cached, detectedLanguage: "cached")
+        if let cached = await TranslationCacheService.shared.cachedTranslation(for: text) {
+            return TranslationResult(original: text, translated: cached, detectedLanguage: "cached")
         }
 
-        let result = try await requestGeminiTranslation(cappedText, context: context)
+        let result = try await requestGeminiTranslation(text, context: context)
 
         // Write-through fire-and-forget: translation never waits on (or fails because of) the cache.
         let translated = result.translated
         Task {
-            await TranslationCacheService.shared.store(sourceText: cappedText, translatedText: translated)
+            await TranslationCacheService.shared.store(sourceText: text, translatedText: translated)
         }
 
         return result
@@ -38,27 +39,14 @@ class GeminiAnalysisService {
 
     private func requestGeminiTranslation(_ text: String, context: String?) async throws -> TranslationResult {
         try await GeminiConfig.executeWithRetry(serviceName: "GeminiAnalysis") {
-            var contextPrompt = ""
-            if let context = context, !context.isEmpty {
-                contextPrompt = "\nDoküman Bağlamı (Özet): \(context)\n"
-            }
-
-            let prompt = """
-            Aşağıdaki metni analiz et:\(contextPrompt)
-            "\(text)"
-
-            Görev:
-            1. Kaynak dili tespit et.\(context != nil ? "\n2. Doküman bağlamını dikkate alarak terminolojiyi en doğru şekilde çevir." : "")
-            2. Kaynak Türkçe ise İngilizce'ye çevir.
-            3. Kaynak Türkçe değilse Türkçe'ye çevir.
-            4. JSON formatında döndür: {"translatedText": "...", "detectedLanguage": "..."}
-            """
-
-            let response = try await self.model.generateContent(prompt)
+            let prompt = TranslationPromptBuilder.literalPrompt(text: text, context: context)
+            let response = try await self.translationModel.generateContent(prompt)
             guard let responseText = response.text else { throw GeminiError.noResponse }
 
-            let cleanedText = self.cleanJSON(responseText)
-            guard let data = cleanedText.data(using: .utf8) else { throw GeminiError.parseError }
+            // The dedicated model enforces application/json with a response
+            // schema, so decode it directly. Generic fence stripping would
+            // corrupt literal source markers such as Markdown code fences.
+            guard let data = responseText.data(using: .utf8) else { throw GeminiError.parseError }
 
             struct TranslationResponse: Decodable {
                 let translatedText: String
@@ -85,31 +73,12 @@ class GeminiAnalysisService {
             return DetailedTranslationResult(contextualTranslation: "", alternatives: [])
         }
 
-        let cappedText = String(text.prefix(2000))
-
         return try await GeminiConfig.executeWithRetry(serviceName: "GeminiAnalysis") {
-            var contextPrompt = ""
-            if let context, !context.isEmpty {
-                contextPrompt = "\nDoküman Bağlamı (Özet): \(context)\n"
-            }
-
-            let prompt = """
-            Aşağıdaki metni derinlemesine çevir:\(contextPrompt)
-            "\(cappedText)"
-
-            Görev:
-            1. Kaynak dili tespit et; kaynak Türkçe ise İngilizce'ye, değilse Türkçe'ye çevir.
-            2. Doküman bağlamını dikkate alarak terminolojiye sadık, akıcı ve TAM bir çeviri yap.
-            3. Metin tek bir kelime veya kısa bir ifadeyse (en fazla 6 kelime) bağlama göre \
-            2-4 alternatif karşılık listele; daha uzun bir pasajsa boş liste döndür.
-            4. JSON formatında döndür: {"contextualTranslation": "...", "alternatives": ["...", "..."]}
-            """
-
-            let response = try await self.model.generateContent(prompt)
+            let prompt = TranslationPromptBuilder.detailedPrompt(text: text, context: context)
+            let response = try await self.detailedTranslationModel.generateContent(prompt)
             guard let responseText = response.text else { throw GeminiError.noResponse }
 
-            let cleanedText = self.cleanJSON(responseText)
-            guard let data = cleanedText.data(using: .utf8) else { throw GeminiError.parseError }
+            guard let data = responseText.data(using: .utf8) else { throw GeminiError.parseError }
 
             return try JSONDecoder().decode(DetailedTranslationResult.self, from: data)
         }
@@ -211,6 +180,7 @@ class GeminiAnalysisService {
             - İçeriği özetle
             - Önemli verileri listele
             - Varsa trendleri veya örüntüleri belirt
+            Yanıtı GitHub uyumlu Markdown ile biçimlendir. HTML ve <br> etiketi kullanma.
             """
 
             let response = try await self.model.generateContent([
@@ -218,7 +188,7 @@ class GeminiAnalysisService {
                 ModelContent.Part.text(analysisPrompt)
             ])
 
-            return response.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return AIResponseFormatter.markdown(from: response.text ?? "")
         }
     }
 

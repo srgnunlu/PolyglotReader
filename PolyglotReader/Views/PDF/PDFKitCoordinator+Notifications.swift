@@ -10,10 +10,32 @@ extension PDFKitCoordinator {
               let document = pdfView.document else { return }
 
         let pageIndex = document.index(for: currentPage)
+
+        if let customPDFView = pdfView as? CustomPDFView {
+            let selectionPages = customPDFView.currentSelection?.pages ?? []
+            let protectedPageIndex = protectedSelectionPageIndex ?? customPDFView.selectionAnchorPageIndex
+            let includesAnchor = protectedPageIndex.map { anchorIndex in
+                selectionPages.contains { document.index(for: $0) == anchorIndex }
+            } ?? true
+            let hasAnomalousSelection = selectionPages.count > 1
+                || (!selectionPages.isEmpty && !includesAnchor)
+            let shouldProtectSelection = hasAnomalousSelection || protectedSelectionPageIndex != nil
+            if !PDFSelectionInteractionPolicy.allowsPageChange(
+                to: pageIndex,
+                anchorPageIndex: protectedPageIndex,
+                shouldProtectSelection: shouldProtectSelection
+            ) {
+                _ = resolvedSelection(in: customPDFView)
+                restoreSelectionAnchorPosition(in: customPDFView)
+                return
+            }
+        }
+
         if lastPageIndex == pageIndex { return }
         lastPageIndex = pageIndex
 
         lastSelectionTextForReport = nil
+        emitProgress()
 
         DispatchQueue.main.async {
             // Mark this binding change as scroll-originated so syncCurrentPage
@@ -33,6 +55,8 @@ extension PDFKitCoordinator {
     @objc func selectionChanged(_ notification: Notification) {
         guard let view = notification.object as? PDFView else { return }
 
+        if isApplyingResolvedSelection { return }
+
         if #available(iOS 16.0, *) {
             if view.window?.windowScene != nil {
                 removeEditMenuInteractions(from: view)
@@ -47,7 +71,14 @@ extension PDFKitCoordinator {
 
         selectionDebounceTimer?.invalidate()
 
-        guard let selection = view.currentSelection,
+        let selection: PDFSelection?
+        if let customPDFView = view as? CustomPDFView {
+            selection = resolvedSelection(in: customPDFView)
+        } else {
+            selection = view.currentSelection
+        }
+
+        guard let selection,
               let text = selection.string,
               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
@@ -69,33 +100,5 @@ extension PDFKitCoordinator {
         for subview in view.subviews {
             removeEditMenuInteractions(from: subview)
         }
-    }
-
-    // MARK: - Reading-Order Selection Text
-
-    /// Rebuilds selection text in reading order from per-line selections.
-    /// Raw `selection.string` on multi-column academic PDFs yields wrong-order
-    /// text and passes hyphenated line breaks through; this clusters lines into
-    /// columns (left-to-right) and orders them top-to-bottom with hyphen merge.
-    /// Falls back to the raw string if per-line data is missing or the rebuild
-    /// comes out empty, so behavior never regresses on single-column text.
-    func readingOrderText(for selection: PDFSelection, on page: PDFPage) -> String {
-        let raw = selection.string ?? ""
-        let pageBounds = page.bounds(for: .mediaBox)
-        guard pageBounds.width > 0, pageBounds.height > 0 else { return raw }
-
-        let lines: [OCRTextLine] = selection.selectionsByLine().compactMap { lineSelection in
-            guard let text = lineSelection.string, !text.isEmpty else { return nil }
-            let bounds = lineSelection.bounds(for: page)
-            guard !bounds.isNull, !bounds.isInfinite else { return nil }
-            // Normalize to 0...1; PDF y-origin is bottom-left so higher midY = higher on page.
-            let midX = Double((bounds.midX - pageBounds.minX) / pageBounds.width)
-            let top = Double((bounds.midY - pageBounds.minY) / pageBounds.height)
-            return OCRTextLine(text: text, midX: midX, top: top)
-        }
-
-        guard !lines.isEmpty else { return raw }
-        let assembled = OCRTextAssembler.assemble(lines)
-        return assembled.isEmpty ? raw : assembled
     }
 }

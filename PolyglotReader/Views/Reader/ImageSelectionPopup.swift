@@ -330,11 +330,8 @@ struct ImageSelectionPopup: View {
                 .padding(.horizontal, 14)
             } else if let description = descriptionText {
                 ScrollView(.vertical, showsIndicators: true) {
-                    Text(description)
-                        .font(.system(size: 15, weight: .regular, design: .rounded))
+                    MarkdownView(text: description) { _ in }
                         .foregroundStyle(.primary)
-                        .multilineTextAlignment(.leading)
-                        .lineSpacing(3)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)

@@ -86,7 +86,7 @@ final class LibraryChatViewModel: ObservableObject {
     func sendMessage(_ text: String? = nil) async {
         guard !isLoading else { return }
         let candidate = text ?? inputText
-        let userText = candidate.trimmingCharacters(in: .whitespaces)
+        let userText = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !userText.isEmpty else { return }
 
         cancelActiveStream()
@@ -122,6 +122,7 @@ final class LibraryChatViewModel: ObservableObject {
     func cancelActiveStream() {
         activeStreamTask?.cancel()
         activeStreamTask = nil
+        isLoading = false
     }
 
     /// Konuşmayı Markdown'a çevirir (toolbar dışa aktarma).
@@ -208,7 +209,6 @@ final class LibraryChatViewModel: ObservableObject {
     private func updateModelMessage(id: String, text: String) {
         guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
         messages[index] = ChatMessage(id: id, role: .model, text: text)
-        if !text.isEmpty { isLoading = false }
     }
 
     private func persist(role: String, content: String) {

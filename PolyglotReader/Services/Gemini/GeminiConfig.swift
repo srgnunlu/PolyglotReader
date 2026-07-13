@@ -45,6 +45,10 @@ enum GeminiConfig {
         ModelContent(role: "system", parts: [.text(systemInstructionText)])
     }
 
+    private static var translationSystemInstruction: ModelContent {
+        ModelContent(role: "system", parts: [.text(TranslationPromptBuilder.systemInstruction)])
+    }
+
     static func createModel() -> GenerativeModel {
         GenerativeModel(
             name: modelName,
@@ -56,6 +60,52 @@ enum GeminiConfig {
                 maxOutputTokens: 16384
             ),
             systemInstruction: systemInstruction,
+            requestOptions: RequestOptions(timeout: SecurityManager.shared.resourceTimeout)
+        )
+    }
+
+    /// Dedicated controlled-generation model for translation. It intentionally
+    /// does not inherit the document analyst's "analyze + Markdown" system role.
+    static func createTranslationModel(detailed: Bool) -> GenerativeModel {
+        let properties: [String: Schema]
+        let requiredProperties: [String]
+
+        if detailed {
+            properties = [
+                "contextualTranslation": Schema(type: .string, nullable: false),
+                "alternatives": Schema(
+                    type: .array,
+                    nullable: false,
+                    items: Schema(type: .string, nullable: false)
+                )
+            ]
+            requiredProperties = ["contextualTranslation", "alternatives"]
+        } else {
+            properties = [
+                "translatedText": Schema(type: .string, nullable: false),
+                "detectedLanguage": Schema(type: .string, nullable: false)
+            ]
+            requiredProperties = ["translatedText", "detectedLanguage"]
+        }
+
+        let responseSchema = Schema(
+            type: .object,
+            properties: properties,
+            requiredProperties: requiredProperties
+        )
+
+        return GenerativeModel(
+            name: modelName,
+            apiKey: apiKey,
+            generationConfig: GenerationConfig(
+                temperature: 0,
+                topP: 0.1,
+                topK: 1,
+                maxOutputTokens: 16384,
+                responseMIMEType: "application/json",
+                responseSchema: responseSchema
+            ),
+            systemInstruction: translationSystemInstruction,
             requestOptions: RequestOptions(timeout: SecurityManager.shared.resourceTimeout)
         )
     }

@@ -103,8 +103,8 @@ struct PDFReaderView: View {
             }
             .ignoresSafeArea()
             .navigationBarHidden(true)
-            .edgeSwipeToDismiss {
-                dismiss()
+            .edgeSwipeToDismiss(isEnabled: viewModel.allowsEdgeSwipeDismiss) {
+                closeReader()
             }
             .sheet(isPresented: $showChat) {
                 ChatView(viewModel: chatViewModel) { page in
@@ -209,6 +209,9 @@ struct PDFReaderView: View {
                 logDebug("PDFReaderView", "View disappeared")
                 speech.stop()
                 autoHideTimer?.invalidate()
+                Task {
+                    await viewModel.flushReadingProgress()
+                }
             }
             .dsAnimation(DSMotion.smooth, value: speech.isSpeaking)
             .onChange(of: showChat) { isOpen in
@@ -239,13 +242,19 @@ struct PDFReaderView: View {
                     logDebug("PDFReaderView", "Navigated to initial page: \(page)")
                 }
             }
+            .interactiveDismissDisabled(!viewModel.allowsEdgeSwipeDismiss)
         }
     }
 
     // MARK: - Dismiss
 
     private func closeReader() {
-        dismiss()
+        Task {
+            // Son scroll olayı iki saniyelik debounce penceresindeyse bile
+            // kütüphaneye dönmeden önce kesin olarak kalıcılaştır.
+            await viewModel.flushReadingProgress()
+            dismiss()
+        }
     }
 
     // MARK: - Bar Toggle & Auto-Hide

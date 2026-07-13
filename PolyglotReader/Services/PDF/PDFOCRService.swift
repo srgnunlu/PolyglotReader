@@ -14,9 +14,9 @@ struct OCRTextLine: Equatable {
     let top: Double
 }
 
-/// Pure, PDFKit-free reading-order assembler. Factored out so the column
-/// clustering and hyphen-merge logic can be unit-tested without Vision or
-/// PDFPage. Shared by OCR output and the reader's selection-text rebuild.
+/// Pure, PDFKit-free reading-order assembler for OCR output. Native selectable
+/// text deliberately keeps PDFKit's exact source order and does not use this
+/// heuristic.
 enum OCRTextAssembler {
     /// Lines whose horizontal centers differ by less than this fraction of the
     /// page width are treated as belonging to the same column. 0.15 tolerates

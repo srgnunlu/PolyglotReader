@@ -5,6 +5,13 @@ import Foundation
 /// main view-model body inside the lint type-body budget.
 @MainActor
 extension PDFReaderViewModel {
+    /// Reader-level dismiss gestures must yield while an overlay owns drag or
+    /// pinch input. This keeps a two-finger popup resize from becoming a reader
+    /// close interaction in the ancestor view.
+    var allowsEdgeSwipeDismiss: Bool {
+        !showTranslationPopup && !showQuickTranslation && !showImagePopup
+    }
+
     func toggleQuickTranslationMode() {
         isQuickTranslationMode.toggle()
         clearSelection()

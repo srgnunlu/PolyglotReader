@@ -24,6 +24,9 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
 
     var selectionDebounceTimer: Timer?
     let selectionDebounceDelay: TimeInterval = 1.0
+    var isApplyingResolvedSelection = false
+    var protectedSelectionPageIndex: Int?
+    var selectionProtectionTimer: Timer?
 
     // MARK: - Image Long-Press Handling
     var isHandlingImageLongPress = false
@@ -52,6 +55,7 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
 
     deinit {
         selectionDebounceTimer?.invalidate()
+        selectionProtectionTimer?.invalidate()
     }
 
     // MARK: - Annotation Handling
@@ -75,15 +79,20 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
         reportSelectionImmediately()
     }
 
+    func handleTouchBegan() {
+        clearSelectionPageProtection()
+    }
+
     func reportSelectionImmediately() {
         guard let customPdfView = pdfView as? CustomPDFView,
-              let selection = customPdfView.managedSelection ?? customPdfView.currentSelection,
+              let selection = resolvedSelection(in: customPdfView),
               let page = selection.pages.first,
               let document = customPdfView.document else { return }
 
-        // Rebuild the reported text in reading order (multi-column + hyphen-aware)
-        // instead of the raw `selection.string`. Rects below are untouched.
-        let selectedText = readingOrderText(for: selection, on: page)
+        // Preserve PDFKit's exact source order and line structure. Reordering
+        // selected lines heuristically breaks tables and changes the reference
+        // text before it reaches translation.
+        let selectedText = (selection.string ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard selectedText.count >= 2 else { return }
 
@@ -91,22 +100,15 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
 
         let pageIndex = document.index(for: page)
 
-        var combinedBounds = CGRect.zero
-        for selectedPage in selection.pages {
-            let pageBounds = selection.bounds(for: selectedPage)
-            if combinedBounds == .zero {
-                combinedBounds = pageBounds
-            } else {
-                combinedBounds = combinedBounds.union(pageBounds)
-            }
-        }
-
-        let viewBounds = customPdfView.convert(combinedBounds, from: page)
+        let pageBounds = selection.bounds(for: page)
+        guard !pageBounds.isNull, !pageBounds.isInfinite else { return }
+        let viewBounds = customPdfView.convert(pageBounds, from: page)
         let screenBounds = customPdfView.convert(viewBounds, to: nil)
 
         // Calculate PDF rects for each line (for annotation positioning)
         var pdfRects: [CGRect] = []
-        for lineSelection in selection.selectionsByLine() {
+        for lineSelection in selection.selectionsByLine()
+        where lineSelection.pages.contains(where: { document.index(for: $0) == pageIndex }) {
             let lineBounds = lineSelection.bounds(for: page)
             if !lineBounds.isNull && !lineBounds.isInfinite && lineBounds.width > 0 && lineBounds.height > 0 {
                 pdfRects.append(lineBounds)
@@ -409,7 +411,7 @@ class PDFKitCoordinator: NSObject, UIGestureRecognizerDelegate {
             let expandedBounds = viewBounds.insetBy(dx: -40, dy: -40)
 
             if !expandedBounds.contains(tapLocation) {
-                pdfView.clearSelection()
+                clearNativeSelection(in: pdfView)
                 lastSelectionTextForReport = nil
 
                 DispatchQueue.main.async {
@@ -457,7 +459,7 @@ extension PDFKitCoordinator: UIScrollViewDelegate {
     }
 
     /// `currentDestination` is the robust "current reading position" on PDFView.
-    private func emitProgress() {
+    func emitProgress() {
         lastProgressReport = Date()
         guard let pdfView = pdfView, let document = pdfView.document else { return }
 
@@ -467,6 +469,11 @@ extension PDFKitCoordinator: UIScrollViewDelegate {
             let pageIndex = document.index(for: page)
             let scale = pdfView.scaleFactor
             parent.onProgressChange?(pageIndex + 1, point, scale)
+        } else if let page = pdfView.currentPage {
+            // PDFKit ilk yükleme veya hızlı sayfa geçişinde destination'ı kısa
+            // süreliğine nil döndürebilir; sayfa ilerlemesini yine de koru.
+            let pageIndex = document.index(for: page)
+            parent.onProgressChange?(pageIndex + 1, .zero, pdfView.scaleFactor)
         }
     }
 }

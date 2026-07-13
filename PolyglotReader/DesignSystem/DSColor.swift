@@ -12,6 +12,10 @@ enum DSColor {
     static let brandSecondary = Color("BrandSecondary")
     /// Sparkle/AI moments (summary, deep search). Reserved for AI features.
     static let aiAccent = Color("AIAccent")
+    /// Editorial ink used by the mark and high-emphasis typography.
+    static let brandInk = Color("BrandInk")
+    /// Warm paper canvas used by entry and marketing surfaces.
+    static let brandCanvas = Color("BrandCanvas")
 
     /// The app's signature gradient. Only for icon fills, CTAs and glows —
     /// never for text or large surfaces.

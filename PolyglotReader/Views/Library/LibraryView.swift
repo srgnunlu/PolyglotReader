@@ -59,10 +59,20 @@ struct LibraryView: View {
                 ) { result in
                     handleFileImport(result: result)
                 }
-                .fullScreenCover(item: $selectedFile) { file in
-                    PDFReaderView(file: file)
-                        .readerZoomTransition(sourceID: file.id, in: readerZoomNamespace)
-                }
+                .fullScreenCover(
+                    item: $selectedFile,
+                    onDismiss: {
+                        Task {
+                            // reading_progress ve legacy page_count backfill'ini
+                            // kartlara/yüzde etiketlerine hemen yansıt.
+                            await viewModel.loadFiles()
+                        }
+                    },
+                    content: { file in
+                        PDFReaderView(file: file)
+                            .readerZoomTransition(sourceID: file.id, in: readerZoomNamespace)
+                    }
+                )
                 .sheet(isPresented: $showCreateFolder) {
                     FolderEditorSheet(viewModel: viewModel)
                         .presentationCornerRadius(DSRadius.popup)

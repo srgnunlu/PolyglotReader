@@ -2,6 +2,7 @@ import SwiftUI
 
 // MARK: - Edge Swipe to Dismiss
 struct EdgeSwipeToDismissModifier: ViewModifier {
+    let isEnabled: Bool
     let onDismiss: () -> Void
 
     @State private var dragOffset: CGFloat = 0
@@ -16,8 +17,18 @@ struct EdgeSwipeToDismissModifier: ViewModifier {
     func body(content: Content) -> some View {
         GeometryReader { geometry in
             content
-                .offset(x: dragOffset)
-                .simultaneousGesture(edgeSwipeGesture(in: geometry))
+                .offset(x: isEnabled ? dragOffset : 0)
+                .simultaneousGesture(
+                    edgeSwipeGesture(in: geometry),
+                    including: isEnabled ? .all : .none
+                )
+                .onChange(of: isEnabled) { enabled in
+                    if !enabled {
+                        dragOffset = 0
+                        isDragging = false
+                        isHorizontalGesture = false
+                    }
+                }
         }
     }
 
@@ -89,8 +100,8 @@ struct EdgeSwipeToDismissModifier: ViewModifier {
 }
 
 extension View {
-    func edgeSwipeToDismiss(onDismiss: @escaping () -> Void) -> some View {
-        modifier(EdgeSwipeToDismissModifier(onDismiss: onDismiss))
+    func edgeSwipeToDismiss(isEnabled: Bool = true, onDismiss: @escaping () -> Void) -> some View {
+        modifier(EdgeSwipeToDismissModifier(isEnabled: isEnabled, onDismiss: onDismiss))
     }
 }
 

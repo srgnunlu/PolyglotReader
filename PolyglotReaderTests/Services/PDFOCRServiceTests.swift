@@ -1,8 +1,7 @@
 import XCTest
 @testable import PolyglotReader
 
-/// Unit tests for the pure reading-order assembly used by OCR and the reader's
-/// selection-text rebuild. Deliberately PDFKit-free: only `OCRTextAssembler`.
+/// Unit tests for the pure reading-order assembly used by scanned-page OCR.
 final class PDFOCRServiceTests: XCTestCase {
 
     // MARK: - Hyphen Merge

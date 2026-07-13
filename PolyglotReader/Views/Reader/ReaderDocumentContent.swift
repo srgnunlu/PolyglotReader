@@ -54,6 +54,7 @@ struct ReaderDocumentContent: View {
             bottomInset: max(showChat ? 350 : 0, bottomDockInset),
             annotations: viewModel.annotations,
             initialScrollPosition: viewModel.initialScrollPosition,
+            initialScale: viewModel.scale,
             onProgressChange: { page, point, scale in
                 viewModel.updateReadingProgress(page: page, point: point, scale: scale)
             },

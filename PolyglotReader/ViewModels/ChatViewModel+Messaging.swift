@@ -29,8 +29,8 @@ extension ChatViewModel {
         // Prevent re-entrancy / double submission
         guard !isLoading else { return nil }
 
-        let textToSend = text ?? inputText
-        guard !textToSend.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        let textToSend = (text ?? inputText).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !textToSend.isEmpty else { return nil }
 
         return textToSend
     }
@@ -173,7 +173,6 @@ extension ChatViewModel {
     private func updateModelMessage(id: String, text: String) {
         guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
         messages[index] = ChatMessage(id: id, role: .model, text: text)
-        if !text.isEmpty { isLoading = false }
     }
 
     func saveChatMessage(role: String, content: String) {

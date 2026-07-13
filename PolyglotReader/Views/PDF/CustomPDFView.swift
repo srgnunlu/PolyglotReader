@@ -11,6 +11,15 @@ class CustomPDFView: PDFView {
     var isTouching = false
     var onTouchStateChanged: ((Bool) -> Void)?
 
+    // Native PDFKit occasionally expands a table selection across later pages.
+    // Retain the page and exact scroll position where this interaction began so
+    // the coordinator can constrain the selection and undo the spurious jump.
+    private(set) var selectionAnchorPage: PDFPage?
+    private(set) var selectionAnchorPageIndex: Int?
+    private(set) var selectionAnchorContentOffset: CGPoint?
+    private(set) var selectionAnchorPoint: CGPoint?
+    private(set) var selectionCurrentPoint: CGPoint?
+
     // Image selection callback - görsel seçim callback'i
     var onImageSelection: ((PDFImageInfo) -> Void)?
 
@@ -55,9 +64,13 @@ class CustomPDFView: PDFView {
     // MARK: - Monitoring Gesture Handler
     @objc private func handleMonitoringGesture(_ gesture: UIGestureRecognizer) {
         if gesture.state == .began {
+            beginSelectionInteraction(at: gesture.location(in: self))
             isTouching = true
             onTouchStateChanged?(true)
+        } else if gesture.state == .changed {
+            updateSelectionInteraction(at: gesture.location(in: self))
         } else if gesture.state == .ended || gesture.state == .cancelled || gesture.state == .failed {
+            updateSelectionInteraction(at: gesture.location(in: self))
             isTouching = false
             onTouchStateChanged?(false)
         }
@@ -139,7 +152,48 @@ class CustomPDFView: PDFView {
     // MARK: - Selection Control
     func clearManagedSelection() {
         managedSelection = nil
+        clearSelectionAnchor()
         clearSelection()
+    }
+
+    /// Releases a previously normalized selection before PDFKit starts a new
+    /// native selection, without mutating PDFKit's current selection itself.
+    func releaseManagedSelectionReference() {
+        _managedSelection = nil
+    }
+
+    func clearSelectionAnchor() {
+        selectionAnchorPage = nil
+        selectionAnchorPageIndex = nil
+        selectionAnchorContentOffset = nil
+        selectionAnchorPoint = nil
+        selectionCurrentPoint = nil
+    }
+
+    private func beginSelectionInteraction(at location: CGPoint) {
+        releaseManagedSelectionReference()
+        guard let page = page(for: location, nearest: true),
+              let document else {
+            clearSelectionAnchor()
+            return
+        }
+
+        selectionAnchorPage = page
+        selectionAnchorPageIndex = document.index(for: page)
+        selectionAnchorContentOffset = scrollView?.contentOffset
+        let pdfPoint = convert(location, to: page)
+        selectionAnchorPoint = pdfPoint
+        selectionCurrentPoint = pdfPoint
+    }
+
+    private func updateSelectionInteraction(at location: CGPoint) {
+        guard let anchorPage = selectionAnchorPage else { return }
+        let pageBounds = anchorPage.bounds(for: displayBox)
+        let pdfPoint = convert(location, to: anchorPage)
+        selectionCurrentPoint = CGPoint(
+            x: min(max(pdfPoint.x, pageBounds.minX), pageBounds.maxX),
+            y: min(max(pdfPoint.y, pageBounds.minY), pageBounds.maxY)
+        )
     }
 
     private func removeEditMenuInteractionsIfNeeded() {

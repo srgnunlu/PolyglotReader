@@ -5,6 +5,11 @@ import PDFKit
 // MARK: - Chat ViewModel
 @MainActor
 class ChatViewModel: ObservableObject {
+    /// Stable identifier for the presentation-only greeting. Keeping it out
+    /// of the durable conversation prevents exports, search, and model
+    /// context from treating the empty-state copy as an AI response.
+    static let welcomeMessageId = "chat-welcome"
+
     @Published var messages: [ChatMessage] = []
     @Published var inputText = ""
     @Published var isLoading = false
@@ -110,6 +115,13 @@ class ChatViewModel: ObservableObject {
         return smartSuggestions
     }
 
+    /// Messages that belong to the actual conversation. The synthetic
+    /// greeting is retained in `messages` for backwards compatibility with
+    /// the persistence lifecycle, but presentation code should use this view.
+    var conversationMessages: [ChatMessage] {
+        messages.filter { $0.id != Self.welcomeMessageId }
+    }
+
     /// Sayfa değiştiğinde önerileri güncelle
     func updateSmartSuggestions() {
         smartSuggestions = smartSuggestionService.getSmartSuggestions(
@@ -153,6 +165,7 @@ class ChatViewModel: ObservableObject {
     func cancelActiveStream() {
         activeStreamTask?.cancel()
         activeStreamTask = nil
+        isLoading = false
     }
 
     init(fileId: String) {
@@ -206,6 +219,7 @@ class ChatViewModel: ObservableObject {
         let welcomeText = "Merhaba! Doküman hakkındaki sorularınızı yanıtlamaya hazırım. " +
             "Tablolar, grafikler ve içerik hakkında yardımcı olabilirim."
         let welcome = ChatMessage(
+            id: Self.welcomeMessageId,
             role: .model,
             text: welcomeText
         )
@@ -239,7 +253,7 @@ class ChatViewModel: ObservableObject {
         formatter.locale = Locale(identifier: "tr_TR")
 
         var lines = ["# Corio AI Sohbeti", ""]
-        for message in messages where message.isError != true {
+        for message in conversationMessages where message.isError != true {
             let speaker = message.role == .user ? "Sen" : "Corio AI"
             lines.append("**\(speaker)** · \(formatter.string(from: message.timestamp))")
             lines.append("")
@@ -361,6 +375,13 @@ class ChatViewModel: ObservableObject {
     /// Kullanıcı mesaj gönderebilir mi? (Indexleme engelliyor mu?)
     var canSendMessage: Bool {
         !isLoading && !indexingStatus.isBlocking
+    }
+
+    /// Composer submit state shared by the button and accessibility actions.
+    /// An attached image can be sent without forcing the user to type a prompt.
+    var canSubmitMessage: Bool {
+        let hasText = !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return (hasText || selectedImage != nil) && canSendMessage
     }
 
     /// Indexleme durumuna göre uyarı mesajı göster

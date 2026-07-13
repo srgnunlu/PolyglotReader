@@ -21,7 +21,14 @@ struct LibraryChatView: View {
     }
 
     private var canSend: Bool {
-        !viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty && !viewModel.isLoading
+        !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !viewModel.isLoading
+    }
+
+    private var shouldShowTypingIndicator: Bool {
+        guard viewModel.isLoading else { return false }
+        guard let lastMessage = viewModel.messages.last else { return true }
+        return lastMessage.role != .model || lastMessage.text.isEmpty
     }
 
     var body: some View {
@@ -31,33 +38,73 @@ struct LibraryChatView: View {
 
                 VStack(spacing: 0) {
                     messagesArea
-                    composer
+                    VStack(spacing: 0) {
+                        composer
+                        Text("chat.disclaimer".localized)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, DSSpacing.lg)
+                            .padding(.bottom, DSSpacing.xs)
+                    }
                         .background(.ultraThinMaterial)
                 }
             }
-            .navigationTitle("library_chat.title".localized)
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .topBarLeading) {
+                ToolbarItem(placement: .topBarLeading) {
                     if !viewModel.messages.isEmpty {
-                        ShareLink(item: viewModel.exportTranscript) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .frame(minWidth: 44, minHeight: 44)
-                        }
-                        .accessibilityLabel("chat.export".localized)
+                        Menu {
+                            ShareLink(item: viewModel.exportTranscript) {
+                                Label("chat.export".localized, systemImage: "square.and.arrow.up")
+                            }
 
-                        Button {
-                            showClearConfirmation = true
+                            Divider()
+
+                            Button(role: .destructive) {
+                                showClearConfirmation = true
+                            } label: {
+                                Label("chat.clear.title".localized, systemImage: "trash")
+                            }
                         } label: {
-                            Image(systemName: "trash")
-                                .font(.subheadline)
+                            Image(systemName: "ellipsis")
+                                .font(.body.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
                         }
-                        .accessibilityLabel("chat.clear.title".localized)
+                        .accessibilityLabel("chat.actions".localized)
                     }
+                }
+
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: DSSpacing.xs) {
+                        Circle()
+                            .fill(DSColor.brandGradient)
+                            .frame(width: 30, height: 30)
+                            .overlay {
+                                Image(systemName: "books.vertical.fill")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.white)
+                            }
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("library_chat.assistant_name".localized)
+                                .font(.subheadline.weight(.semibold))
+                            Text(
+                                viewModel.isLoading
+                                    ? "library_chat.status.thinking".localized
+                                    : String(
+                                        format: "library_chat.status.ready".localized,
+                                        viewModel.files.count
+                                    )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -71,7 +118,7 @@ struct LibraryChatView: View {
                 }
             }
             .confirmationDialog(
-                "chat.clear.confirm".localized,
+                "library_chat.clear.confirm".localized,
                 isPresented: $showClearConfirmation,
                 titleVisibility: .visible
             ) {
@@ -111,18 +158,20 @@ struct LibraryChatView: View {
                         MessageBubble(
                             message: message,
                             isStreaming: isStreamingMessage(message),
+                            showsActions: message.role == .model
+                                && message.isError != true
+                                && !isStreamingMessage(message),
                             onRegenerate: isLastModelMessage(message) ? {
                                 Task { await viewModel.regenerateLastResponse() }
                             } : nil,
                             onRetry: message.isError == true ? {
                                 Task { await viewModel.retryLastFailedMessage() }
-                            } : nil,
-                            onNavigateToPage: { _ in }
-                        )
+                            } : nil
+                        ) { _ in }
                         .id(message.id)
                     }
 
-                    if viewModel.isLoading {
+                    if shouldShowTypingIndicator {
                         TypingIndicator()
                     }
 
@@ -155,11 +204,18 @@ struct LibraryChatView: View {
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: DSSpacing.xs) {
             VStack(spacing: DSSpacing.xs) {
-                Image(systemName: "books.vertical")
-                    .font(.largeTitle)
-                    .foregroundStyle(DSColor.brand)
+                Circle()
+                    .fill(DSColor.brandGradient)
+                    .frame(width: 64, height: 64)
+                    .overlay {
+                        Image(systemName: "books.vertical.fill")
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .shadow(color: DSColor.brand.opacity(0.24), radius: 18, y: 8)
+                    .accessibilityHidden(true)
                 Text("library_chat.empty.title".localized)
-                    .font(.headline)
+                    .font(.title3.weight(.bold))
                 Text(String(format: "library_chat.empty.subtitle".localized, viewModel.files.count))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -195,6 +251,10 @@ struct LibraryChatView: View {
                     .padding(DSSpacing.sm)
                     .background(DSColor.surfaceSecondary)
                     .clipShape(RoundedRectangle(cornerRadius: DSRadius.small))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: DSRadius.small)
+                            .stroke(Color(.separator).opacity(0.4), lineWidth: 0.5)
+                    }
                     .contentShape(RoundedRectangle(cornerRadius: DSRadius.small))
                 }
                 .buttonStyle(DSPressableButtonStyle())
@@ -216,14 +276,24 @@ struct LibraryChatView: View {
 
             Button {
                 DSHaptics.lightImpact()
+                if viewModel.isLoading {
+                    viewModel.cancelActiveStream()
+                    return
+                }
                 Task { await viewModel.sendMessage() }
             } label: {
-                Image(systemName: "arrow.up")
+                Image(systemName: viewModel.isLoading ? "stop.fill" : "arrow.up")
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(
+                        viewModel.isLoading
+                            ? Color(.systemBackground)
+                            : .white
+                    )
                     .frame(width: 32, height: 32)
                     .background(
-                        canSend
+                        viewModel.isLoading
+                            ? AnyShapeStyle(Color(.label))
+                            : canSend
                             ? AnyShapeStyle(DSColor.brandGradient)
                             : AnyShapeStyle(Color(.systemGray3)),
                         in: Circle()
@@ -232,8 +302,21 @@ struct LibraryChatView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(DSPressableButtonStyle())
-            .disabled(!canSend)
-            .accessibilityLabel("chat.accessibility.send".localized)
+            .disabled(!viewModel.isLoading && !canSend)
+            .dsAnimation(DSMotion.snappy, value: viewModel.isLoading)
+            .accessibilityLabel(
+                viewModel.isLoading
+                    ? "chat.stop_generation".localized
+                    : "chat.accessibility.send".localized
+            )
+            .accessibilityHint(
+                viewModel.isLoading
+                    ? "chat.stop_generation.hint".localized
+                    : "chat.accessibility.send.hint".localized
+            )
+            .accessibilityIdentifier(
+                viewModel.isLoading ? "library_chat_stop_button" : "library_chat_send_button"
+            )
         }
         .background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
         .overlay {

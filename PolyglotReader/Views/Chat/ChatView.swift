@@ -38,14 +38,28 @@ struct ChatView: View {
     }
 
     private var canSend: Bool {
-        !viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty && viewModel.canSendMessage
+        viewModel.canSubmitMessage
+    }
+
+    private var hasConversation: Bool {
+        !viewModel.conversationMessages.isEmpty
     }
 
     /// Arama aktifken yalnız eşleşen mesajlar listelenir.
     private var visibleMessages: [ChatMessage] {
         let query = searchQuery.trimmingCharacters(in: .whitespaces)
-        guard isSearchActive, !query.isEmpty else { return viewModel.messages }
-        return viewModel.messages.filter { $0.text.localizedCaseInsensitiveContains(query) }
+        let messages = viewModel.conversationMessages
+        guard isSearchActive, !query.isEmpty else { return messages }
+        return messages.filter { $0.text.localizedCaseInsensitiveContains(query) }
+    }
+
+    /// The animated dots bridge only the time before the first response
+    /// token. Once a model bubble exists, that bubble itself communicates the
+    /// ongoing stream and a second indicator would look like a duplicate reply.
+    private var shouldShowTypingIndicator: Bool {
+        guard viewModel.isLoading else { return false }
+        guard let lastMessage = viewModel.messages.last else { return true }
+        return lastMessage.role != .model || lastMessage.text.isEmpty
     }
 
     /// Akış hâlâ sürerken son model mesajı "yazılıyor" kabul edilir —
@@ -79,7 +93,7 @@ struct ChatView: View {
     /// Zaman damgası yalnız konuşma kırılımlarında gösterilir: rol değişimi,
     /// 5 dakikadan uzun ara veya son mesaj — WhatsApp/iMessage dili.
     private func showsTimestamp(at index: Int) -> Bool {
-        let messages = viewModel.messages
+        let messages = viewModel.conversationMessages
         guard index < messages.count else { return false }
         if index == messages.count - 1 { return true }
 
@@ -114,47 +128,71 @@ struct ChatView: View {
                     inputArea
                 }
             }
-            .navigationTitle("chat.title".localized)
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .topBarLeading) {
-                    // Ara / dışa aktar / temizle — yalnız gerçek konuşma varken.
-                    if viewModel.messages.count > 1 {
-                        Button {
-                            withAnimation(DSMotion.snappy) {
-                                isSearchActive.toggle()
-                                if !isSearchActive { searchQuery = "" }
+                ToolbarItem(placement: .topBarLeading) {
+                    if hasConversation {
+                        Menu {
+                            Button {
+                                withAnimation(DSMotion.snappy) {
+                                    isSearchActive.toggle()
+                                    if !isSearchActive { searchQuery = "" }
+                                }
+                            } label: {
+                                Label("chat.search".localized, systemImage: "magnifyingglass")
+                            }
+
+                            ShareLink(item: viewModel.exportTranscript) {
+                                Label("chat.export".localized, systemImage: "square.and.arrow.up")
+                            }
+
+                            Divider()
+
+                            Button(role: .destructive) {
+                                showClearConfirmation = true
+                            } label: {
+                                Label("chat.clear.title".localized, systemImage: "trash")
                             }
                         } label: {
-                            Image(systemName: "magnifyingglass")
-                                .font(.subheadline)
-                                .foregroundStyle(isSearchActive ? DSColor.brand : .secondary)
-                                .frame(minWidth: 44, minHeight: 44)
-                        }
-                        .accessibilityLabel("chat.search".localized)
-                        .accessibilityIdentifier("chat_search_button")
-
-                        ShareLink(item: viewModel.exportTranscript) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.subheadline)
+                            Image(systemName: "ellipsis")
+                                .font(.body.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
                         }
-                        .accessibilityLabel("chat.export".localized)
-                        .accessibilityIdentifier("chat_export_button")
-
-                        Button {
-                            showClearConfirmation = true
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .frame(minWidth: 44, minHeight: 44)
-                        }
-                        .accessibilityLabel("chat.clear.title".localized)
-                        .accessibilityIdentifier("clear_chat_button")
+                        .accessibilityLabel("chat.actions".localized)
+                        .accessibilityIdentifier("chat_actions_menu")
                     }
                 }
+
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: DSSpacing.xs) {
+                        Circle()
+                            .fill(DSColor.brandGradient)
+                            .frame(width: 30, height: 30)
+                            .overlay {
+                                Image(systemName: "sparkles")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.white)
+                            }
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("chat.assistant_name".localized)
+                                .font(.subheadline.weight(.semibold))
+                            Text(
+                                viewModel.isLoading
+                                    ? "chat.status.thinking".localized
+                                    : "chat.status.ready".localized
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .contentTransition(.numericText())
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         dismiss()
@@ -196,14 +234,18 @@ struct ChatView: View {
                 await viewModel.loadHistoryIfNeeded()
                 // Boş sohbette klavye hazır beklesin; geçmiş varsa okuma
                 // alanını klavye ile daraltma.
-                if viewModel.messages.count <= 1 {
+                if viewModel.conversationMessages.isEmpty {
                     try? await Task.sleep(nanoseconds: 400_000_000)
                     isInputFocused = true
                 }
             }
         }
     }
+}
 
+// MARK: - Chat Sections
+
+private extension ChatView {
     // MARK: - Messages Area
 
     private var messagesArea: some View {
@@ -211,14 +253,23 @@ struct ChatView: View {
             ScrollView {
                 LazyVStack(spacing: DSSpacing.sm) {
                     // Geçmiş yüklenirken balon iskeletleri (yalnız içerik iskeletlenir).
-                    if viewModel.isLoadingHistory && viewModel.messages.count <= 1 {
+                    if viewModel.isLoadingHistory && viewModel.conversationMessages.isEmpty {
                         ChatHistorySkeleton()
+                    }
+
+                    if viewModel.conversationMessages.isEmpty
+                        && !viewModel.isLoading
+                        && !viewModel.isLoadingHistory {
+                        emptyConversation
                     }
 
                     ForEach(Array(visibleMessages.enumerated()), id: \.element.id) { index, message in
                         MessageBubble(
                             message: message,
                             isStreaming: isStreamingMessage(message),
+                            showsActions: message.role == .model
+                                && message.isError != true
+                                && !isStreamingMessage(message),
                             // Arama modunda indeksler filtreli listeye ait olduğundan
                             // zaman damgası kırılım hesabı anlamsızlaşır — gizlenir.
                             showsTimestamp: isSearchActive ? false : showsTimestamp(at: index),
@@ -262,14 +313,8 @@ struct ChatView: View {
                             .padding(.top, DSSpacing.lg)
                     }
 
-                    if viewModel.isLoading {
+                    if shouldShowTypingIndicator {
                         TypingIndicator()
-                    }
-
-                    // Konuşma başlamadıysa öneriler akışın içinde kart olarak
-                    // durur — klavye üstüne sıkışmış çiplerden daha davetkâr.
-                    if viewModel.messages.count <= 1 && !viewModel.isLoading && !viewModel.isLoadingHistory {
-                        suggestionCards
                     }
 
                     // Alt sınır nöbetçisi: görünürlüğü "sona git" butonunu
@@ -352,6 +397,39 @@ struct ChatView: View {
     }
 
     // MARK: - Suggestion Cards (boş sohbet)
+
+    private var emptyConversation: some View {
+        VStack(spacing: DSSpacing.lg) {
+            VStack(spacing: DSSpacing.sm) {
+                Circle()
+                    .fill(DSColor.brandGradient)
+                    .frame(width: 64, height: 64)
+                    .overlay {
+                        Image(systemName: "sparkles")
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .shadow(color: DSColor.brand.opacity(0.24), radius: 18, y: 8)
+                    .accessibilityHidden(true)
+
+                Text("chat.empty.title".localized)
+                    .font(.title3.weight(.bold))
+                    .multilineTextAlignment(.center)
+
+                Text("chat.empty.subtitle".localized)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, DSSpacing.lg)
+
+            suggestionCards
+        }
+        .frame(maxWidth: 620)
+        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+    }
 
     private var suggestionCards: some View {
         VStack(alignment: .leading, spacing: DSSpacing.xs) {
@@ -440,6 +518,14 @@ struct ChatView: View {
             }
 
             composer
+
+            Text("chat.disclaimer".localized)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, DSSpacing.lg)
+                .padding(.bottom, DSSpacing.xs)
+                .accessibilityLabel("chat.disclaimer".localized)
         }
         .background(.ultraThinMaterial)
     }
@@ -481,11 +567,15 @@ struct ChatView: View {
                     : "chat.accessibility.deep_search.off".localized
             )
             .accessibilityIdentifier("deep_search_toggle")
+            .disabled(viewModel.isLoading)
+            .opacity(viewModel.isLoading ? 0.55 : 1)
 
             // Büyüyen giriş kapsülü + gömülü gönder butonu
             HStack(alignment: .bottom, spacing: DSSpacing.xxs) {
                 ChatPhotoPickerButton(viewModel: viewModel)
                     .padding(.leading, DSSpacing.xxs)
+                    .disabled(viewModel.isLoading)
+                    .opacity(viewModel.isLoading ? 0.55 : 1)
 
                 TextField("chat.placeholder".localized, text: $viewModel.inputText, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -495,13 +585,19 @@ struct ChatView: View {
                     .accessibilityIdentifier("chat_input_field")
 
                 ChatMicButton(recognizer: speechRecognizer)
+                    .disabled(viewModel.isLoading)
+                    .opacity(viewModel.isLoading ? 0.55 : 1)
 
                 Button {
-                    // Mikro-uçuşun dokunsal eşi: gönderim anında hafif vuruş.
                     DSHaptics.lightImpact()
                     speechRecognizer.stop()
+
+                    if viewModel.isLoading {
+                        viewModel.cancelActiveStream()
+                        return
+                    }
+
                     Task {
-                        // Eğer görsel seçiliyse görsel ile gönder
                         if viewModel.selectedImage != nil {
                             await viewModel.sendMessageWithImage()
                         } else {
@@ -509,12 +605,18 @@ struct ChatView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "arrow.up")
+                    Image(systemName: viewModel.isLoading ? "stop.fill" : "arrow.up")
                         .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(
+                            viewModel.isLoading
+                                ? Color(.systemBackground)
+                                : .white
+                        )
                         .frame(width: 32, height: 32)
                         .background(
-                            canSend
+                            viewModel.isLoading
+                                ? AnyShapeStyle(Color(.label))
+                                : canSend
                                 ? AnyShapeStyle(DSColor.brandGradient)
                                 : AnyShapeStyle(Color(.systemGray3)),
                             in: Circle()
@@ -523,11 +625,22 @@ struct ChatView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(DSPressableButtonStyle())
-                .disabled(!canSend)
+                .disabled(!viewModel.isLoading && !canSend)
                 .dsAnimation(DSMotion.snappy, value: canSend)
-                .accessibilityLabel("chat.accessibility.send".localized)
-                .accessibilityHint("chat.accessibility.send.hint".localized)
-                .accessibilityIdentifier("send_message_button")
+                .dsAnimation(DSMotion.snappy, value: viewModel.isLoading)
+                .accessibilityLabel(
+                    viewModel.isLoading
+                        ? "chat.stop_generation".localized
+                        : "chat.accessibility.send".localized
+                )
+                .accessibilityHint(
+                    viewModel.isLoading
+                        ? "chat.stop_generation.hint".localized
+                        : "chat.accessibility.send.hint".localized
+                )
+                .accessibilityIdentifier(
+                    viewModel.isLoading ? "stop_response_button" : "send_message_button"
+                )
             }
             .background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
             .overlay {

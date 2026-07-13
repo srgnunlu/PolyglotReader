@@ -83,6 +83,8 @@ export interface ChatMessage {
     type: 'image';
     content: string;
   };
+  /** UI-only lifecycle state. Persisted history leaves this undefined (= complete). */
+  status?: 'complete' | 'streaming' | 'stopped' | 'error';
 }
 
 export interface QuizQuestion {

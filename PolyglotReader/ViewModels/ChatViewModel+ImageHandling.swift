@@ -7,11 +7,11 @@ extension ChatViewModel {
 
     /// Görsel ile birlikte soru gönder
     func sendMessageWithImage(_ text: String? = nil) async {
-        guard let textToSend = validatedUserInput(text) else { return }
         guard let imageData = selectedImage else {
             await sendMessage(text)
             return
         }
+        guard let textToSend = validatedImageInput(text) else { return }
 
         // An image question supersedes any response still streaming in.
         cancelActiveStream()
@@ -21,6 +21,14 @@ extension ChatViewModel {
         isLoading = true
 
         await handleImageResponse(imageData: imageData, question: textToSend)
+    }
+
+    /// Image submissions accept an empty composer and use a localized default
+    /// question so attachment-only sends behave like modern chat products.
+    func validatedImageInput(_ text: String?) -> String? {
+        guard !isLoading, selectedImage != nil else { return nil }
+        let candidate = (text ?? inputText).trimmingCharacters(in: .whitespacesAndNewlines)
+        return candidate.isEmpty ? "chat.image_default_prompt".localized : candidate
     }
 
     private func clearImageInput(after text: String?) {

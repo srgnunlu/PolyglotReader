@@ -85,7 +85,7 @@ class UITestBase: XCTestCase {
                app.buttons["apple_sign_in_button"].exists ||
                app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Google'")).firstMatch.exists ||
                app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Apple'")).firstMatch.exists ||
-               app.staticTexts["Polyglot Reader"].exists
+               app.staticTexts["Corio Docs"].exists
     }
     
     /// Check if the app is on the main library screen

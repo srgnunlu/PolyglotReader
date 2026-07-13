@@ -1,636 +1,451 @@
 'use client';
 
-import { useState, useRef, useEffect, memo } from 'react';
-import { ChatMessage } from '@/types/models';
-import { streamChat, streamChatWithImage, streamChatWithRAGAndHistory } from '@/lib/gemini';
-import { searchRelevantChunks } from '@/lib/rag';
-import { loadChatHistory, saveChatMessage, clearChatHistory } from '@/lib/chatSync';
-import { toChatHistory } from '@/lib/chatHistory';
-import styles from './ChatPanel.module.css';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Drawer } from 'vaul';
 import {
-    CorioLogo,
-    NewChatIcon,
-    HistoryIcon,
-    DownloadIcon,
-    CloseIcon,
-    SendIcon,
-    UserAvatarIcon,
-    AIAvatarIcon,
-    SparkleIcon,
-    TrashIcon,
-    QuoteIcon,
-    MessageIcon,
-} from './ChatIcons';
+  ArrowDown,
+  Download,
+  Ellipsis,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { CorioLogo } from '@/components/shared/CorioLogo';
+import { ChatInput } from './ChatInput';
+import { ChatMessage } from './ChatMessage';
+import { SuggestedPrompts } from './SuggestedPrompts';
+import { useChatSession } from '@/hooks/useChatSession';
+import { useIsDesktop, useMediaQuery } from '@/hooks/useMediaQuery';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface ChatPanelProps {
-    isOpen: boolean;
-    onClose: () => void;
-    documentId?: string;
-    documentContext?: string;
-    initialMessage?: string;
-    initialImage?: string;
-    activeSelection?: string | null;
-    onClearInitialMessage?: () => void;
-    onClearSelection?: () => void;
-    /** Sayfa atıfına tıklanınca PDF'i o sayfaya kaydırır (iOS eşleniği). */
-    onNavigateToPage?: (page: number) => void;
+  activeSelection?: string | null;
+  currentPage?: number;
+  documentContext?: string;
+  documentId?: string;
+  documentName?: string;
+  initialImage?: string;
+  initialMessage?: string;
+  isOpen: boolean;
+  onClearInitialMessage?: () => void;
+  onClearSelection?: () => void;
+  onClose: () => void;
+  onNavigateToPage?: (page: number) => void;
 }
 
-// Default suggestions for empty state
-const DEFAULT_SUGGESTIONS = [
-    "Bu belgenin ana konusu nedir?",
-    "Bu içeriği özetler misin?",
-    "En önemli noktaları listele",
-    "Bu konuyu basitçe açıkla",
-];
-
-// Stable plugin reference — avoids handing react-markdown a fresh array each render.
-const REMARK_PLUGINS = [remarkGfm];
-
-const PAGE_LINK_PREFIX = '#corio-page-';
-
-// Model çıktısındaki düz "Sayfa 12" / "[Sayfa 12]" atıflarını markdown
-// linkine çevirir; custom `a` renderer'ı tıklamayı sayfa navigasyonuna
-// yönlendirir (iOS'taki linkifyPageCitations eşleniği).
-function linkifyPageCitations(text: string): string {
-    return text
-        .replace(/\[Sayfa (\d{1,4})\](?!\()/g, `[Sayfa $1](${PAGE_LINK_PREFIX}$1)`)
-        .replace(/(?<![[\w])Sayfa (\d{1,4})/g, `[Sayfa $1](${PAGE_LINK_PREFIX}$1)`);
-}
-
-// One chat message, memoized. During streaming, setMessages only replaces the
-// active message object; every other message keeps its identity, so this memo
-// skips re-parsing their markdown on every chunk (Phase B perf — P6).
-const ChatMessageItem = memo(function ChatMessageItem({
-    message,
-    onNavigateToPage,
-}: {
-    message: ChatMessage;
-    onNavigateToPage?: (page: number) => void;
-}) {
-    const handleCopy = () => {
-        navigator.clipboard?.writeText(message.text).catch(() => {
-            /* clipboard izni yoksa sessizce geç */
-        });
-    };
-
-    return (
-        <div className={`${styles.message} ${styles[message.role]}`}>
-            <div className={styles.messageAvatar}>
-                {message.role === 'user' ? (
-                    <UserAvatarIcon size={28} />
-                ) : (
-                    <AIAvatarIcon size={28} />
-                )}
-            </div>
-            <div className={styles.messageBubble}>
-                {message.attachment && message.attachment.type === 'image' && (
-                    <div className={styles.messageImageContainer}>
-                        <img
-                            src={`data:image/png;base64,${message.attachment.content}`}
-                            alt="Görsel eki"
-                            className={styles.messageImage}
-                        />
-                    </div>
-                )}
-                {message.text ? (
-                    <div className={styles.messageMarkdown}>
-                        <ReactMarkdown
-                            remarkPlugins={REMARK_PLUGINS}
-                            components={{
-                                a: ({ href, children }) => {
-                                    if (href?.startsWith(PAGE_LINK_PREFIX)) {
-                                        const page = parseInt(href.slice(PAGE_LINK_PREFIX.length), 10);
-                                        return (
-                                            <button
-                                                type="button"
-                                                className={styles.pageLink}
-                                                onClick={() => onNavigateToPage?.(page)}
-                                            >
-                                                {children}
-                                            </button>
-                                        );
-                                    }
-                                    return (
-                                        <a href={href} target="_blank" rel="noopener noreferrer">
-                                            {children}
-                                        </a>
-                                    );
-                                },
-                            }}
-                        >
-                            {message.role === 'model'
-                                ? linkifyPageCitations(message.text)
-                                : message.text}
-                        </ReactMarkdown>
-                    </div>
-                ) : (
-                    <div className={styles.typingIndicator}>
-                        <span className={styles.typingDot} />
-                        <span className={styles.typingDot} />
-                        <span className={styles.typingDot} />
-                    </div>
-                )}
-                {message.text && (
-                    <button
-                        type="button"
-                        className={styles.copyMessageBtn}
-                        onClick={handleCopy}
-                        title="Mesajı kopyala"
-                        aria-label="Mesajı kopyala"
-                    >
-                        ⧉
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-});
+const iconButton = 'flex size-9 shrink-0 items-center justify-center rounded-xl text-corio-fg/55 transition-colors hover:bg-corio-surface-2 hover:text-corio-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-corio-accent/40 disabled:opacity-35';
 
 export function ChatPanel({
-    isOpen,
-    onClose,
-    documentId,
-    documentContext,
-    initialMessage,
-    initialImage,
+  activeSelection,
+  currentPage,
+  documentContext,
+  documentId,
+  documentName,
+  initialImage,
+  initialMessage,
+  isOpen,
+  onClearInitialMessage,
+  onClearSelection,
+  onClose,
+  onNavigateToPage,
+}: ChatPanelProps) {
+  const isDesktop = useIsDesktop();
+  const isTablet = useMediaQuery('(min-width: 768px)');
+  const [draft, setDraft] = useState('');
+  const [attachment, setAttachment] = useState<string | null>(null);
+  const [panelWidth, setPanelWidth] = useState(() => {
+    if (typeof window === 'undefined') return 420;
+    const savedWidth = Number.parseInt(window.localStorage.getItem('corio-chat-width') ?? '', 10);
+    return Number.isFinite(savedWidth) ? Math.min(680, Math.max(360, savedWidth)) : 420;
+  });
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [showJumpButton, setShowJumpButton] = useState(false);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+  const handledInitialRef = useRef<string | null>(null);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
+
+  const session = useChatSession({
     activeSelection,
+    currentPage,
+    documentContext,
+    documentId,
+    isActive: isOpen,
+  });
+
+  useEffect(() => () => resizeCleanupRef.current?.(), []);
+
+  useEffect(() => {
+    if (!initialMessage && !initialImage) {
+      handledInitialRef.current = null;
+      return;
+    }
+    if (!isOpen || !session.isHistoryReady) return;
+    const signature = `${initialMessage ?? ''}:${initialImage?.slice(0, 48) ?? ''}`;
+    if (handledInitialRef.current === signature) return;
+    handledInitialRef.current = signature;
+
+    const frame = window.requestAnimationFrame(() => {
+      if (initialImage) {
+        setAttachment(initialImage);
+        if (initialMessage) setDraft(initialMessage);
+      } else if (initialMessage) {
+        session.sendMessage({ text: initialMessage, selection: activeSelection });
+        onClearSelection?.();
+      }
+      onClearInitialMessage?.();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    activeSelection,
+    initialImage,
+    initialMessage,
+    isOpen,
     onClearInitialMessage,
     onClearSelection,
-    onNavigateToPage,
-}: ChatPanelProps) {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [input, setInput] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [pendingAttachment, setPendingAttachment] = useState<string | null>(null);
-    const [showHistory, setShowHistory] = useState(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    const [panelWidth, setPanelWidth] = useState(380);
-    const resizeStartRef = useRef<{ x: number; width: number } | null>(null);
-    const historyRef = useRef<HTMLDivElement>(null);
-    const abortRef = useRef<AbortController | null>(null);
+    session,
+  ]);
 
-    // Cancel any in-flight stream when the panel unmounts; otherwise the
-    // fetch keeps generating (and billing) into a dead component.
-    useEffect(() => {
-        return () => abortRef.current?.abort();
-    }, []);
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    scroller.scrollTo({ behavior, top: scroller.scrollHeight });
+    isNearBottomRef.current = true;
+    setShowJumpButton(false);
+  };
 
-    // Scroll to bottom when new message
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
-
-    // Load chat history from Supabase when documentId changes
-    useEffect(() => {
-        if (!documentId) {
-            setMessages([]);
-            return;
-        }
-
-        let isMounted = true;
-
-        const loadHistory = async () => {
-            try {
-                const history = await loadChatHistory(documentId);
-                if (isMounted) {
-                    const chatMessages: ChatMessage[] = history.map(h => ({
-                        id: h.id || `${h.created_at}-${h.role}`,
-                        role: h.role,
-                        text: h.content,
-                        timestamp: h.created_at ? new Date(h.created_at) : new Date(),
-                    }));
-                    setMessages(chatMessages);
-                }
-            } catch (error) {
-                console.error('Failed to load chat history:', error);
-            }
-        };
-
-        loadHistory();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [documentId]);
-
-    // Handle initial message/image from selection
-    useEffect(() => {
-        if ((initialMessage || initialImage) && onClearInitialMessage) {
-            if (initialImage) {
-                setPendingAttachment(initialImage);
-            } else if (initialMessage) {
-                handleSendMessage(initialMessage);
-            }
-            onClearInitialMessage();
-        }
-    }, [initialMessage, initialImage]);
-
-    // Close history dropdown when clicking outside
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (historyRef.current && !historyRef.current.contains(event.target as Node)) {
-                setShowHistory(false);
-            }
-        }
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const handleSendMessage = async (messageText?: string) => {
-        const text = messageText || input.trim();
-        const img = pendingAttachment;
-
-        if ((!text && !img) || isLoading) return;
-
-        const messageContent = activeSelection
-            ? `${text}\n\n> ${activeSelection}`
-            : text;
-
-        const userMessage: ChatMessage = {
-            id: Date.now().toString(),
-            role: 'user',
-            text: messageContent,
-            timestamp: new Date(),
-            attachment: img ? {
-                type: 'image',
-                content: img
-            } : undefined
-        };
-
-        setMessages(prev => [...prev, userMessage]);
-        setInput('');
-        setPendingAttachment(null);
-
-        if (activeSelection && onClearSelection) {
-            onClearSelection();
-        }
-
-        setIsLoading(true);
-
-        const aiMessageId = (Date.now() + 1).toString();
-        const aiMessage: ChatMessage = {
-            id: aiMessageId,
-            role: 'model',
-            text: '',
-            timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, aiMessage]);
-
-        // A new message supersedes any response still streaming in.
-        abortRef.current?.abort();
-        const controller = new AbortController();
-        abortRef.current = controller;
-
-        // Persist the question up front (matches iOS): it must survive even
-        // if the model call fails, so the user finds it after a reload.
-        if (documentId) {
-            saveChatMessage(documentId, 'user', messageContent).catch(saveError =>
-                console.error('Failed to save user message:', saveError)
-            );
-        }
-
-        try {
-            let fullResponse = '';
-            const chatHistory = toChatHistory(messages);
-
-            let stream: AsyncGenerator<string, void, unknown>;
-
-            if (img) {
-                let context = documentContext;
-                if (documentId) {
-                    try {
-                        context = await searchRelevantChunks(documentId, messageContent, 15);
-                    } catch (ragError) {
-                        console.error('RAG search failed:', ragError);
-                    }
-                }
-                stream = streamChatWithImage(messageContent, img, context, controller.signal);
-            } else if (documentId) {
-                stream = streamChatWithRAGAndHistory(
-                    messageContent,
-                    documentId,
-                    chatHistory,
-                    controller.signal
-                );
-            } else {
-                stream = streamChat(messageContent, documentContext, controller.signal);
-            }
-
-            for await (const chunk of stream) {
-                fullResponse += chunk;
-                setMessages(prev =>
-                    prev.map(m =>
-                        m.id === aiMessageId ? { ...m, text: fullResponse } : m
-                    )
-                );
-            }
-
-            if (documentId) {
-                try {
-                    await saveChatMessage(documentId, 'model', fullResponse);
-                } catch (saveError) {
-                    console.error('Failed to save chat messages:', saveError);
-                }
-            }
-        } catch (err) {
-            if (controller.signal.aborted) {
-                // Cancelled (new message or panel closed): drop the empty
-                // placeholder, keep any partial text, show no error.
-                setMessages(prev => prev.filter(m => !(m.id === aiMessageId && !m.text)));
-            } else {
-                console.error('Chat error:', err);
-                setMessages(prev =>
-                    prev.map(m =>
-                        m.id === aiMessageId
-                            ? { ...m, text: 'Bir hata oluştu. Lütfen tekrar deneyin.' }
-                            : m
-                    )
-                );
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSendMessage();
-        }
-    };
-
-    // Without per-conversation ids in the chats schema, "new chat" and
-    // "clear" are necessarily the same operation — and it permanently deletes
-    // the saved history, so it must be confirmed (iOS shows the same dialog).
-    const handleClearChat = async () => {
-        if (messages.length === 0) return;
-        const confirmed = window.confirm(
-            'Sohbet geçmişi kalıcı olarak silinecek. Devam etmek istiyor musunuz?'
-        );
-        if (!confirmed) return;
-
-        abortRef.current?.abort();
-        setMessages([]);
-        if (documentId) {
-            try {
-                await clearChatHistory(documentId);
-            } catch (error) {
-                console.error('Failed to clear chat history:', error);
-            }
-        }
-    };
-
-    const handleSuggestionClick = (suggestion: string) => {
-        handleSendMessage(suggestion);
-    };
-
-    // Konuşmayı Markdown dosyası olarak indirir (iOS ShareLink eşleniği).
-    const handleExport = () => {
-        if (messages.length === 0) return;
-        const body = messages
-            .map(m => `**${m.role === 'user' ? 'Sen' : 'Corio AI'}**\n\n${m.text}`)
-            .join('\n\n---\n\n');
-        const blob = new Blob([`# Corio AI Sohbeti\n\n${body}\n`], {
-            type: 'text/markdown;charset=utf-8',
-        });
-        const url = URL.createObjectURL(blob);
-        const anchor = window.document.createElement('a');
-        anchor.href = url;
-        anchor.download = 'corio-sohbet.md';
-        anchor.click();
-        URL.revokeObjectURL(url);
-    };
-
-    if (!isOpen) return null;
-
-    const handlePanelMouseDown = (e: React.MouseEvent) => {
-        e.stopPropagation();
-    };
-
-    const handleResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const startWidth = panelWidth;
-        resizeStartRef.current = { x: e.clientX, width: startWidth };
-
-        const minWidth = 320;
-        const maxWidth = Math.max(minWidth, Math.min(760, window.innerWidth - 240));
-
-        const handlePointerMove = (event: PointerEvent) => {
-            if (!resizeStartRef.current) return;
-            const delta = resizeStartRef.current.x - event.clientX;
-            const nextWidth = Math.min(
-                maxWidth,
-                Math.max(minWidth, resizeStartRef.current.width + delta)
-            );
-            setPanelWidth(nextWidth);
-        };
-
-        const handlePointerUp = () => {
-            resizeStartRef.current = null;
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-            document.removeEventListener('pointermove', handlePointerMove);
-            document.removeEventListener('pointerup', handlePointerUp);
-        };
-
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
-        document.addEventListener('pointermove', handlePointerMove);
-        document.addEventListener('pointerup', handlePointerUp);
-    };
-
-    return (
-        <div
-            className={styles.panel}
-            style={{ width: panelWidth }}
-            onMouseDown={handlePanelMouseDown}
-            data-chat-panel="true"
-        >
-            <div
-                className={styles.resizeHandle}
-                onPointerDown={handleResizeStart}
-                aria-hidden="true"
-            />
-
-            {/* Header */}
-            <div className={styles.header}>
-                <div className={styles.headerLeft}>
-                    <div className={styles.logo}>
-                        <CorioLogo size={28} className={styles.logoIcon} />
-                        <span className={styles.logoText}>Corio AI</span>
-                    </div>
-                </div>
-                <div className={styles.headerActions}>
-                    <button
-                        className={styles.iconBtn}
-                        onClick={handleClearChat}
-                        title="Yeni Sohbet"
-                    >
-                        <NewChatIcon size={18} />
-                    </button>
-                    <button
-                        className={styles.iconBtn}
-                        onClick={handleExport}
-                        title="Sohbeti Dışa Aktar (.md)"
-                        disabled={messages.length === 0}
-                    >
-                        <DownloadIcon size={18} />
-                    </button>
-                    <div className={styles.historyContainer} ref={historyRef}>
-                        <button
-                            className={styles.iconBtn}
-                            onClick={() => setShowHistory(!showHistory)}
-                            title="Sohbet Geçmişi"
-                        >
-                            <HistoryIcon size={18} />
-                        </button>
-                        {showHistory && (
-                            <div className={styles.historyDropdown}>
-                                <div className={styles.historyHeader}>Sohbet Geçmişi</div>
-                                {messages.length > 0 ? (
-                                    <div className={styles.historyItem}>
-                                        <MessageIcon size={20} className={styles.historyItemIcon} />
-                                        <div className={styles.historyItemText}>
-                                            <div className={styles.historyItemTitle}>
-                                                {messages[0]?.text?.substring(0, 40) || 'Mevcut Sohbet'}...
-                                            </div>
-                                            <div className={styles.historyItemDate}>
-                                                {new Date().toLocaleDateString('tr-TR')}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className={styles.historyEmpty}>
-                                        Henüz sohbet geçmişi yok
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                    <button
-                        className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
-                        onClick={handleClearChat}
-                        title="Sohbeti Temizle"
-                    >
-                        <TrashIcon size={18} />
-                    </button>
-                    <button
-                        className={styles.iconBtn}
-                        onClick={onClose}
-                        title="Kapat"
-                    >
-                        <CloseIcon size={18} />
-                    </button>
-                </div>
-            </div>
-
-            {/* Messages */}
-            <div className={styles.messages}>
-                {messages.length === 0 ? (
-                    <div className={styles.emptyState}>
-                        <MessageIcon size={56} className={styles.emptyIcon} />
-                        <h3 className={styles.emptyTitle}>Merhaba! Ben Corio AI</h3>
-                        <p className={styles.emptySubtitle}>
-                            Belgeniz hakkında sorular sorabilir, özetler isteyebilir veya herhangi bir konuda yardım alabilirsiniz.
-                        </p>
-                        <div className={styles.suggestions}>
-                            {DEFAULT_SUGGESTIONS.map((suggestion, index) => (
-                                <button
-                                    key={index}
-                                    className={styles.suggestionChip}
-                                    onClick={() => handleSuggestionClick(suggestion)}
-                                >
-                                    <SparkleIcon size={16} className={styles.suggestionIcon} />
-                                    <span className={styles.suggestionText}>{suggestion}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                ) : (
-                    messages.map(message => (
-                        <ChatMessageItem
-                            key={message.id}
-                            message={message}
-                            onNavigateToPage={onNavigateToPage}
-                        />
-                    ))
-                )}
-                <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input Area */}
-            <div className={styles.inputArea}>
-                <div className={styles.inputWrapper}>
-                    <div className={styles.inputContainer}>
-                        {activeSelection && (
-                            <div className={styles.selectedQuote}>
-                                <QuoteIcon size={16} className={styles.quoteIcon} />
-                                <div className={styles.quoteContent}>
-                                    <div className={styles.quoteText}>&ldquo;{activeSelection}&rdquo;</div>
-                                </div>
-                                <button
-                                    className={styles.quoteClose}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onClearSelection?.();
-                                    }}
-                                    title="Seçimi kaldır"
-                                >
-                                    <CloseIcon size={14} />
-                                </button>
-                            </div>
-                        )}
-                        {pendingAttachment && (
-                            <div className={styles.pendingAttachment}>
-                                <img
-                                    src={`data:image/png;base64,${pendingAttachment}`}
-                                    alt="Eklenecek görsel"
-                                    className={styles.pendingImage}
-                                />
-                                <button
-                                    className={styles.removeAttachmentBtn}
-                                    onClick={() => setPendingAttachment(null)}
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                        )}
-                        <textarea
-                            className={styles.input}
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onFocus={(e) => e.stopPropagation()}
-                            placeholder={
-                                pendingAttachment
-                                    ? "Görsel hakkında soru sorun..."
-                                    : activeSelection
-                                        ? "Seçili metin hakkında soru sorun..."
-                                        : "Mesajınızı yazın..."
-                            }
-                            rows={1}
-                            disabled={isLoading}
-                        />
-                    </div>
-                </div>
-                <button
-                    className={styles.sendBtn}
-                    onClick={() => handleSendMessage()}
-                    disabled={(!input.trim() && !pendingAttachment) || isLoading}
-                >
-                    {isLoading ? (
-                        <span className={styles.spinner} />
-                    ) : (
-                        <SendIcon size={20} />
-                    )}
-                </button>
-            </div>
-        </div>
+  useEffect(() => {
+    const lastMessage = session.messages.at(-1);
+    if (!lastMessage || (!isNearBottomRef.current && lastMessage.role !== 'user')) return;
+    const frame = window.requestAnimationFrame(() =>
+      scrollToBottom(lastMessage.status === 'streaming' ? 'auto' : 'smooth')
     );
+    return () => window.cancelAnimationFrame(frame);
+  }, [session.messages]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const frame = window.requestAnimationFrame(() => scrollToBottom('auto'));
+    return () => window.cancelAnimationFrame(frame);
+  }, [isOpen, session.isLoadingHistory]);
+
+  const visibleMessages = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase('tr-TR');
+    if (!query) return session.messages;
+    return session.messages.filter(message => message.text.toLocaleLowerCase('tr-TR').includes(query));
+  }, [searchQuery, session.messages]);
+
+  const lastModelId = useMemo(
+    () => [...session.messages].reverse().find(message => message.role === 'model')?.id,
+    [session.messages],
+  );
+
+  const handleSubmit = (text = draft) => {
+    session.sendMessage({ attachment, selection: activeSelection, text });
+    setDraft('');
+    setAttachment(null);
+    onClearSelection?.();
+  };
+
+  const handleExport = () => {
+    const blob = new Blob([session.exportTranscript()], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = window.document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'corio-sohbet.md';
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
+  const handleClose = () => {
+    session.stopGenerating();
+    onClose();
+  };
+
+  const handleResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = panelWidth;
+
+    const move = (pointerEvent: PointerEvent) => {
+      const maxWidth = Math.min(680, window.innerWidth - 360);
+      setPanelWidth(Math.max(360, Math.min(maxWidth, startWidth + startX - pointerEvent.clientX)));
+    };
+    const cleanup = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', cleanup);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      resizeCleanupRef.current = null;
+      setPanelWidth(width => {
+        window.localStorage.setItem('corio-chat-width', String(Math.round(width)));
+        return width;
+      });
+    };
+
+    resizeCleanupRef.current?.();
+    resizeCleanupRef.current = cleanup;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', cleanup);
+  };
+
+  const panelContent = (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-corio-bg text-corio-fg" data-chat-panel="true">
+      <header className="shrink-0 border-b border-corio-border-subtle bg-corio-bg/92 px-3 py-2.5 backdrop-blur-xl sm:px-4">
+        <div className="flex min-h-10 items-center gap-2">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-corio-accent-subtle ring-1 ring-corio-accent/10">
+            <CorioLogo size={21} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-semibold tracking-[-0.01em]">Corio AI</h2>
+            <div className="flex items-center gap-1.5 text-[11px] text-corio-fg/45">
+              <span className={`size-1.5 rounded-full ${session.isLoading ? 'animate-pulse bg-corio-accent' : 'bg-corio-success'}`} />
+              <span className="truncate">{session.isLoading ? 'Yanıt hazırlanıyor' : documentName ? `${documentName} ile bağlı` : 'Belgeye bağlı'}</span>
+            </div>
+          </div>
+
+          {session.messages.length > 0 && (
+            <button
+              aria-label="Sohbette ara"
+              className={iconButton}
+              onClick={() => {
+                setSearchOpen(open => !open);
+                if (searchOpen) setSearchQuery('');
+              }}
+              title="Sohbette ara"
+              type="button"
+            >
+              <Search className="size-[17px]" />
+            </button>
+          )}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger className={iconButton} aria-label="Sohbet seçenekleri">
+              <Ellipsis className="size-[18px]" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52 border border-corio-border bg-corio-surface-1 text-corio-fg">
+              <DropdownMenuItem disabled={session.messages.length === 0} onClick={handleExport}>
+                <Download /> Sohbeti dışa aktar
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={session.messages.length === 0}
+                onClick={() => setConfirmClear(true)}
+                variant="destructive"
+              >
+                <Trash2 /> Sohbeti temizle
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <button aria-label="Sohbeti kapat" className={iconButton} onClick={handleClose} title="Kapat" type="button">
+            <X className="size-[18px]" />
+          </button>
+        </div>
+
+        {searchOpen && (
+          <div className="mt-2 flex items-center gap-2 rounded-xl border border-corio-border bg-corio-surface-1 px-2.5 py-1.5">
+            <Search className="size-4 text-corio-fg/35" />
+            <input
+              aria-label="Sohbet mesajlarında ara"
+              autoFocus
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-corio-fg/35"
+              onChange={event => setSearchQuery(event.target.value)}
+              placeholder="Mesajlarda ara…"
+              value={searchQuery}
+            />
+            <span className="text-[11px] tabular-nums text-corio-fg/40">{visibleMessages.length}</span>
+            <button aria-label="Aramayı kapat" className="rounded-md p-1 hover:bg-corio-surface-2" onClick={() => { setSearchOpen(false); setSearchQuery(''); }} type="button">
+              <X className="size-3.5" />
+            </button>
+          </div>
+        )}
+      </header>
+
+      {session.error && (
+        <div className="mx-3 mt-2 flex items-start gap-2 rounded-xl border border-corio-destructive/15 bg-corio-destructive/5 px-3 py-2 text-xs leading-relaxed text-corio-fg/70" role="alert">
+          <span className="flex-1">{session.error}</span>
+          <button aria-label="Uyarıyı kapat" className="rounded p-0.5 hover:bg-corio-destructive/10" onClick={session.dismissError} type="button">
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
+
+      <div
+        className="relative flex-1 overflow-y-auto overscroll-contain px-3 py-5 sm:px-4"
+        onScroll={event => {
+          const target = event.currentTarget;
+          const nearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 110;
+          isNearBottomRef.current = nearBottom;
+          setShowJumpButton(!nearBottom);
+        }}
+        ref={scrollerRef}
+      >
+        <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col">
+          {session.isLoadingHistory ? (
+            <div className="space-y-5 py-2" aria-label="Sohbet geçmişi yükleniyor" role="status">
+              {[0, 1, 2].map(index => (
+                <div className={`flex gap-2.5 ${index === 1 ? 'justify-end' : ''}`} key={index}>
+                  {index !== 1 && <div className="size-7 animate-pulse rounded-full bg-corio-surface-2" />}
+                  <div className={`h-16 animate-pulse rounded-2xl bg-corio-surface-2 ${index === 1 ? 'w-2/3' : 'w-4/5'}`} />
+                </div>
+              ))}
+            </div>
+          ) : session.messages.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center py-7 text-center">
+              <div className="mb-5 flex size-16 items-center justify-center rounded-[22px] bg-corio-accent-subtle ring-1 ring-corio-accent/10">
+                <CorioLogo size={34} />
+              </div>
+              <h3 className="text-lg font-semibold tracking-[-0.02em]">Belgeni birlikte inceleyelim</h3>
+              <p className="mb-6 mt-1.5 max-w-sm text-sm leading-relaxed text-corio-fg/50">
+                Özet çıkarabilir, kavramları açıklayabilir ve yanıtları doğrudan ilgili sayfalara bağlayabilirim.
+              </p>
+              <SuggestedPrompts disabled={session.isLoading} onSelect={handleSubmit} prompts={session.suggestions} />
+            </div>
+          ) : visibleMessages.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 py-20 text-center text-corio-fg/45">
+              <Search className="size-6" />
+              <p className="text-sm">Bu aramayla eşleşen mesaj yok.</p>
+            </div>
+          ) : (
+            <div className="space-y-4" aria-live="polite">
+              {visibleMessages.map(message => (
+                <ChatMessage
+                  isLastModelMessage={message.id === lastModelId}
+                  key={message.id}
+                  message={message}
+                  onNavigateToPage={onNavigateToPage}
+                  onRegenerate={session.regenerateLastResponse}
+                  onRetry={message.status === 'error' ? session.retryLastResponse : undefined}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {showJumpButton && (
+          <button
+            aria-label="Son mesaja git"
+            className="sticky bottom-2 left-full flex size-9 -translate-x-1 items-center justify-center rounded-full border border-corio-border bg-corio-surface-1 text-corio-fg/65 shadow-md transition-transform hover:scale-105 hover:text-corio-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-corio-accent/40"
+            onClick={() => scrollToBottom()}
+            type="button"
+          >
+            <ArrowDown className="size-4" />
+          </button>
+        )}
+      </div>
+
+      <div className="shrink-0 border-t border-corio-border-subtle bg-corio-bg/94 backdrop-blur-xl">
+        <ChatInput
+          activeSelection={activeSelection}
+          attachment={attachment}
+          autoFocus={isOpen && session.isHistoryReady && session.messages.length === 0}
+          draft={draft}
+          isLoading={session.isLoading}
+          onAttachmentChange={setAttachment}
+          onDraftChange={setDraft}
+          onRemoveSelection={onClearSelection}
+          onStop={session.stopGenerating}
+          onSubmit={() => handleSubmit()}
+        />
+      </div>
+    </div>
+  );
+
+  if (!isOpen) return null;
+
+  const clearDialog = (
+    <Dialog onOpenChange={setConfirmClear} open={confirmClear}>
+      <DialogContent className="border border-corio-border bg-corio-surface-1 text-corio-fg" showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>Sohbet temizlensin mi?</DialogTitle>
+          <DialogDescription>Bu belgeye ait tüm sohbet geçmişi kalıcı olarak silinecek.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="border-corio-border-subtle bg-corio-surface-2/60">
+          <button className="rounded-xl border border-corio-border px-3 py-2 text-sm font-medium hover:bg-corio-surface-3" onClick={() => setConfirmClear(false)} type="button">
+            Vazgeç
+          </button>
+          <button
+            className="rounded-xl bg-corio-destructive px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+            onClick={() => void session.clearHistory().then(() => setConfirmClear(false)).catch(() => undefined)}
+            type="button"
+          >
+            Kalıcı olarak sil
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (isDesktop) {
+    return (
+      <>
+        <aside
+          aria-label="Corio AI sohbet paneli"
+          className="relative h-full min-w-[360px] max-w-[680px] shrink-0 border-l border-corio-border-subtle bg-corio-bg shadow-[-14px_0_40px_rgba(42,37,32,0.06)]"
+          style={{ width: panelWidth }}
+        >
+          <div
+            aria-hidden="true"
+            className="absolute inset-y-0 -left-1 z-20 w-2 cursor-col-resize transition-colors hover:bg-corio-accent/20"
+            onPointerDown={handleResizeStart}
+          />
+          {panelContent}
+        </aside>
+        {clearDialog}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Drawer.Root
+        direction={isTablet ? 'right' : 'bottom'}
+        fixed
+        handleOnly={!isTablet}
+        modal
+        onOpenChange={open => { if (!open) handleClose(); }}
+        open={isOpen}
+      >
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 z-[70] bg-black/30 backdrop-blur-[2px]" />
+          <Drawer.Content
+            className={
+              isTablet
+                ? 'fixed inset-y-0 right-0 z-[80] w-[min(470px,92vw)] border-l border-corio-border bg-corio-bg shadow-2xl outline-none'
+                : 'fixed inset-x-0 bottom-0 z-[80] h-[94dvh] overflow-hidden rounded-t-[28px] border border-b-0 border-corio-border bg-corio-bg shadow-2xl outline-none'
+            }
+          >
+            <Drawer.Title className="sr-only">Corio AI sohbeti</Drawer.Title>
+            <Drawer.Description className="sr-only">Belgeniz hakkında soru sorun.</Drawer.Description>
+            {!isTablet && (
+              <div className="absolute inset-x-0 top-2 z-30 flex justify-center">
+                <Drawer.Handle className="!m-0 h-1.5 w-12 rounded-full bg-corio-fg/18" />
+              </div>
+            )}
+            <div className={!isTablet ? 'h-full pt-3' : 'h-full'}>{panelContent}</div>
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
+      {clearDialog}
+    </>
+  );
 }

@@ -515,7 +515,7 @@ struct MarkdownView: View {
                 // Header row
                 HStack(spacing: 0) {
                     ForEach(headers.indices, id: \.self) { index in
-                        Text(headers[index])
+                        renderInlineText(headers[index])
                             .font(.caption.bold())
                             .foregroundColor(.primary)
                             .frame(width: columnWidth, alignment: .leading)
@@ -537,7 +537,7 @@ struct MarkdownView: View {
                 ForEach(rows.indices, id: \.self) { rowIndex in
                     HStack(spacing: 0) {
                         ForEach(rows[rowIndex].indices, id: \.self) { colIndex in
-                            Text(rows[rowIndex][colIndex])
+                            renderInlineText(rows[rowIndex][colIndex])
                                 .font(.caption)
                                 .foregroundColor(.primary)
                                 .frame(width: columnWidth, alignment: .leading)

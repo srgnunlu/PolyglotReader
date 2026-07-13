@@ -3,14 +3,15 @@ import Foundation
 
 // MARK: - Cache Key
 
-/// Builds the cross-platform translation cache key.
+/// Builds translation cache keys for both legacy and literal policies.
 ///
-/// CRITICAL: The normalization and hash MUST stay byte-identical to the web
-/// implementation (`text.trim().replace(/\s+/g, ' ')` + SHA-256 hex of
-/// `"<targetLang>::<normalized>"`) so iOS and web share the same
-/// `translation_cache` rows in Supabase.
-// nonisolated: the project defaults to MainActor isolation, but these helpers
-// must be callable synchronously from inside `actor TranslationCacheService`.
+/// The unversioned path stays byte-identical to the web implementation
+/// (`text.trim().replace(/\s+/g, ' ')` + SHA-256 hex of
+/// `"<targetLang>::<normalized>"`). The versioned literal policy deliberately
+/// preserves internal whitespace so differently structured source text cannot
+/// reuse a translation produced for another layout.
+/// `nonisolated` is required because the project defaults to `MainActor`
+/// isolation while these helpers are called synchronously from the cache actor.
 nonisolated enum TranslationCacheKey {
     /// Trims leading/trailing whitespace and collapses every internal
     /// whitespace run (spaces, tabs, newlines) into a single space.
@@ -19,11 +20,25 @@ nonisolated enum TranslationCacheKey {
         text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
-    /// Lowercase SHA-256 hex digest of the UTF-8 string "<targetLang>::<normalized>".
-    static func hash(sourceText: String, targetLang: String) -> String {
-        let payload = "\(targetLang)::\(normalize(sourceText))"
+    /// Lowercase SHA-256 hex digest of the UTF-8 cache payload. An optional
+    /// policy namespace invalidates results produced under an older prompt
+    /// contract without deleting users' history rows.
+    static func hash(sourceText: String, targetLang: String, policyVersion: String? = nil) -> String {
+        let namespace = policyVersion.map { "\($0)::" } ?? ""
+        let preparedSource = policyVersion == TranslationPromptBuilder.policyVersion
+            ? literalSource(sourceText)
+            : normalize(sourceText)
+        let payload = "\(namespace)\(targetLang)::\(preparedSource)"
         let digest = SHA256.hash(data: Data(payload.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Literal translations retain internal whitespace because line breaks and
+    /// table layout are part of the requested output contract.
+    private static func literalSource(_ text: String) -> String {
+        text.replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
@@ -70,7 +85,8 @@ nonisolated struct TranslationLRUCache {
 // MARK: - Translation Cache Service
 
 /// Two-layer translation cache: in-memory LRU (instant) + Supabase
-/// `translation_cache` table (shared across devices and with the web app).
+/// `translation_cache` table (shared across iOS devices). Legacy, unversioned
+/// keys remain compatible with the web app; literal-policy keys are namespaced.
 ///
 /// Every remote failure degrades to a cache miss — translation must never
 /// fail because of the cache, and remote errors are logged only once.
@@ -79,6 +95,7 @@ actor TranslationCacheService {
 
     /// The popup always caches under Turkish; matches the table default.
     static let defaultTargetLanguage = "tr"
+    static let policyVersion = TranslationPromptBuilder.policyVersion
 
     private var memory: TranslationLRUCache
     private var hasLoggedRemoteFailure = false
@@ -93,7 +110,11 @@ actor TranslationCacheService {
         for sourceText: String,
         targetLang: String = TranslationCacheService.defaultTargetLanguage
     ) async -> String? {
-        let key = TranslationCacheKey.hash(sourceText: sourceText, targetLang: targetLang)
+        let key = TranslationCacheKey.hash(
+            sourceText: sourceText,
+            targetLang: targetLang,
+            policyVersion: Self.policyVersion
+        )
         if let hit = memory.value(forKey: key) {
             return hit
         }
@@ -122,7 +143,11 @@ actor TranslationCacheService {
         let normalized = TranslationCacheKey.normalize(sourceText)
         guard !normalized.isEmpty, !translatedText.isEmpty else { return }
 
-        let key = TranslationCacheKey.hash(sourceText: sourceText, targetLang: targetLang)
+        let key = TranslationCacheKey.hash(
+            sourceText: sourceText,
+            targetLang: targetLang,
+            policyVersion: Self.policyVersion
+        )
         memory.insert(translatedText, forKey: key)
 
         do {

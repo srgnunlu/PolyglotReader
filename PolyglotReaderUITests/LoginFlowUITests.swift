@@ -9,8 +9,12 @@ final class LoginFlowUITests: UITestBase {
         // Given - App is launched and we're on the login screen
         
         // Then - Login UI elements should be present using accessibility identifiers
-        let googleButton = app.buttons["google_sign_in_button"]
-        let appleButton = app.buttons["apple_sign_in_button"]
+        let googleButton = app.buttons
+            .matching(NSPredicate(format: "label CONTAINS[c] 'Google'"))
+            .firstMatch
+        let appleButton = app.buttons
+            .matching(NSPredicate(format: "label CONTAINS[c] 'Apple'"))
+            .firstMatch
         
         // Allow time for the app to load
         _ = googleButton.waitForExistence(timeout: 5)
@@ -31,16 +35,35 @@ final class LoginFlowUITests: UITestBase {
         // Given - App is launched
         
         // Then - App title or logo should be visible
-        // Note: AuthView uses "Polyglot Reader" with a space
-        let appTitle = app.staticTexts["Polyglot Reader"]
+        let appTitle = app.staticTexts["Corio Docs"]
         let hasTitle = waitForElement(appTitle, timeout: 5)
         
         // The app might show the title differently
         if !hasTitle {
             // Check for any prominent text element or login screen
-            let anyTitle = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'Polyglot'")).firstMatch
+            let anyTitle = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'Corio'")).firstMatch
             XCTAssertTrue(anyTitle.exists || isOnLoginScreen, "App should show title or login screen")
         }
+    }
+
+    func testInteractiveProductDemoKeepsAuthenticationAvailable() {
+        let entryExperience = app.otherElements["entry_experience"]
+        XCTAssertTrue(entryExperience.waitForExistence(timeout: 5))
+
+        let translationStage = app.buttons["Seç. Anında çevir."]
+        XCTAssertTrue(translationStage.waitForExistence(timeout: 3))
+        translationStage.tap()
+
+        XCTAssertTrue(app.buttons["Çeviri sonucu"].waitForExistence(timeout: 3))
+
+        let appleButton = app.buttons
+            .matching(NSPredicate(format: "label CONTAINS[c] 'Apple'"))
+            .firstMatch
+        let googleButton = app.buttons
+            .matching(NSPredicate(format: "label CONTAINS[c] 'Google'"))
+            .firstMatch
+        XCTAssertTrue(appleButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(googleButton.waitForExistence(timeout: 3))
     }
     
     // MARK: - Navigation Tests
@@ -64,30 +87,28 @@ final class LoginFlowUITests: UITestBase {
     
     // MARK: - Button Interaction Tests
     
-    func testGoogleSignInButtonIsHittable() {
+    func testGoogleSignInButtonIsHittable() throws {
         // Given
         let googleButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Google'")).firstMatch
         
         // When - Wait for button
         guard waitForElement(googleButton, timeout: 5) else {
             // If no Google button, we might already be logged in
-            XCTSkip("Google sign-in button not found - user may be logged in")
-            return
+            throw XCTSkip("Google sign-in button not found - user may be logged in")
         }
         
         // Then
         XCTAssertTrue(googleButton.isHittable, "Google sign-in button should be tappable")
     }
     
-    func testAppleSignInButtonIsHittable() {
+    func testAppleSignInButtonIsHittable() throws {
         // Given
         let appleButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Apple'")).firstMatch
         
         // When - Wait for button
         guard waitForElement(appleButton, timeout: 5) else {
             // If no Apple button, we might already be logged in
-            XCTSkip("Apple sign-in button not found - user may be logged in")
-            return
+            throw XCTSkip("Apple sign-in button not found - user may be logged in")
         }
         
         // Then

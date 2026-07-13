@@ -2,8 +2,26 @@ import Foundation
 import Combine
 import PDFKit
 
+@MainActor
+protocol ReadingProgressServicing: AnyObject {
+    func getReadingProgress(fileId: String) async throws -> ReadingProgress?
+
+    func saveReadingProgress(
+        fileId: String,
+        page: Int,
+        offsetX: Double,
+        offsetY: Double,
+        scale: Double
+    ) async throws
+}
+
+extension SupabaseService: ReadingProgressServicing {}
+
 // MARK: - PDF Reader ViewModel
 @MainActor
+// Existing reader responsibilities are split across extensions where practical;
+// pending progress-restoration work in this branch temporarily exceeds the cap.
+// swiftlint:disable:next type_body_length
 class PDFReaderViewModel: ObservableObject {
     @Published var document: PDFDocument?
     @Published var currentPage = 1
@@ -48,17 +66,23 @@ class PDFReaderViewModel: ObservableObject {
     private let geminiService = GeminiService.shared
     // Internal: +Translation extension'ı da kullanır.
     let supabaseService = SupabaseService.shared
+    private let readingProgressService: any ReadingProgressServicing
     private var pdfData: Data?
 
     // MARK: - Page Pre-rendering
     // MARK: - Page Pre-rendering
     private var pagePreRenderingTask: Task<Void, Never>?
     private var progressUpdateTask: Task<Void, Never>?
+    private var pendingReadingProgress: PendingReadingProgress?
     private var networkObserver: AnyCancellable?
     private let adjacentPagesToPreRender = 1  // Pre-render 1 page ahead/behind
 
-    init(file: PDFDocumentMetadata) {
+    init(
+        file: PDFDocumentMetadata,
+        readingProgressService: (any ReadingProgressServicing)? = nil
+    ) {
         self.fileMetadata = file
+        self.readingProgressService = readingProgressService ?? SupabaseService.shared
         setupNetworkObserver()
         #if DEBUG
         MemoryDebugger.shared.logInit(self)
@@ -105,9 +129,12 @@ class PDFReaderViewModel: ObservableObject {
             let (data, url) = try await loadPdfDataWithCache()
             let pdfDocument = try createPdfDocument(from: data)
 
+            // PDFKit ilk kez ekrana gelmeden önce kayıtlı sayfa/konumu uygula.
+            // Aksi halde ilk sayfa bildirimi uzaktan gelen ilerlemeyle yarışıp
+            // binding'i tekrar 1'e çekebiliyor.
+            await restoreReadingProgress(totalPages: pdfDocument.pageCount)
             applyLoadedDocument(pdfDocument, data: data)
             loadAnnotationsAsync()
-            loadReadingProgressAsync()
             prepareChatAsync(url: url)
 
             // İlk sayfayı arka planda cache'e kaydet (bir sonraki açılış için)
@@ -302,42 +329,79 @@ class PDFReaderViewModel: ObservableObject {
         }
     }
 
-    private func loadReadingProgressAsync() {
-        Task {
-            do {
-                if let progress = try await supabaseService.getReadingProgress(fileId: fileMetadata.id) {
-                    await MainActor.run {
-                        self.currentPage = progress.page
-                        self.scale = CGFloat(progress.zoomScale)
-                        self.initialScrollPosition = CGPoint(x: progress.offsetX, y: progress.offsetY)
-                        logInfo("PDFReaderVM", "Okuma ilerlemesi yüklendi", details: "Sayfa \(progress.page)")
-                    }
-                }
-            } catch {
-                logWarning("PDFReaderVM", "Okuma ilerlemesi yüklenemedi", details: error.localizedDescription)
-            }
+    func restoreReadingProgress(totalPages: Int) async {
+        do {
+            guard let progress = try await readingProgressService.getReadingProgress(
+                fileId: fileMetadata.id
+            ) else { return }
+
+            currentPage = min(max(progress.page, 1), max(totalPages, 1))
+            scale = CGFloat(progress.zoomScale)
+            initialScrollPosition = CGPoint(x: progress.offsetX, y: progress.offsetY)
+            logInfo(
+                "PDFReaderVM",
+                "Okuma ilerlemesi yüklendi",
+                details: "Sayfa \(currentPage)"
+            )
+        } catch {
+            logWarning(
+                "PDFReaderVM",
+                "Okuma ilerlemesi yüklenemedi",
+                details: error.localizedDescription
+            )
         }
     }
-    
+
     func updateReadingProgress(page: Int, point: CGPoint, scale: CGFloat) {
+        guard page > 0, scale.isFinite, scale > 0 else { return }
+
+        pendingReadingProgress = PendingReadingProgress(
+            page: page,
+            point: point,
+            scale: scale
+        )
+
         // İlerleme kaydetme (debounce: 2 saniye)
         progressUpdateTask?.cancel()
-        progressUpdateTask = Task {
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            guard !Task.isCancelled else { return }
-            
+        progressUpdateTask = Task { [weak self] in
             do {
-                try await supabaseService.saveReadingProgress(
-                    fileId: fileMetadata.id,
-                    page: page,
-                    offsetX: point.x,
-                    offsetY: point.y,
-                    scale: Double(scale)
-                )
-                logDebug("PDFReaderVM", "Okuma ilerlemesi kaydedildi")
+                try await Task.sleep(nanoseconds: 2_000_000_000)
             } catch {
-                logError("PDFReaderVM", "Okuma ilerlemesi kaydedilemedi", error: error)
+                return
             }
+
+            guard !Task.isCancelled else { return }
+            await self?.persistPendingReadingProgress()
+        }
+    }
+
+    /// Bekleyen son konumu debounce süresini beklemeden yazar. Okuyucu
+    /// kapanırken çağrılarak son kaydırmanın deinit sırasında kaybolmasını önler.
+    func flushReadingProgress() async {
+        progressUpdateTask?.cancel()
+        progressUpdateTask = nil
+        await persistPendingReadingProgress()
+    }
+
+    private func persistPendingReadingProgress() async {
+        guard let progress = pendingReadingProgress else { return }
+
+        do {
+            try await readingProgressService.saveReadingProgress(
+                fileId: fileMetadata.id,
+                page: progress.page,
+                offsetX: progress.point.x,
+                offsetY: progress.point.y,
+                scale: Double(progress.scale)
+            )
+
+            if pendingReadingProgress == progress {
+                pendingReadingProgress = nil
+            }
+            logDebug("PDFReaderVM", "Okuma ilerlemesi kaydedildi")
+        } catch {
+            // Pending değer korunur; kapanış/sonraki tetikleme yeniden deneyebilir.
+            logError("PDFReaderVM", "Okuma ilerlemesi kaydedilemedi", error: error)
         }
     }
 
@@ -684,6 +748,12 @@ class PDFReaderViewModel: ObservableObject {
         CacheService.shared.removePDFPages(forFileId: fileMetadata.id)
         logDebug("PDFReaderVM", "Sayfa cache temizlendi")
     }
+}
+
+private struct PendingReadingProgress: Equatable {
+    let page: Int
+    let point: CGPoint
+    let scale: CGFloat
 }
 
 // MARK: - Library Metadata Backfill

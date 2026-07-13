@@ -70,6 +70,19 @@ xcodebuild -scheme PolyglotReader -destination 'platform=iOS Simulator,name=iPho
 API anahtarları gitignore'lanmış `Config.plist` dosyasından okunur — şablon ve
 detaylar için [CLAUDE.md](CLAUDE.md) dosyasına bakın.
 
+### Corio Docs marka ve giriş deneyimi
+
+Kimlik doğrulama öncesindeki tek ekran; kütüphane, okuyucu, hızlı çeviri ve
+anotasyon akışlarını ağ isteği yapmadan etkileşimli olarak tanıtır. Hareketi
+azalt erişilebilirlik ayarı açıkken otomatik geçişler durur. iPhone'da dikey,
+iPad'de iki sütunlu yerleşim kullanılır.
+
+- Marka kaynakları ve ikonlar: `Marketing/Brand/`
+- App Store üretim kaynakları: `Marketing/AppStore/`
+- 6.9 inç Türkçe mağaza görsellerini yenileme:
+  `Marketing/AppStore/generate-assets.sh`
+- Marka renk token'ları: `PolyglotReader/DesignSystem/DSColor.swift`
+
 ## Veritabanı
 
 Şema ve RPC fonksiyonları [CLAUDE.md](CLAUDE.md) içinde belgelidir. SQL

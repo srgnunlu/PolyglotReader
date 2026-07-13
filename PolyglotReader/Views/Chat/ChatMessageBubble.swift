@@ -5,6 +5,7 @@ import UIKit // UIRectCorner + UIPasteboard
 struct MessageBubble: View {
     let message: ChatMessage
     var isStreaming: Bool = false
+    var showsActions: Bool = false
     var showsTimestamp: Bool = false
     /// AI yanıtını sesli okutur (nil ise menüde gösterilmez).
     var onSpeak: ((String) -> Void)?
@@ -13,6 +14,8 @@ struct MessageBubble: View {
     /// Hata balonundaki inline "Tekrar Dene" (nil ise buton gösterilmez).
     var onRetry: (() -> Void)?
     let onNavigateToPage: (Int) -> Void
+
+    @State private var didCopy = false
 
     private var isUser: Bool { message.role == .user }
     private var isError: Bool { message.isError == true }
@@ -43,6 +46,13 @@ struct MessageBubble: View {
                     Spacer(minLength: DSSpacing.xxl)
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                isUser
+                    ? "chat.accessibility.your_message".localized
+                    : "chat.accessibility.ai_response".localized
+            )
+            .accessibilityValue(message.text)
 
             if showsTimestamp {
                 Text(Self.timeFormatter.string(from: message.timestamp))
@@ -50,14 +60,14 @@ struct MessageBubble: View {
                     .foregroundStyle(.tertiary)
                     .padding(isUser ? .trailing : .leading, isUser ? DSSpacing.xxs : 34)
             }
+
+            if showsActions, !isUser, !isError, !isStreaming {
+                responseActions
+                    .padding(.leading, 34)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            isUser
-                ? "chat.accessibility.your_message".localized
-                : "chat.accessibility.ai_response".localized
-        )
-        .accessibilityValue(message.text)
+        .dsAnimation(DSMotion.snappy, value: showsActions)
     }
 
     /// AI mesajlarının kimliği: marka gradyanlı küçük avatar, balonun alt
@@ -124,8 +134,7 @@ struct MessageBubble: View {
         )
         .contextMenu {
             Button {
-                UIPasteboard.general.string = message.text
-                DSHaptics.lightImpact()
+                copyMessage()
             } label: {
                 Label("chat.copy".localized, systemImage: "doc.on.doc")
             }
@@ -158,6 +167,64 @@ struct MessageBubble: View {
             bubble.dsShadow(.subtle, tint: DSColor.brand)
         } else {
             bubble
+        }
+    }
+
+    /// Common response actions remain visible instead of being hidden behind
+    /// a long press. Each target keeps a full 44pt hit area for touch and
+    /// VoiceOver while the compact icon row stays visually quiet.
+    private var responseActions: some View {
+        HStack(spacing: 2) {
+            Button {
+                copyMessage()
+            } label: {
+                Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
+                    .contentTransition(.symbolEffect(.replace))
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel(didCopy ? "chat.copied".localized : "chat.copy".localized)
+
+            if let onSpeak {
+                Button {
+                    DSHaptics.lightImpact()
+                    onSpeak(message.text)
+                } label: {
+                    Image(systemName: "speaker.wave.2")
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("chat.speak".localized)
+            }
+
+            ShareLink(item: message.text) {
+                Image(systemName: "square.and.arrow.up")
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("chat.share".localized)
+
+            if let onRegenerate {
+                Button {
+                    DSHaptics.lightImpact()
+                    onRegenerate()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("chat.regenerate".localized)
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .buttonStyle(DSPressableButtonStyle())
+    }
+
+    private func copyMessage() {
+        UIPasteboard.general.string = message.text
+        DSHaptics.lightImpact()
+        didCopy = true
+
+        Task {
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            didCopy = false
         }
     }
 

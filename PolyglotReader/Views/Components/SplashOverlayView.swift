@@ -2,8 +2,8 @@ import SwiftUI
 
 // MARK: - Splash Overlay
 /// Brand moment on cold start (≤1s total): the glass logo appears over the
-/// same mesh background AuthView uses, then the overlay fades out while
-/// AuthView's own logo entrance picks up the motion — a scale+fade handoff.
+/// same editorial background AuthView uses, then the overlay fades out while
+/// AuthView's own brand lockup picks up the motion — a scale+fade handoff.
 /// Also masks the brief session-restore flicker before auth state resolves.
 struct SplashOverlayView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -11,14 +11,13 @@ struct SplashOverlayView: View {
 
     var body: some View {
         ZStack {
-            AnimatedMeshBackground()
-                .ignoresSafeArea()
+            CorioEntryBackground()
 
             ZStack {
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [.white.opacity(0.3), .clear],
+                            colors: [DSColor.brand.opacity(0.16), .clear],
                             center: .center,
                             startRadius: 0,
                             endRadius: 80
@@ -27,27 +26,8 @@ struct SplashOverlayView: View {
                     .frame(width: 160, height: 160)
                     .blur(radius: 20)
 
-                Circle()
-                    .fill(.ultraThinMaterial)
-                    .frame(width: 110, height: 110)
-                    .overlay(
-                        Circle()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.5), .white.opacity(0.1)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1.5
-                            )
-                    )
+                CorioBrandMark(size: 96)
                     .dsShadow(.floating)
-
-                Image(systemName: "doc.text.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 44, height: 44)
-                    .foregroundStyle(DSColor.brandGradient)
             }
             .scaleEffect(appeared ? 1.0 : 0.85)
             .opacity(appeared ? 1 : 0)

@@ -18,6 +18,7 @@ struct PDFKitView: UIViewRepresentable {
     
     // Reading Progress
     var initialScrollPosition: CGPoint?
+    var initialScale: CGFloat?
     var onProgressChange: ((Int, CGPoint, CGFloat) -> Void)?
 
     // Callbacks
@@ -84,7 +85,9 @@ struct PDFKitView: UIViewRepresentable {
         pdfView.addGestureRecognizer(tapGesture)
 
         pdfView.onTouchStateChanged = { [weak coordinator] isTouching in
-            if !isTouching {
+            if isTouching {
+                coordinator?.handleTouchBegan()
+            } else {
                 coordinator?.handleTouchEnded()
             }
         }
@@ -151,8 +154,9 @@ struct PDFKitView: UIViewRepresentable {
         pdfView.alpha = 0
         pdfView.document = newDocument
 
-        if let firstPage = newDocument.page(at: 0) {
-            pdfView.go(to: firstPage)
+        let targetPageIndex = min(max(currentPage - 1, 0), max(newDocument.pageCount - 1, 0))
+        if let targetPage = newDocument.page(at: targetPageIndex) {
+            pdfView.go(to: targetPage)
         }
 
         updateInsetsIfNeeded(for: pdfView)
@@ -205,19 +209,20 @@ struct PDFKitView: UIViewRepresentable {
 
         guard let page = document.page(at: currentPage - 1) else { return }
         
-        let dest = PDFDestination(page: page, at: initialPos)
-        // Zoom restoring logic handles by PDFKit naturally if destination has zoom?
-        // PDFDestination point + zoom? 
-        // PDFDestination(page:at:) uses kPDFDestinationPage/Point.
-        
-        // We might need to ensure scale is set if needed, but viewModel binds scale?
-        // Let's assume point restoration is key.
-        
-        // Use a slight delay to ensure layout is ready?
-        DispatchQueue.main.async {
-            pdfView.go(to: dest)
+        let destination = PDFDestination(page: page, at: initialPos)
+        let restoredScale = initialScale.map {
+            min(max($0, pdfView.minScaleFactor), pdfView.maxScaleFactor)
         }
-        
+
+        // Belge yerleşimi tamamlandıktan sonra zoom ve sayfa içi konumu birlikte
+        // uygula; ilk sayfaya yapılan geçici navigasyon kayıtlı konumu ezmesin.
+        DispatchQueue.main.async {
+            if let restoredScale, restoredScale.isFinite, restoredScale > 0 {
+                pdfView.scaleFactor = restoredScale
+            }
+            pdfView.go(to: destination)
+        }
+
         coordinator.hasRestoredInitialPosition = true
     }
 

@@ -441,6 +441,7 @@ function ReaderContent({ documentId }: { documentId: string }) {
         {/* Chat Panel */}
         <ChatPanel isOpen={isChatOpen} onClose={() => setChatOpen(false)}
           documentId={documentId} documentContext={documentContext}
+          documentName={document.name} currentPage={currentPage}
           initialMessage={chatInitialMessage} initialImage={chatInitialImage}
           activeSelection={chatSelectedText}
           onClearInitialMessage={() => { setChatInitialMessage(undefined); setChatInitialImage(undefined); }}

@@ -33,7 +33,37 @@
 
 /* App Title */
 "auth.app_name" = "Corio Docs";
-"auth.app_subtitle" = "Akıllı Doküman Asistanı";
+"auth.app_subtitle" = "Oku. Anla. Hatırla.";
+
+/* Unified entry experience */
+"entry.hero.title" = "Belgeleri sadece okuma. Onlarla çalış.";
+"entry.hero.subtitle" = "PDF kütüphanen, anlık çeviri ve notların tek bir kesintisiz çalışma alanında.";
+"entry.signin.title" = "Çalışma alanına gir";
+"entry.signin.subtitle" = "Kütüphanen ve notların tüm cihazlarında seninle.";
+"entry.demo.accessibility" = "Ürün tanıtımı, aşama %d / %d";
+"entry.demo.library.title" = "Kütüphanen, düzenli ve hazır";
+"entry.demo.library.subtitle" = "PDF'lerini tek bakışta bul ve kaldığın yerden devam et.";
+"entry.demo.reader.title" = "Okumaya odaklan";
+"entry.demo.reader.subtitle" = "Temiz okuyucu içinde bir cümleyi parmağınla seç.";
+"entry.demo.translation.title" = "Seç. Anında çevir.";
+"entry.demo.translation.subtitle" = "Çeviri, bağlamını kaybetmeden metnin hemen altında belirir.";
+"entry.demo.annotation.title" = "Bilgiyi kalıcılaştır";
+"entry.demo.annotation.subtitle" = "Vurgula, kenar notu bırak ve tüm notlarını Defter'de topla.";
+"entry.scene.library" = "Kütüphane";
+"entry.scene.book.one" = "Klinik Yaklaşım";
+"entry.scene.book.two" = "Dolaşım Sistemi";
+"entry.scene.book.three" = "Araştırma Notları";
+"entry.scene.open_hint" = "Bir PDF açmak için dokun";
+"entry.scene.reader" = "Dolaşım Sistemi";
+"entry.scene.paper.title" = "The Circulatory System";
+"entry.scene.sample" = "The heart pumps blood through the circulatory system.";
+"entry.scene.selection_hint" = "Çevirmek için cümle üzerinde sürükle";
+"entry.scene.translation" = "Kalp, kanı dolaşım sistemi boyunca pompalar.";
+"entry.scene.translation_result" = "Çeviri sonucu";
+"entry.scene.translation_continue" = "Not alma aşamasına geçmek için dokunun";
+"entry.scene.annotation_title" = "Ana fikir";
+"entry.scene.annotation_quote" = "Düzenli dolaşım, dokulara kesintisiz oksijen taşır.";
+"entry.scene.note" = "Sınav için: sistemik ve pulmoner dolaşımı karşılaştır.";
 
 /* Features */
 "auth.feature.pdf_analysis" = "Doküman Analizi";
@@ -263,6 +293,10 @@
 
 /* Navigation */
 "chat.title" = "AI Asistan";
+"chat.assistant_name" = "Corio AI";
+"chat.status.ready" = "Belgeye bağlı";
+"chat.status.thinking" = "Yanıt hazırlanıyor";
+"chat.actions" = "Sohbet seçenekleri";
 
 /* History */
 "chat.history.loading" = "Sohbet geçmişi yükleniyor...";
@@ -295,12 +329,23 @@
 "chat.mic" = "Sesli soru sor";
 "chat.mic.stop" = "Kaydı durdur";
 "chat.attach_photo" = "Görsel ekle";
+"chat.image_default_prompt" = "Bu görseli analiz et.";
+"chat.stop_generation" = "Yanıtı durdur";
+"chat.stop_generation.hint" = "Oluşturulmakta olan yanıtı durdurur";
+"chat.copied" = "Kopyalandı";
+"chat.disclaimer" = "Corio AI hata yapabilir; önemli bilgileri kaynaktan doğrula.";
 "library_chat.title" = "Kütüphane Sohbeti";
+"library_chat.assistant_name" = "Corio Kütüphane";
+"library_chat.status.ready" = "%d belgeye bağlı";
+"library_chat.status.thinking" = "Kütüphane taranıyor";
+"library_chat.clear.confirm" = "Kütüphane sohbet geçmişi kalıcı olarak silinsin mi?";
 "library_chat.placeholder" = "Tüm dokümanlarına sor...";
 "library_chat.empty.title" = "Kütüphanenle Sohbet Et";
 "library_chat.empty.subtitle" = "%d doküman üzerinde arama yaparak yanıtlar. Kaynaklar dosya adı ve sayfayla belirtilir.";
 "library_chat.open" = "Kütüphane sohbeti";
 "chat.suggestions.header" = "Başlamak için deneyin";
+"chat.empty.title" = "Belgeni birlikte inceleyelim";
+"chat.empty.subtitle" = "Özet iste, bir bölümü açıklat veya seçtiğin içerik hakkında soru sor.";
 "chat.scroll_to_bottom" = "Son mesaja git";
 "chat.clear.title" = "Sohbeti Temizle";
 "chat.clear.confirm" = "Bu dokümanın sohbet geçmişi kalıcı olarak silinsin mi?";
